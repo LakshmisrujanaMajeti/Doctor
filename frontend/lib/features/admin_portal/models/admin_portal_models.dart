@@ -110,6 +110,17 @@ class AdminUserModel {
       lockedUntil: json['locked_until'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'email': email,
+    'full_name': fullName,
+    'role_name': roleName,
+    'phone': phone,
+    'is_active': isActive,
+    'is_verified': isVerified,
+    'locked_until': lockedUntil,
+  };
 }
 
 @immutable

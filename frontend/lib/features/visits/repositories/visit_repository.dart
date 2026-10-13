@@ -4,6 +4,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../models/visit_model.dart';
 import '../models/vitals_model.dart';
+import '../../patients/models/patient_model.dart';
 
 class VisitRepository {
   final DioClient _dioClient;
@@ -66,6 +67,9 @@ class VisitRepository {
     required String patientId,
     required String doctorId,
     required String departmentId,
+    String? doctorName,
+    String? departmentName,
+    PatientModel? patient,
     String triagePriority = 'NORMAL',
     double consultationFee = 500.0,
     String? notes,
@@ -85,9 +89,14 @@ class VisitRepository {
 
       if (res.data['status'] == 'success') {
         final created = OPDVisitModel.fromJson(res.data['data'] as Map<String, dynamic>);
-        _localVisits.insert(0, created);
+        final merged = created.copyWith(
+          patient: patient ?? created.patient,
+          doctorName: doctorName ?? created.doctorName,
+          departmentName: departmentName ?? created.departmentName,
+        );
+        _localVisits.insert(0, merged);
         await _saveCache();
-        return created;
+        return merged;
       }
     } catch (_) {}
 
@@ -107,8 +116,9 @@ class VisitRepository {
       paymentStatus: 'UNPAID',
       notes: notes,
       visitDate: DateTime.now(),
-      doctorName: 'Dr. Sarah Chen, MD',
-      departmentName: 'General Medicine',
+      patient: patient,
+      doctorName: doctorName ?? 'Dr. Sarah Chen, MD',
+      departmentName: departmentName ?? departmentId,
     );
     _localVisits.insert(0, newVisit);
     await _saveCache();

@@ -8,7 +8,9 @@ import '../providers/admin_portal_provider.dart';
 import '../../patient_portal/models/patient_portal_models.dart';
 
 class HospitalAdminWorkspaceView extends ConsumerStatefulWidget {
-  const HospitalAdminWorkspaceView({super.key});
+  final int initialTabIndex;
+
+  const HospitalAdminWorkspaceView({super.key, this.initialTabIndex = 0});
 
   @override
   ConsumerState<HospitalAdminWorkspaceView> createState() =>
@@ -29,7 +31,10 @@ class _HospitalAdminWorkspaceViewState
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 8, vsync: this);
+    final idx = (widget.initialTabIndex >= 0 && widget.initialTabIndex < 8)
+        ? widget.initialTabIndex
+        : 0;
+    _tabController = TabController(length: 8, vsync: this, initialIndex: idx);
   }
 
   @override

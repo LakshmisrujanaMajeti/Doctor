@@ -32,6 +32,30 @@ class AuthRepository {
     'pharmacist@opdconnect.com': {'pass': 'Pharmacy@123456', 'role': 'pharmacist', 'name': 'Elena Rostova (Pharmacist)', 'phone': '+1555000005'},
   };
 
+  static final Map<String, Map<String, String>> _dynamicStaffDirectory = {};
+
+  static Future<void> registerDynamicStaff({
+    required String email,
+    required String password,
+    required String role,
+    required String fullName,
+    String? phone,
+  }) async {
+    _dynamicStaffDirectory[email.toLowerCase()] = {
+      'pass': password,
+      'role': role,
+      'name': fullName,
+      if (phone != null) 'phone': phone,
+    };
+    if (phone != null && phone.isNotEmpty) {
+      _staffPhoneDirectory[phone] = {
+        'email': email.toLowerCase(),
+        'role': role,
+        'name': fullName,
+      };
+    }
+  }
+
   AuthRepository(this._dioClient);
 
   Future<UserModel> login(String identifier, String password) async {
@@ -105,7 +129,7 @@ class AuthRepository {
     }
 
     // 4. Authorized Hospital Staff Fallback (Resilient Clinical Continuity)
-    final staffEntry = _staffEmailDirectory[resolvedEmail];
+    final staffEntry = _staffEmailDirectory[resolvedEmail] ?? _dynamicStaffDirectory[resolvedEmail.toLowerCase()];
     if (staffEntry != null && staffEntry['pass'] == cleanPass) {
       final user = UserModel(
         id: 'staff-${staffEntry['role']}',

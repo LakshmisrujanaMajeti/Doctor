@@ -469,6 +469,27 @@ class AuthService:
         db.commit()
         db.refresh(user)
 
+        # If role is doctor, auto-provision Doctor clinical roster profile
+        if role.name.lower() == "doctor":
+            from app.models.doctor import Doctor
+            from app.models.department import Department
+            existing_doc = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+            if not existing_doc:
+                dept = db.query(Department).first()
+                doc_count = db.query(Doctor).count()
+                new_doc = Doctor(
+                    user_id=user.id,
+                    department_id=dept.id if dept else "dept-default",
+                    qualification="MBBS, Specialist",
+                    specialization=dept.name if dept else "General Medicine",
+                    registration_number=f"MCI-2026-{int(datetime.utcnow().timestamp()) % 100000:05d}",
+                    room_number=f"Room {101 + doc_count}",
+                    consultation_fee="500.00",
+                    is_available=True,
+                )
+                db.add(new_doc)
+                db.commit()
+
         db.add(AuditLog(
             user_id=admin_user.id,
             action="ADMIN_STAFF_ACCOUNT_CREATED",

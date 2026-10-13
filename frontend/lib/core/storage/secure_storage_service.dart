@@ -118,6 +118,18 @@ class SecureStorageService {
     return prefs.getString(keyVisitsData);
   }
 
+  static const String keyStaffDirectoryData = 'opd_staff_directory_data';
+
+  static Future<void> saveStaffDirectoryJson(String jsonStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(keyStaffDirectoryData, jsonStr);
+  }
+
+  static Future<String?> getStaffDirectoryJson() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(keyStaffDirectoryData);
+  }
+
   static Future<void> clearTokens() async {
     try {
       await _secureStorage.delete(key: keyAccessToken);

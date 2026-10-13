@@ -7,6 +7,10 @@ import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/triage_chip.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patient_provider.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
+import '../../dashboard/providers/doctor_dashboard_provider.dart';
+import '../../doctors/models/doctor_model.dart';
+import '../../doctors/repositories/doctor_repository.dart';
 import '../providers/visit_provider.dart';
 
 class NewVisitScreen extends ConsumerStatefulWidget {
@@ -20,6 +24,7 @@ class NewVisitScreen extends ConsumerStatefulWidget {
 
 class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
   PatientModel? _selectedPatient;
+  DoctorModel? _selectedDoctor;
   String _selectedDepartment = 'General Medicine';
   String _triagePriority = 'NORMAL';
   final _feeController = TextEditingController(text: '500.00');
@@ -52,14 +57,19 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
     try {
       final createdVisit = await ref.read(visitRepositoryProvider).createVisit(
         patientId: _selectedPatient!.id,
-        doctorId: 'default',
+        doctorId: _selectedDoctor?.id ?? 'default',
         departmentId: _selectedDepartment,
+        doctorName: _selectedDoctor?.name,
+        departmentName: _selectedDoctor?.departmentName ?? _selectedDepartment,
+        patient: _selectedPatient,
         triagePriority: _triagePriority,
-        consultationFee: double.tryParse(_feeController.text.trim()) ?? 500.0,
+        consultationFee: double.tryParse(_feeController.text.trim()) ?? (_selectedDoctor?.consultationFee ?? 500.0),
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       );
 
       ref.invalidate(visitListProvider);
+      ref.invalidate(dashboardStatsProvider);
+      ref.invalidate(doctorDashboardProvider);
 
       if (mounted) {
         showDialog(
@@ -217,9 +227,9 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
                   ),
                 const SizedBox(height: 24),
 
-                // Department
+                // Department & Consulting Physician
                 const Text(
-                  '2. OPD Department & Doctor',
+                  '2. OPD Department & Consulting Physician',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
@@ -229,11 +239,85 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
                       .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                       .toList(),
                   onChanged: (val) {
-                    if (val != null) setState(() => _selectedDepartment = val);
+                    if (val != null) {
+                      setState(() {
+                        _selectedDepartment = val;
+                        // auto-clear doctor if not matching
+                        if (_selectedDoctor != null &&
+                            _selectedDoctor!.departmentName.toLowerCase() != val.toLowerCase()) {
+                          _selectedDoctor = null;
+                        }
+                      });
+                    }
                   },
                   decoration: const InputDecoration(
+                    labelText: 'Clinical Department',
                     prefixIcon: Icon(Icons.domain_rounded),
                   ),
+                ),
+                const SizedBox(height: 12),
+
+                // Doctor Selection Dropdown
+                ref.watch(doctorListProvider).when(
+                  data: (doctors) {
+                    final matchingDoctors = doctors.where((d) =>
+                        d.departmentName.toLowerCase() == _selectedDepartment.toLowerCase()).toList();
+                    final availableDocs = matchingDoctors.isNotEmpty ? matchingDoctors : doctors;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DropdownButtonFormField<DoctorModel>(
+                          value: _selectedDoctor != null && availableDocs.any((d) => d.id == _selectedDoctor!.id)
+                              ? _selectedDoctor
+                              : (availableDocs.isNotEmpty ? availableDocs.first : null),
+                          hint: const Text('Select Consulting Physician / Doctor'),
+                          items: availableDocs.map((doc) => DropdownMenuItem(
+                            value: doc,
+                            child: Text('${doc.name} • ${doc.roomNumber} (₹${doc.consultationFee.toInt()})'),
+                          )).toList(),
+                          onChanged: (doc) {
+                            if (doc != null) {
+                              setState(() {
+                                _selectedDoctor = doc;
+                                _feeController.text = doc.consultationFee.toStringAsFixed(2);
+                                _selectedDepartment = doc.departmentName;
+                              });
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Assigned Physician (Doctor Roster)',
+                            prefixIcon: Icon(Icons.medical_services_rounded),
+                          ),
+                        ),
+                        if (_selectedDoctor != null) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryBlue.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.badge_rounded, size: 16, color: AppColors.primaryBlue),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${_selectedDoctor!.name} • ${_selectedDoctor!.qualification} • ${_selectedDoctor!.roomNumber}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                  loading: () => const LinearProgressIndicator(),
+                  error: (_, __) => const SizedBox(),
                 ),
                 const SizedBox(height: 24),
 

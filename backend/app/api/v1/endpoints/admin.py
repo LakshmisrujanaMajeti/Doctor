@@ -49,6 +49,41 @@ router = APIRouter()
 # 1. Operational Summaries & Metrics
 # ==========================================
 
+@router.get("/stats", summary="Real-time OPD Overall Statistics")
+def get_admin_stats(
+    db: Session = Depends(get_db),
+):
+    today_start = datetime.combine(date.today(), datetime.min.time())
+    total_patients = db.query(func.count(Patient.id)).scalar() or 0
+    total_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.visit_date >= today_start).scalar() or 0
+    active_doctors = db.query(func.count(Doctor.id)).filter(Doctor.is_available == True).scalar() or 0
+    departments = db.query(func.count(Department.id)).filter(Department.is_active == True).scalar() or 0
+    waiting = db.query(func.count(OPDVisit.id)).filter(
+        OPDVisit.visit_date >= today_start,
+        OPDVisit.status.in_(["WAITING", "REGISTERED"])
+    ).scalar() or 0
+    triaged = db.query(func.count(OPDVisit.id)).filter(
+        OPDVisit.visit_date >= today_start,
+        OPDVisit.status == "TRIAGED"
+    ).scalar() or 0
+    completed = db.query(func.count(OPDVisit.id)).filter(
+        OPDVisit.visit_date >= today_start,
+        OPDVisit.status == "COMPLETED"
+    ).scalar() or 0
+
+    return success_response(
+        data={
+            "total_patients": total_patients,
+            "total_visits": total_visits,
+            "active_doctors": active_doctors,
+            "departments": departments,
+            "waiting": waiting,
+            "triaged": triaged,
+            "completed": completed,
+        },
+        message="Live operational stats retrieved successfully"
+    )
+
 @router.get("/dashboard-summary", summary="Comprehensive Hospital Operational Dashboard")
 def get_operational_dashboard_summary(
     db: Session = Depends(get_db),

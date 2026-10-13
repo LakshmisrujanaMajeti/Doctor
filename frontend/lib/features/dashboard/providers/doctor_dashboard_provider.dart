@@ -3,6 +3,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../models/doctor_dashboard_model.dart';
 import '../../visits/models/visit_model.dart';
+import '../../visits/providers/visit_provider.dart';
 
 final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async {
   final dioClient = ref.watch(dioClientProvider);
@@ -16,19 +17,27 @@ final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async
     // If running in development/mock mode without active backend or offline, provide realistic fallback
   }
 
-  // Return clean production state when no records exist or backend is initializing
+  List<OPDVisitModel> visits = [];
+  try {
+    visits = await ref.watch(visitRepositoryProvider).getVisits();
+  } catch (_) {}
+
+  final waiting = visits.where((v) => v.status == 'WAITING' || v.status == 'REGISTERED' || v.status == 'TRIAGED').toList();
+  final underConsult = visits.where((v) => v.status == 'UNDER_CONSULTATION' || v.status == 'IN_CONSULTATION').toList();
+  final completed = visits.where((v) => v.status == 'COMPLETED').toList();
+
   return DoctorDashboardModel(
     stats: DoctorDashboardStatsModel(
-      todayAppointments: 0,
-      waitingPatients: 0,
-      underConsultation: 0,
-      completedConsultations: 0,
+      todayAppointments: visits.length,
+      waitingPatients: waiting.length,
+      underConsultation: underConsult.length,
+      completedConsultations: completed.length,
       pendingInvestigations: 0,
       followUpAppointments: 0,
     ),
-    waitingPatients: const [],
-    underConsultation: const [],
-    completedConsultations: const [],
+    waitingPatients: waiting,
+    underConsultation: underConsult,
+    completedConsultations: completed,
     pendingInvestigations: const [],
     followUpAppointments: const [],
     recentAuthorizedPatients: const [],

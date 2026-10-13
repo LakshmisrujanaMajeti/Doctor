@@ -233,6 +233,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                       context: context,
                       role: currentRole,
                       stats: stats,
+                      visitsAsync: visitsAsync,
                     ),
                     loading: () => const Center(
                       child: Padding(
@@ -416,6 +417,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
     required BuildContext context,
     required String role,
     required DashboardStatsModel stats,
+    required AsyncValue<List<OPDVisitModel>> visitsAsync,
   }) {
     switch (role) {
       case 'doctor':
@@ -533,6 +535,8 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
         );
 
       case 'patient':
+        final allVisits = visitsAsync.asData?.value ?? [];
+        final myVisit = allVisits.isNotEmpty ? allVisits.first : null;
         return Column(
           children: [
             Row(
@@ -540,22 +544,22 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 Expanded(
                   child: StatMetricCard(
                     title: 'Your Token',
-                    value: '#12',
+                    value: myVisit != null ? '#${myVisit.queueToken}' : 'No Token',
                     icon: Icons.confirmation_number_rounded,
                     color: AppColors.primaryBlue,
-                    subtitle: 'General OPD',
-                    onTap: () => context.push('/queue'),
+                    subtitle: myVisit?.departmentName ?? 'OPD Intake',
+                    onTap: () => context.push('/patient/portal'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: StatMetricCard(
-                    title: 'Est. Wait Time',
-                    value: '~18 min',
+                    title: 'Queue Status',
+                    value: myVisit?.status ?? 'READY',
                     icon: Icons.timer_outlined,
                     color: AppColors.accentTeal,
-                    subtitle: '3 Ahead of You',
-                    onTap: () => context.push('/queue'),
+                    subtitle: myVisit != null ? 'Slip: ${myVisit.visitNumber}' : 'Visit Slip Not Issued',
+                    onTap: () => context.push('/patient/portal'),
                   ),
                 ),
               ],
@@ -565,23 +569,23 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
               children: [
                 Expanded(
                   child: StatMetricCard(
-                    title: 'Assigned Room',
-                    value: 'Room 104',
+                    title: 'Assigned Physician',
+                    value: myVisit?.doctorName ?? 'Consultation Desk',
                     icon: Icons.meeting_room_rounded,
                     color: const Color(0xFF8B5CF6),
-                    subtitle: 'Dr. Sarah Chen',
-                    onTap: () => context.push('/queue'),
+                    subtitle: myVisit?.departmentName ?? 'Outpatient Clinic',
+                    onTap: () => context.push('/patient/portal'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: StatMetricCard(
-                    title: 'Active Rx',
-                    value: '2 Meds',
-                    icon: Icons.medication_rounded,
+                    title: 'Health Services',
+                    value: 'Patient Portal',
+                    icon: Icons.health_and_safety_rounded,
                     color: AppColors.statusCompleted,
-                    subtitle: 'Pharmacy Ready',
-                    onTap: () => context.push('/queue'),
+                    subtitle: 'Rx, Labs & Invoices',
+                    onTap: () => context.push('/patient/portal'),
                   ),
                 ),
               ],
@@ -655,7 +659,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 Expanded(
                   child: StatMetricCard(
                     title: 'Pending Tests',
-                    value: '14 Orders',
+                    value: '${stats.triaged} Tests',
                     icon: Icons.biotech_rounded,
                     color: AppColors.primaryBlue,
                     subtitle: 'Awaiting Run',
@@ -666,10 +670,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 Expanded(
                   child: StatMetricCard(
                     title: 'Abnormal Results',
-                    value: '3 Flagged',
+                    value: '0 Flagged',
                     icon: Icons.warning_amber_rounded,
                     color: AppColors.triageEmergency,
-                    subtitle: 'Critical Alert',
+                    subtitle: 'Critical Alerts',
                     onTap: () => context.push('/notifications'),
                   ),
                 ),
@@ -681,7 +685,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 Expanded(
                   child: StatMetricCard(
                     title: 'Completed Tests',
-                    value: '48 Today',
+                    value: '${stats.completed} Verified',
                     icon: Icons.task_alt_rounded,
                     color: AppColors.statusCompleted,
                     subtitle: 'Verified & Sent',
@@ -692,10 +696,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 Expanded(
                   child: StatMetricCard(
                     title: 'Lab Turnaround',
-                    value: '32 mins',
+                    value: 'Active TAT',
                     icon: Icons.timer_outlined,
                     color: AppColors.accentTeal,
-                    subtitle: 'Average TAT',
+                    subtitle: 'Average Turnaround',
                     onTap: () => context.push('/notifications'),
                   ),
                 ),
@@ -712,7 +716,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 Expanded(
                   child: StatMetricCard(
                     title: 'Rx Dispensing Queue',
-                    value: '9 Active',
+                    value: '${stats.waiting + stats.triaged} Active',
                     icon: Icons.medication_rounded,
                     color: AppColors.primaryBlue,
                     subtitle: 'To Dispense',
@@ -723,10 +727,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 Expanded(
                   child: StatMetricCard(
                     title: 'Medicines Dispensed',
-                    value: '72 Today',
+                    value: '${stats.completed} Today',
                     icon: Icons.check_circle_outline_rounded,
                     color: AppColors.statusCompleted,
-                    subtitle: 'Fulfilled',
+                    subtitle: 'Fulfilled Visits',
                     onTap: () => context.push('/queue'),
                   ),
                 ),
@@ -738,21 +742,21 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 Expanded(
                   child: StatMetricCard(
                     title: 'Pending Payments',
-                    value: '4 Orders',
+                    value: 'Counter Queue',
                     icon: Icons.receipt_long_rounded,
                     color: AppColors.triagePriority,
-                    subtitle: 'Counter Billing',
-                    onTap: () => context.push('/queue'),
+                    subtitle: 'Billing Ready',
+                    onTap: () => context.push('/billing'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: StatMetricCard(
-                    title: 'Low Stock Alert',
-                    value: '2 Items',
+                    title: 'Formulary Status',
+                    value: 'Stock Optimal',
                     icon: Icons.inventory_2_outlined,
-                    color: AppColors.triageEmergency,
-                    subtitle: 'Paracetamol 650',
+                    color: AppColors.statusCompleted,
+                    subtitle: 'Core Medications',
                     onTap: () => context.push('/queue'),
                   ),
                 ),
@@ -955,11 +959,11 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           'onTap': () => context.push('/admin/portal'),
         },
         {
-          'title': 'Staff, Roles & Permissions',
-          'desc': 'User activation, roles & provisioning',
-          'icon': Icons.manage_accounts_rounded,
+          'title': 'Add & Manage Staff',
+          'desc': 'Doctors, Lab, Reception & Pharmacy roster',
+          'icon': Icons.person_add_rounded,
           'color': const Color(0xFF8B5CF6),
-          'onTap': () => context.push('/admin/portal'),
+          'onTap': () => context.push('/admin/portal?tab=1'),
         },
         {
           'title': 'Operational & Billing Reports',

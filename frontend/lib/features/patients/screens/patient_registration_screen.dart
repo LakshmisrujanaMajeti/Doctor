@@ -7,6 +7,7 @@ import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../models/patient_model.dart';
 import '../providers/patient_provider.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 
 class PatientRegistrationScreen extends ConsumerStatefulWidget {
   const PatientRegistrationScreen({super.key});
@@ -375,6 +376,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
         allowDuplicate: allowDuplicate,
       );
       ref.invalidate(patientListProvider);
+      ref.invalidate(dashboardStatsProvider);
 
       if (mounted) {
         _showSuccessCard(registered);

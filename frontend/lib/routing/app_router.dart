@@ -281,7 +281,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         name: RouteNames.adminPortal,
         path: '/admin/portal',
-        builder: (context, state) => const HospitalAdminWorkspaceView(),
+        builder: (context, state) {
+          final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
+          return HospitalAdminWorkspaceView(initialTabIndex: tab);
+        },
       ),
 
       // Reusable System State Screens
