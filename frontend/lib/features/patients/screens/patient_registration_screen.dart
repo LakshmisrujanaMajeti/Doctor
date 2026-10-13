@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/input_sanitizer.dart';
+import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../models/patient_model.dart';
 import '../providers/patient_provider.dart';
@@ -333,26 +335,38 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
 
     setState(() => _isSaving = true);
     try {
+      final cleanName = InputSanitizer.sanitizeText(_nameController.text);
+      final cleanPhone = InputSanitizer.sanitizePhone(_phoneController.text);
+      final cleanEmail = InputSanitizer.sanitizeEmail(_emailController.text);
+      final cleanParentSpouse = InputSanitizer.sanitizeText(_parentSpouseController.text);
+      final cleanAddress = InputSanitizer.sanitizeText(_addressController.text);
+      final cleanCity = InputSanitizer.sanitizeText(_cityController.text);
+      final cleanState = InputSanitizer.sanitizeText(_stateController.text);
+      final cleanPostal = InputSanitizer.sanitizeText(_postalCodeController.text);
+      final cleanEmerName = InputSanitizer.sanitizeText(_emergencyNameController.text);
+      final cleanEmerPhone = InputSanitizer.sanitizePhone(_emergencyPhoneController.text);
+      final cleanRegNum = InputSanitizer.sanitizeText(_hospitalRegController.text);
+
       final newPatient = PatientModel(
         id: '',
         uhid: '',
-        hospitalRegNum: _hospitalRegController.text.trim().isNotEmpty ? _hospitalRegController.text.trim() : null,
-        fullName: _nameController.text.trim(),
-        parentSpouseName: _parentSpouseController.text.trim().isNotEmpty ? _parentSpouseController.text.trim() : null,
+        hospitalRegNum: cleanRegNum.isNotEmpty ? cleanRegNum : null,
+        fullName: cleanName,
+        parentSpouseName: cleanParentSpouse.isNotEmpty ? cleanParentSpouse : null,
         parentSpouseRelation: _parentRelation,
         dateOfBirth: _dobController.text.trim().isNotEmpty ? _dobController.text.trim() : null,
         ageYears: int.tryParse(_ageYearsController.text.trim()),
         ageMonths: int.tryParse(_ageMonthsController.text.trim()),
         gender: _gender,
-        phone: _phoneController.text.trim(),
-        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-        address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
-        city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : null,
-        state: _stateController.text.trim().isNotEmpty ? _stateController.text.trim() : null,
-        postalCode: _postalCodeController.text.trim().isNotEmpty ? _postalCodeController.text.trim() : null,
+        phone: cleanPhone,
+        email: cleanEmail.isNotEmpty ? cleanEmail : null,
+        address: cleanAddress.isNotEmpty ? cleanAddress : null,
+        city: cleanCity.isNotEmpty ? cleanCity : null,
+        state: cleanState.isNotEmpty ? cleanState : null,
+        postalCode: cleanPostal.isNotEmpty ? cleanPostal : null,
         bloodGroup: _bloodGroup,
-        emergencyContactName: _emergencyNameController.text.trim().isNotEmpty ? _emergencyNameController.text.trim() : null,
-        emergencyContactPhone: _emergencyPhoneController.text.trim().isNotEmpty ? _emergencyPhoneController.text.trim() : null,
+        emergencyContactName: cleanEmerName.isNotEmpty ? cleanEmerName : null,
+        emergencyContactPhone: cleanEmerPhone.isNotEmpty ? cleanEmerPhone : null,
         emergencyContactRelation: _emergencyRelation,
       );
 
@@ -461,15 +475,18 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
           ],
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildDemographicsTab(),
-            _buildContactTab(),
-            _buildClinicalEmergencyTab(),
-          ],
+      body: MedicalIllustratorBackground(
+        variant: MedicalBackgroundVariant.clinical,
+        child: Form(
+          key: _formKey,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildDemographicsTab(),
+              _buildContactTab(),
+              _buildClinicalEmergencyTab(),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: Container(

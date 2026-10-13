@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../shared/widgets/empty_state_widget.dart';
+import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/triage_chip.dart';
 import '../providers/visit_provider.dart';
@@ -31,51 +33,42 @@ class OpdQueueScreen extends ConsumerWidget {
         label: const Text('Book Visit'),
         onPressed: () => context.push('/visits/new'),
       ),
-      body: Column(
-        children: [
-          // Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                _filterChip(ref, null, 'All Visits', currentFilter == null),
-                const SizedBox(width: 8),
-                _filterChip(ref, 'REGISTERED', 'Waiting Triage', currentFilter == 'REGISTERED'),
-                const SizedBox(width: 8),
-                _filterChip(ref, 'TRIAGED', 'Ready for Doctor', currentFilter == 'TRIAGED'),
-                const SizedBox(width: 8),
-                _filterChip(ref, 'IN_CONSULTATION', 'In Consultation', currentFilter == 'IN_CONSULTATION'),
-                const SizedBox(width: 8),
-                _filterChip(ref, 'COMPLETED', 'Completed', currentFilter == 'COMPLETED'),
-              ],
+      body: MedicalIllustratorBackground(
+        variant: MedicalBackgroundVariant.clinical,
+        child: Column(
+          children: [
+            // Filter Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  _filterChip(ref, null, 'All Visits', currentFilter == null),
+                  const SizedBox(width: 8),
+                  _filterChip(ref, 'REGISTERED', 'Waiting Triage', currentFilter == 'REGISTERED'),
+                  const SizedBox(width: 8),
+                  _filterChip(ref, 'TRIAGED', 'Ready for Doctor', currentFilter == 'TRIAGED'),
+                  const SizedBox(width: 8),
+                  _filterChip(ref, 'IN_CONSULTATION', 'In Consultation', currentFilter == 'IN_CONSULTATION'),
+                  const SizedBox(width: 8),
+                  _filterChip(ref, 'COMPLETED', 'Completed', currentFilter == 'COMPLETED'),
+                ],
+              ),
             ),
-          ),
 
-          // Visits List
-          Expanded(
-            child: visitsAsync.when(
-              data: (visits) {
-                if (visits.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.queue_rounded, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'No visits in this queue',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Select another filter or tap "+ Book Visit" to generate a token.',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  );
-                }
+            // Visits List
+            Expanded(
+              child: visitsAsync.when(
+                data: (visits) {
+                  if (visits.isEmpty) {
+                    return EmptyStateWidget(
+                      title: 'No Visits in Queue',
+                      message: 'No patient visits found in this status queue. Select another filter or book a new visit.',
+                      icon: Icons.queue_rounded,
+                      actionLabel: 'Book Visit',
+                      onAction: () => context.push('/visits/new'),
+                    );
+                  }
 
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -143,17 +136,22 @@ class OpdQueueScreen extends ConsumerWidget {
                             ),
                             const Divider(height: 24),
 
-                            // Doctor & Vitals Info
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            // Doctor & Vitals Info with responsive Wrap
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
                               children: [
                                 Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const Icon(Icons.person_pin_rounded, size: 16, color: Colors.grey),
                                     const SizedBox(width: 6),
                                     Text(
                                       visit.doctorName ?? 'Consulting Doctor',
                                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                      softWrap: true,
                                     ),
                                   ],
                                 ),
@@ -222,7 +220,8 @@ class OpdQueueScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _filterChip(WidgetRef ref, String? status, String label, bool isSelected) {

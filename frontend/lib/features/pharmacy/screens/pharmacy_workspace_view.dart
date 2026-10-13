@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/input_sanitizer.dart';
+import '../../../shared/widgets/empty_state_widget.dart';
 import '../models/pharmacy_models.dart';
 import '../providers/pharmacy_provider.dart';
 import '../widgets/stock_receipt_dialog.dart';
@@ -270,13 +272,18 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    softWrap: true,
                   ),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
                     ),
                   ),
                   Text(
@@ -288,6 +295,7 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    softWrap: true,
                   ),
                 ],
               ),
@@ -314,13 +322,13 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          // Search Box
-          SizedBox(
-            width: 320,
+          // Search Box with responsive constraints
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 180, maxWidth: 340),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search medicine, generic, batch, UHID...',
+                hintText: 'Search medicine, batch, UHID...',
                 prefixIcon: const Icon(Icons.search, size: 20),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -340,27 +348,28 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                 ),
               ),
               onChanged: (val) {
-                ref.read(pharmacyInventoryFilterProvider.notifier).setQuery(val);
+                final cleaned = InputSanitizer.sanitizeSearchQuery(val);
+                ref.read(pharmacyInventoryFilterProvider.notifier).setQuery(cleaned);
               },
             ),
           ),
 
           // Actions
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               OutlinedButton.icon(
                 icon: const Icon(Icons.tune_rounded, size: 17),
                 label: const Text('Stock Adjustment'),
                 onPressed: () => _openStockAdjustment(),
               ),
-              const SizedBox(width: 10),
               ElevatedButton.icon(
                 icon: const Icon(Icons.add_shopping_cart_rounded, size: 17),
                 label: const Text('+ Receive Stock'),
                 onPressed: _openStockReceipt,
               ),
-              const SizedBox(width: 8),
               IconButton(
                 tooltip: 'Refresh Pharmacy Data',
                 icon: const Icon(Icons.refresh, size: 20),
@@ -386,26 +395,10 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
     return prescriptionsAsync.when(
       data: (prescriptions) {
         if (prescriptions.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle_outline, size: 54, color: Colors.green.shade400),
-                const SizedBox(height: 12),
-                const Text(
-                  'No Pending Prescriptions to Dispense',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'All signed outpatient prescriptions have been fulfilled.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                  ),
-                ),
-              ],
-            ),
+          return const EmptyStateWidget(
+            title: 'No Pending Prescriptions to Dispense',
+            message: 'All signed outpatient prescriptions have been fulfilled.',
+            icon: Icons.check_circle_outline,
           );
         }
 
@@ -428,57 +421,87 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.person_pin, color: AppColors.primaryBlue, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 500;
+                      final infoWidget = Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.person_pin, color: AppColors.primaryBlue, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  rx.patientName,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    Text(
+                                      rx.patientName,
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                                      softWrap: true,
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryBlue.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        rx.patientUhid,
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryBlue),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primaryBlue.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Prescribed by: ${rx.doctorName} • Signed: ${rx.signedAt?.split("T").first ?? "Recent"}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                                   ),
-                                  child: Text(
-                                    rx.patientUhid,
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryBlue),
-                                  ),
+                                  softWrap: true,
                                 ),
                               ],
                             ),
-                            Text(
-                              'Prescribed by: ${rx.doctorName} • Signed: ${rx.signedAt?.split("T").first ?? "Recent"}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton.icon(
+                          ),
+                        ],
+                      );
+
+                      final dispenseBtn = ElevatedButton.icon(
                         icon: const Icon(Icons.check, size: 16),
                         label: Text('Dispense (${pendingItems.length} items)'),
                         onPressed: () => _openDispenseDialog(rx),
-                      ),
-                    ],
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            infoWidget,
+                            const SizedBox(height: 10),
+                            SizedBox(width: double.infinity, child: dispenseBtn),
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(child: infoWidget),
+                            const SizedBox(width: 12),
+                            dispenseBtn,
+                          ],
+                        );
+                      }
+                    },
                   ),
                   const Divider(height: 22),
                   Wrap(
@@ -506,12 +529,15 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                               color: item.isDispensed ? Colors.grey : (hasStock ? Colors.green.shade700 : Colors.red.shade700),
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                              '${item.medicineName} (${item.dosage}) • Qty: ${item.quantity}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                decoration: item.isDispensed ? TextDecoration.lineThrough : null,
+                            Flexible(
+                              child: Text(
+                                '${item.medicineName} (${item.dosage}) • Qty: ${item.quantity}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: item.isDispensed ? TextDecoration.lineThrough : null,
+                                ),
+                                softWrap: true,
                               ),
                             ),
                           ],
@@ -578,20 +604,12 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
           child: inventoryAsync.when(
             data: (items) {
               if (items.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.medication_liquid_outlined, size: 48, color: Colors.grey),
-                      const SizedBox(height: 10),
-                      const Text('No medicines found matching filters', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      TextButton(
-                        onPressed: () => filterNotifier.reset(),
-                        child: const Text('Reset Filters'),
-                      ),
-                    ],
-                  ),
+                return EmptyStateWidget(
+                  title: 'No Matching Medicines Found',
+                  message: 'No medicines match the selected dosage form or stock threshold filters.',
+                  icon: Icons.medication_liquid_outlined,
+                  actionLabel: 'Reset Filters',
+                  onAction: () => filterNotifier.reset(),
                 );
               }
 
@@ -635,13 +653,16 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 4,
                                 children: [
                                   Text(
                                     med.name,
                                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                    softWrap: true,
                                   ),
-                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -654,7 +675,6 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                                     ),
                                   ),
                                   if (med.genericName.isNotEmpty) ...[
-                                    const SizedBox(width: 8),
                                     Text(
                                       '(${med.genericName})',
                                       style: TextStyle(
@@ -662,17 +682,19 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                                         fontStyle: FontStyle.italic,
                                         color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                                       ),
+                                      softWrap: true,
                                     ),
                                   ],
                                 ],
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Text(
                                 '${med.dosageForm} • ${med.strength} • Batch: ${med.batchNumber} • Expiry: ${med.expiryDate}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                                 ),
+                                softWrap: true,
                               ),
                             ],
                           ),
@@ -682,7 +704,10 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 2,
                               children: [
                                 Text(
                                   '${med.availableQuantity} units',
@@ -693,7 +718,6 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                                   ),
                                 ),
                                 if (med.isLowStock) ...[
-                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -707,7 +731,6 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                                   ),
                                 ],
                                 if (med.isExpired) ...[
-                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -728,6 +751,7 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                                 fontSize: 11,
                                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                               ),
+                              softWrap: true,
                             ),
                           ],
                         ),
@@ -764,7 +788,11 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
     return dispensesAsync.when(
       data: (records) {
         if (records.isEmpty) {
-          return const Center(child: Text('No dispensing records found.'));
+          return const EmptyStateWidget(
+            title: 'No Dispensing Records',
+            message: 'All completed outpatient pharmacy dispensations will be catalogued in this ledger.',
+            icon: Icons.history_rounded,
+          );
         }
 
         return ListView.separated(
@@ -785,10 +813,16 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -801,10 +835,10 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.primaryBlue),
                             ),
                           ),
-                          const SizedBox(width: 10),
                           Text(
                             '${rec.patientName} (${rec.patientUhid})',
                             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                            softWrap: true,
                           ),
                         ],
                       ),
@@ -821,6 +855,7 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                       fontSize: 11.5,
                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                     ),
+                    softWrap: true,
                   ),
                   if (rec.notes.isNotEmpty) ...[
                     const SizedBox(height: 4),
@@ -831,6 +866,7 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                         fontStyle: FontStyle.italic,
                         color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                       ),
+                      softWrap: true,
                     ),
                   ],
                 ],
@@ -851,7 +887,11 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
     return movementsAsync.when(
       data: (movements) {
         if (movements.isEmpty) {
-          return const Center(child: Text('No stock movements recorded yet.'));
+          return const EmptyStateWidget(
+            title: 'No Stock Movements Recorded',
+            message: 'Inward stock receipts and dispensation adjustments will appear here.',
+            icon: Icons.sync_alt_rounded,
+          );
         }
 
         return ListView.separated(
@@ -889,7 +929,10 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 2,
                           children: [
                             Text(
                               mov.movementType,
@@ -899,7 +942,6 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                                 color: isAddition ? Colors.green.shade800 : Colors.red.shade800,
                               ),
                             ),
-                            const SizedBox(width: 8),
                             Text(
                               'Ref: ${mov.referenceNumber}',
                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
@@ -912,6 +954,7 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                             fontSize: 11,
                             color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                           ),
+                          softWrap: true,
                         ),
                       ],
                     ),

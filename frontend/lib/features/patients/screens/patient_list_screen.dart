@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/input_sanitizer.dart';
+import '../../../shared/widgets/empty_state_widget.dart';
+import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../models/patient_model.dart';
 import '../providers/patient_provider.dart';
 
@@ -29,50 +32,42 @@ class PatientListScreen extends ConsumerWidget {
         label: const Text('New Patient'),
         onPressed: () => context.push('/patients/new'),
       ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search by Name, UHID, Reg No, Phone, or Barcode...',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear_rounded),
-                  onPressed: () => ref.read(patientSearchQueryProvider.notifier).setQuery(''),
+      body: MedicalIllustratorBackground(
+        variant: MedicalBackgroundVariant.portal,
+        child: Column(
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search by Name, UHID, Reg No, Phone, or Barcode...',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.clear_rounded),
+                    onPressed: () => ref.read(patientSearchQueryProvider.notifier).setQuery(''),
+                  ),
                 ),
+                onChanged: (value) {
+                  final cleaned = InputSanitizer.sanitizeSearchQuery(value);
+                  ref.read(patientSearchQueryProvider.notifier).setQuery(cleaned);
+                },
               ),
-              onChanged: (value) {
-                ref.read(patientSearchQueryProvider.notifier).setQuery(value);
-              },
             ),
-          ),
 
-          // Patients List
-          Expanded(
-            child: patientsAsync.when(
-              data: (patients) {
-                if (patients.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.person_search_rounded, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'No patients found',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Try searching with a different UHID or register a new patient.',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  );
-                }
+            // Patients List
+            Expanded(
+              child: patientsAsync.when(
+                data: (patients) {
+                  if (patients.isEmpty) {
+                    return EmptyStateWidget(
+                      title: 'No Patients Found',
+                      message: 'Try searching with a different UHID or register a new patient.',
+                      icon: Icons.person_search_rounded,
+                      actionLabel: 'Register Patient',
+                      onAction: () => context.push('/patients/new'),
+                    );
+                  }
 
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -205,7 +200,8 @@ class PatientListScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   void _showPatientOptions(BuildContext context, PatientModel patient) {

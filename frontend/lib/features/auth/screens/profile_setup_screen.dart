@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/opd_constants.dart';
+import '../../../core/utils/input_sanitizer.dart';
 import '../../../routing/route_names.dart';
 import '../../../shared/widgets/error_banner_widget.dart';
+import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../providers/auth_provider.dart';
@@ -42,8 +44,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final email = _emailController.text.trim();
-    if (_selectedRole != 'patient' && email.isEmpty) {
+    final rawEmail = _emailController.text.trim();
+    if (_selectedRole != 'patient' && rawEmail.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: AppColors.triageEmergency,
@@ -57,22 +59,25 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
     try {
       final authNotifier = ref.read(authProvider.notifier);
+      final cleanName = InputSanitizer.sanitizeText(_nameController.text);
+      final cleanPhone = InputSanitizer.sanitizePhone(_phoneController.text);
+      final cleanEmail = rawEmail.isNotEmpty ? InputSanitizer.sanitizeEmail(rawEmail) : null;
       final bool success;
 
       if (_selectedRole == 'patient') {
         success = await authNotifier.registerPatient(
-          fullName: _nameController.text.trim(),
-          phone: _phoneController.text.trim(),
-          email: email.isNotEmpty ? email : null,
+          fullName: cleanName,
+          phone: cleanPhone,
+          email: cleanEmail,
           password: _passwordController.text,
         );
       } else {
         success = await authNotifier.registerStaff(
-          fullName: _nameController.text.trim(),
-          email: email,
+          fullName: cleanName,
+          email: cleanEmail ?? '',
           password: _passwordController.text,
           roleName: _selectedRole,
-          phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+          phone: cleanPhone.isNotEmpty ? cleanPhone : null,
         );
       }
 
@@ -80,7 +85,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.primaryBlue,
-            content: Text('Registration complete! Welcome, ${_nameController.text.trim()}.'),
+            content: Text('Registration complete! Welcome, $cleanName.'),
           ),
         );
         context.goNamed(RouteNames.dashboard);
@@ -90,7 +95,6 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -99,8 +103,11 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       appBar: AppBar(
         title: const Text('Hospital Profile Setup'),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
+      body: MedicalIllustratorBackground(
+        variant: MedicalBackgroundVariant.portal,
+        child: SafeArea(
+          child: SingleChildScrollView(
+
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Center(
             child: ConstrainedBox(
@@ -250,6 +257,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
+}
+

@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/data/mock_presentation_data.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
+import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_card.dart';
 import '../../../shared/widgets/stat_metric_card.dart';
 import '../../../shared/widgets/status_badge.dart';
@@ -81,31 +82,39 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 ),
               ),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    AppStrings.appName,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      AppStrings.appName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                      ),
                     ),
-                  ),
-                  Text(
-                    AppStrings.tagline,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w500,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
+                    Text(
+                      AppStrings.tagline,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
+
           actions: [
             // Quick Role Switcher Pill (One tap to test any role)
             InkWell(
@@ -183,7 +192,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             const SizedBox(width: 6),
           ],
         ),
-        body: RefreshIndicator(
+        body: MedicalIllustratorBackground(
+          variant: MedicalBackgroundVariant.dashboard,
+          child: RefreshIndicator(
+
           onRefresh: () async {
             ref.invalidate(dashboardStatsProvider);
             ref.invalidate(visitListProvider);
@@ -250,6 +262,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
               ],
             ),
           ),
+        ),
         ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _currentTabIndex,

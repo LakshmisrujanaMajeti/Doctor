@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/data/mock_presentation_data.dart';
+import '../../../core/utils/input_sanitizer.dart';
 import '../../../routing/route_names.dart';
 import '../../../shared/widgets/error_banner_widget.dart';
+import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../providers/auth_provider.dart';
@@ -40,8 +42,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final sanitizedIdentifier = InputSanitizer.sanitizeText(_emailController.text.trim());
     final success = await ref.read(authProvider.notifier).login(
-      _emailController.text.trim(),
+      sanitizedIdentifier,
       _passwordController.text,
     );
 
@@ -60,8 +63,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       appBar: AppBar(
         title: const Text('Sign In'),
       ),
-      body: SafeArea(
-        child: Center(
+      body: MedicalIllustratorBackground(
+        variant: MedicalBackgroundVariant.auth,
+        child: SafeArea(
+          child: Center(
+
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: ConstrainedBox(
@@ -249,6 +255,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
+}
+

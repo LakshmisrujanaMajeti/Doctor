@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/data/mock_presentation_data.dart';
 import '../../../routing/route_names.dart';
+import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_card.dart';
 import '../providers/auth_provider.dart';
@@ -17,8 +18,11 @@ class WelcomeScreen extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
+      body: MedicalIllustratorBackground(
+        variant: MedicalBackgroundVariant.auth,
+        child: SafeArea(
+          child: SingleChildScrollView(
+
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Center(
             child: ConstrainedBox(
@@ -157,12 +161,19 @@ class WelcomeScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     preset.title,
+                                    softWrap: true,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                                   ),
                                   Text(
                                     preset.subtitle,
+                                    softWrap: true,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(color: Colors.grey[500], fontSize: 12),
                                   ),
+
                                 ],
                               ),
                             ),
@@ -179,6 +190,8 @@ class WelcomeScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
+}
+

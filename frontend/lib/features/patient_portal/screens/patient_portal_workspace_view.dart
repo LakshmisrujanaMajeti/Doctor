@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/input_sanitizer.dart';
+import '../../../shared/widgets/empty_state_widget.dart';
+import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../models/patient_portal_models.dart';
 import '../providers/patient_portal_provider.dart';
 
@@ -52,71 +55,74 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
           ),
         ],
       ),
-      body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 12),
-              Text('Unable to load patient profile: $err'),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () => ref.refresh(patientProfileProvider),
-                child: const Text('Retry'),
-              ),
-            ],
+      body: MedicalIllustratorBackground(
+        variant: MedicalBackgroundVariant.portal,
+        child: profileAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, stack) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 12),
+                Text('Unable to load patient profile: $err'),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () => ref.refresh(patientProfileProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
+          data: (profile) {
+            final patient = profile.patient;
+            final dependents = profile.dependents;
+
+            return Column(
+              children: [
+                // 1. Patient Profile Header & Dependent Profile Switcher
+                _buildProfileHeader(patient, dependents, profile, isDark),
+
+                // 2. Navigation Tabs
+                Container(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    labelColor: AppColors.primaryBlue,
+                    unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    indicatorColor: AppColors.primaryBlue,
+                    tabs: const [
+                      Tab(icon: Icon(Icons.calendar_month, size: 18), text: 'Appointments'),
+                      Tab(icon: Icon(Icons.medication, size: 18), text: 'Prescriptions'),
+                      Tab(icon: Icon(Icons.biotech, size: 18), text: 'Lab Reports'),
+                      Tab(icon: Icon(Icons.folder_shared, size: 18), text: 'Medical Documents'),
+                      Tab(icon: Icon(Icons.receipt_long, size: 18), text: 'Bills & Receipts'),
+                      Tab(icon: Icon(Icons.timeline, size: 18), text: 'Visit History'),
+                      Tab(icon: Icon(Icons.contact_support, size: 18), text: 'Support & Inquiries'),
+                    ],
+                  ),
+                ),
+
+                // 3. Tab Views
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildAppointmentsTab(isDark),
+                      _buildPrescriptionsTab(isDark),
+                      _buildLabReportsTab(isDark),
+                      _buildDocumentsTab(isDark),
+                      _buildBillsTab(isDark),
+                      _buildVisitsTab(isDark),
+                      _buildSupportTab(isDark),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
-        data: (profile) {
-          final patient = profile.patient;
-          final dependents = profile.dependents;
-
-          return Column(
-            children: [
-              // 1. Patient Profile Header & Dependent Profile Switcher
-              _buildProfileHeader(patient, dependents, profile, isDark),
-
-              // 2. Navigation Tabs
-              Container(
-                color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
-                child: TabBar(
-                  controller: _tabController,
-                  isScrollable: true,
-                  labelColor: AppColors.primaryBlue,
-                  unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                  indicatorColor: AppColors.primaryBlue,
-                  tabs: const [
-                    Tab(icon: Icon(Icons.calendar_month, size: 18), text: 'Appointments'),
-                    Tab(icon: Icon(Icons.medication, size: 18), text: 'Prescriptions'),
-                    Tab(icon: Icon(Icons.biotech, size: 18), text: 'Lab Reports'),
-                    Tab(icon: Icon(Icons.folder_shared, size: 18), text: 'Medical Documents'),
-                    Tab(icon: Icon(Icons.receipt_long, size: 18), text: 'Bills & Receipts'),
-                    Tab(icon: Icon(Icons.timeline, size: 18), text: 'Visit History'),
-                    Tab(icon: Icon(Icons.contact_support, size: 18), text: 'Support & Inquiries'),
-                  ],
-                ),
-              ),
-
-              // 3. Tab Views
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildAppointmentsTab(isDark),
-                    _buildPrescriptionsTab(isDark),
-                    _buildLabReportsTab(isDark),
-                    _buildDocumentsTab(isDark),
-                    _buildBillsTab(isDark),
-                    _buildVisitsTab(isDark),
-                    _buildSupportTab(isDark),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
       ),
     );
   }
@@ -141,130 +147,165 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     final displayGender = isViewingDependent ? activeDependent!.gender : patient.gender;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
         border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: isViewingDependent ? AppColors.accentTeal : AppColors.primaryBlue,
-                child: Text(
-                  displayName.isNotEmpty ? displayName[0].toUpperCase() : 'P',
-                  style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 560;
+              final infoRow = Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: isViewingDependent ? AppColors.accentTeal : AppColors.primaryBlue,
+                    child: Text(
+                      displayName.isNotEmpty ? displayName[0].toUpperCase() : 'P',
+                      style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          displayName,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              displayName,
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                              softWrap: true,
+                            ),
+                            if (isViewingDependent)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentTeal.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Dependent (${activeDependent?.relation ?? "Child"})',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.accentTeal, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                          ],
                         ),
-                        if (isViewingDependent) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.accentTeal.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Dependent (${activeDependent?.relation ?? "Child"})',
-                              style: const TextStyle(fontSize: 11, color: AppColors.accentTeal, fontWeight: FontWeight.bold),
-                            ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'UHID: $displayUhid • Age: $displayAge • Gender: $displayGender • Phone: ${patient.phone}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                           ),
-                        ],
+                          softWrap: true,
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'UHID: $displayUhid • Age: $displayAge • Gender: $displayGender • Phone: ${patient.phone}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Active Token Live Banner
-              if (profile.hasActiveToken) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.amber.shade600),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.confirmation_number, color: Colors.amber, size: 20),
-                      const SizedBox(width: 6),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              );
+
+              final tokenWidget = profile.hasActiveToken
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.shade600),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'Active Token: ${profile.activeTokenNumber}',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
-                          ),
-                          Text(
-                            'Status: ${profile.activeTokenQueueStatus}',
-                            style: TextStyle(fontSize: 11, color: Colors.amber.shade800),
+                          const Icon(Icons.confirmation_number, color: Colors.amber, size: 20),
+                          const SizedBox(width: 6),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Active Token: ${profile.activeTokenNumber}',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
+                              ),
+                              Text(
+                                'Status: ${profile.activeTokenQueueStatus}',
+                                style: TextStyle(fontSize: 11, color: Colors.amber.shade800),
+                              ),
+                            ],
                           ),
                         ],
                       ),
+                    )
+                  : null;
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    infoRow,
+                    if (tokenWidget != null) ...[
+                      const SizedBox(height: 10),
+                      tokenWidget,
                     ],
-                  ),
-                ),
-              ],
-            ],
+                  ],
+                );
+              } else {
+                return Row(
+                  children: [
+                    Expanded(child: infoRow),
+                    if (tokenWidget != null) ...[
+                      const SizedBox(width: 12),
+                      tokenWidget,
+                    ],
+                  ],
+                );
+              }
+            },
           ),
           const SizedBox(height: 12),
 
-          // Profile Switcher Bar
-          Row(
-            children: [
-              const Text('Active Profile: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-              const SizedBox(width: 8),
-              ChoiceChip(
-                label: Text('Self (${patient.fullName})', style: const TextStyle(fontSize: 12)),
-                selected: selectedId == null || selectedId == patient.id,
-                onSelected: (selected) {
-                  if (selected) {
-                    ref.read(selectedPortalPatientIdProvider.notifier).state = patient.id;
-                  }
-                },
-              ),
-              const SizedBox(width: 8),
-              for (final dep in dependents) ...[
+          // Profile Switcher Bar with horizontal scroll so it never clips or overflows
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                const Text('Active Profile: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 8),
                 ChoiceChip(
-                  label: Text('${dep.fullName} (${dep.relation})', style: const TextStyle(fontSize: 12)),
-                  selected: selectedId == dep.id,
+                  label: Text('Self (${patient.fullName})', style: const TextStyle(fontSize: 12)),
+                  selected: selectedId == null || selectedId == patient.id,
                   onSelected: (selected) {
                     if (selected) {
-                      ref.read(selectedPortalPatientIdProvider.notifier).state = dep.id;
+                      ref.read(selectedPortalPatientIdProvider.notifier).state = patient.id;
                     }
                   },
                 ),
                 const SizedBox(width: 8),
+                for (final dep in dependents) ...[
+                  ChoiceChip(
+                    label: Text('${dep.fullName} (${dep.relation})', style: const TextStyle(fontSize: 12)),
+                    selected: selectedId == dep.id,
+                    onSelected: (selected) {
+                      if (selected) {
+                        ref.read(selectedPortalPatientIdProvider.notifier).state = dep.id;
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                ActionChip(
+                  avatar: const Icon(Icons.person_add, size: 16),
+                  label: const Text('Add Dependent', style: TextStyle(fontSize: 12)),
+                  onPressed: () => _showAddDependentDialog(context),
+                ),
               ],
-              ActionChip(
-                avatar: const Icon(Icons.person_add, size: 16),
-                label: const Text('Add Dependent', style: TextStyle(fontSize: 12)),
-                onPressed: () => _showAddDependentDialog(context),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -279,15 +320,10 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
       error: (e, _) => Center(child: Text('Error loading appointments: $e')),
       data: (appts) {
         if (appts.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.event_available, size: 48, color: Colors.grey),
-                SizedBox(height: 12),
-                Text('No upcoming appointments or follow-up reminders scheduled.'),
-              ],
-            ),
+          return const EmptyStateWidget(
+            title: 'No Upcoming Appointments',
+            message: 'You have no scheduled doctor reviews or follow-up visits currently pending.',
+            icon: Icons.event_available,
           );
         }
 
@@ -317,12 +353,16 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
                               Text(
                                 'Scheduled Review: ${a.scheduledDate}',
                                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                softWrap: true,
                               ),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -338,10 +378,10 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text('Clinician: ${a.doctorName} • ${a.departmentName}', style: const TextStyle(fontSize: 13)),
+                          Text('Clinician: ${a.doctorName} • ${a.departmentName}', style: const TextStyle(fontSize: 13), softWrap: true),
                           if (a.followUpReason != null) ...[
                             const SizedBox(height: 4),
-                            Text('Reason: ${a.followUpReason}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text('Reason: ${a.followUpReason}', style: const TextStyle(fontSize: 12, color: Colors.grey), softWrap: true),
                           ],
                           if (a.carePlan != null) ...[
                             const SizedBox(height: 6),
@@ -351,7 +391,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                                 color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text('Doctor\'s Advice: ${a.carePlan}', style: const TextStyle(fontSize: 12)),
+                              child: Text('Doctor\'s Advice: ${a.carePlan}', style: const TextStyle(fontSize: 12), softWrap: true),
                             ),
                           ],
                         ],
@@ -375,7 +415,11 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
       error: (e, _) => Center(child: Text('Error loading prescriptions: $e')),
       data: (prescriptions) {
         if (prescriptions.isEmpty) {
-          return const Center(child: Text('No active prescriptions found.'));
+          return const EmptyStateWidget(
+            title: 'No Prescriptions Found',
+            message: 'Your clinician has not issued any active prescription orders for this profile.',
+            icon: Icons.medication_outlined,
+          );
         }
 
         return ListView.builder(
@@ -391,12 +435,16 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
                         Text(
                           'Prescription signed by ${rx.doctorName}',
                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          softWrap: true,
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -415,6 +463,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                     Text(
                       'Clinic: ${rx.departmentName} • Signed: ${rx.signedAt ?? "Approved"}',
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      softWrap: true,
                     ),
                     const Divider(height: 20),
                     const Text('Prescribed Medications & Instructions:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -440,15 +489,18 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                                   Text(
                                     '${item.medicineName} (${item.form} ${item.dosage})',
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    softWrap: true,
                                   ),
                                   Text(
                                     'Dosage: ${item.frequency} for ${item.durationDays} days • Route: ${item.route} • Qty: ${item.quantity}',
                                     style: const TextStyle(fontSize: 12),
+                                    softWrap: true,
                                   ),
                                   if (item.timing != null || item.instructions != null) ...[
                                     Text(
                                       'Instructions: ${item.timing ?? ""} ${item.instructions ?? ""}'.trim(),
                                       style: TextStyle(fontSize: 11, color: Colors.blue.shade700, fontWeight: FontWeight.w600),
+                                      softWrap: true,
                                     ),
                                   ],
                                 ],
@@ -476,7 +528,11 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
       error: (e, _) => Center(child: Text('Error loading lab reports: $e')),
       data: (reports) {
         if (reports.isEmpty) {
-          return const Center(child: Text('No released laboratory reports available.'));
+          return const EmptyStateWidget(
+            title: 'No Laboratory Reports',
+            message: 'Diagnostic test reports will appear here once verified and released by clinical pathology.',
+            icon: Icons.biotech_outlined,
+          );
         }
 
         return ListView.builder(
@@ -489,8 +545,8 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: ExpansionTile(
                 leading: const Icon(Icons.biotech, color: AppColors.primaryBlue),
-                title: Text(r.testName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                subtitle: Text('Category: ${r.testCategory} • Released: ${r.completedAt ?? r.orderedAt}'),
+                title: Text(r.testName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), softWrap: true),
+                subtitle: Text('Category: ${r.testCategory} • Released: ${r.completedAt ?? r.orderedAt}', softWrap: true),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(6)),
@@ -505,13 +561,13 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                         const Text('Test Parameters & Results:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 8),
                         if (r.results.isEmpty)
-                          const Text('Test completed and verified by clinical pathologist.')
+                          const Text('Test completed and verified by clinical pathologist.', softWrap: true)
                         else
                           for (final res in r.results) ...[
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(res.parameterName, style: const TextStyle(fontSize: 13)),
+                                Expanded(child: Text(res.parameterName, style: const TextStyle(fontSize: 13), softWrap: true)),
                                 Text(
                                   '${res.resultValue} ${res.unit ?? ""}',
                                   style: TextStyle(
@@ -522,7 +578,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                               ],
                             ),
                             if (res.referenceRange != null) ...[
-                              Text('Ref Range: ${res.referenceRange}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text('Ref Range: ${res.referenceRange}', style: const TextStyle(fontSize: 11, color: Colors.grey), softWrap: true),
                             ],
                             const Divider(height: 12),
                           ],
@@ -546,7 +602,11 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
       error: (e, _) => Center(child: Text('Error loading documents: $e')),
       data: (docs) {
         if (docs.isEmpty) {
-          return const Center(child: Text('No medical documents archived.'));
+          return const EmptyStateWidget(
+            title: 'No Medical Documents',
+            message: 'Historical records, scanned prescriptions, and lab test documents will appear here.',
+            icon: Icons.folder_shared_outlined,
+          );
         }
 
         return ListView.builder(
@@ -559,8 +619,8 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: ListTile(
                 leading: const Icon(Icons.picture_as_pdf, color: Colors.red, size: 30),
-                title: Text(d['file_name'] ?? 'Medical Document', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('Type: ${d['document_type']} • Pages: ${d['page_count']} • Uploaded: ${d['created_at']}'),
+                title: Text(d['file_name'] ?? 'Medical Document', style: const TextStyle(fontWeight: FontWeight.bold), softWrap: true),
+                subtitle: Text('Type: ${d['document_type']} • Pages: ${d['page_count']} • Uploaded: ${d['created_at']}', softWrap: true),
                 trailing: TextButton.icon(
                   icon: const Icon(Icons.visibility, size: 16),
                   label: const Text('View (15 min)'),
@@ -586,7 +646,11 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
       error: (e, _) => Center(child: Text('Error loading bills: $e')),
       data: (bills) {
         if (bills.isEmpty) {
-          return const Center(child: Text('No itemized bills found.'));
+          return const EmptyStateWidget(
+            title: 'No Itemized Invoices',
+            message: 'Hospital pharmacy, consultation, and diagnostic invoices will be logged here.',
+            icon: Icons.receipt_long_outlined,
+          );
         }
 
         return ListView.builder(
@@ -607,8 +671,8 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                   ),
                   child: Icon(Icons.receipt_long, color: isPaid ? Colors.green : Colors.orange),
                 ),
-                title: Text('Invoice #${b.invoiceNumber}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('Date: ${b.billedAt} • Items: ${b.itemsCount} • Receipt: ${b.receiptNumber ?? "None"}'),
+                title: Text('Invoice #${b.invoiceNumber}', style: const TextStyle(fontWeight: FontWeight.bold), softWrap: true),
+                subtitle: Text('Date: ${b.billedAt} • Items: ${b.itemsCount} • Receipt: ${b.receiptNumber ?? "None"}', softWrap: true),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -643,7 +707,11 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
       error: (e, _) => Center(child: Text('Error loading visits: $e')),
       data: (visits) {
         if (visits.isEmpty) {
-          return const Center(child: Text('No OPD visit records found.'));
+          return const EmptyStateWidget(
+            title: 'No OPD Visits Recorded',
+            message: 'Past consultations and clinic visit summaries will be automatically archived here.',
+            icon: Icons.timeline_outlined,
+          );
         }
 
         return ListView.builder(
@@ -661,26 +729,31 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
-                        Text('Visit ${v['visit_number']} • Token #${v['queue_token']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text('Visit ${v['visit_number']} • Token #${v['queue_token']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), softWrap: true),
                         Text('${v['status']}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text('Doctor: ${v['doctor_name']} • Department: ${v['department_name']} • Date: ${v['visit_date']}'),
+                    Text('Doctor: ${v['doctor_name']} • Department: ${v['department_name']} • Date: ${v['visit_date']}', softWrap: true),
                     if (v['diagnosis'] != null) ...[
                       const SizedBox(height: 6),
-                      Text('Diagnosis: ${v['diagnosis']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text('Diagnosis: ${v['diagnosis']}', style: const TextStyle(fontWeight: FontWeight.w600), softWrap: true),
                     ],
                     if (vitals != null && (vitals['bp'] != null || vitals['pulse'] != null)) ...[
                       const Divider(height: 16),
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          if (vitals['bp'] != null) Text('BP: ${vitals['bp']} mmHg  •  ', style: const TextStyle(fontSize: 12)),
-                          if (vitals['pulse'] != null) Text('Pulse: ${vitals['pulse']} bpm  •  ', style: const TextStyle(fontSize: 12)),
-                          if (vitals['temp'] != null) Text('Temp: ${vitals['temp']} °F  •  ', style: const TextStyle(fontSize: 12)),
+                          if (vitals['bp'] != null) Text('BP: ${vitals['bp']} mmHg', style: const TextStyle(fontSize: 12)),
+                          if (vitals['pulse'] != null) Text('Pulse: ${vitals['pulse']} bpm', style: const TextStyle(fontSize: 12)),
+                          if (vitals['temp'] != null) Text('Temp: ${vitals['temp']} °F', style: const TextStyle(fontSize: 12)),
                           if (vitals['spo2'] != null) Text('SpO₂: ${vitals['spo2']}%', style: const TextStyle(fontSize: 12)),
                         ],
                       ),
@@ -705,7 +778,14 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Hospital Desk Inquiries & Assistance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Expanded(
+                child: Text(
+                  'Hospital Desk Inquiries & Assistance',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  softWrap: true,
+                ),
+              ),
+              const SizedBox(width: 8),
               ElevatedButton.icon(
                 icon: const Icon(Icons.add_comment, size: 16),
                 label: const Text('New Inquiry'),
@@ -720,7 +800,13 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
             error: (e, _) => Center(child: Text('Error loading tickets: $e')),
             data: (tickets) {
               if (tickets.isEmpty) {
-                return const Center(child: Text('No support inquiries submitted yet.'));
+                return EmptyStateWidget(
+                  title: 'No Inquiries Submitted',
+                  message: 'Submit questions or assistance requests to our OPD hospital front-desk.',
+                  icon: Icons.contact_support_outlined,
+                  actionLabel: 'Submit Inquiry',
+                  onAction: () => _showNewSupportTicketDialog(context),
+                );
               }
 
               return ListView.builder(
@@ -737,10 +823,13 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
-                              Text(t.subject, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text(t.subject, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), softWrap: true),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
@@ -752,9 +841,9 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text('Category: ${t.category} • Submitted: ${t.createdAt}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('Category: ${t.category} • Submitted: ${t.createdAt}', style: const TextStyle(fontSize: 11, color: Colors.grey), softWrap: true),
                           const SizedBox(height: 6),
-                          Text(t.message, style: const TextStyle(fontSize: 13)),
+                          Text(t.message, style: const TextStyle(fontSize: 13), softWrap: true),
                           if (t.adminResponse != null) ...[
                             const SizedBox(height: 8),
                             Container(
@@ -769,7 +858,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                                 children: [
                                   const Text('Hospital Desk Response:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.green)),
                                   const SizedBox(height: 2),
-                                  Text(t.adminResponse!, style: const TextStyle(fontSize: 12)),
+                                  Text(t.adminResponse!, style: const TextStyle(fontSize: 12), softWrap: true),
                                 ],
                               ),
                             ),
@@ -837,12 +926,14 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty) return;
+                final cleanName = InputSanitizer.sanitizeText(nameCtrl.text);
+                final cleanRelation = InputSanitizer.sanitizeText(relationCtrl.text);
+                if (cleanName.isEmpty) return;
                 try {
                   final repo = ref.read(patientPortalRepositoryProvider);
                   await repo.addDependent(
-                    fullName: nameCtrl.text.trim(),
-                    relation: relationCtrl.text.trim(),
+                    fullName: cleanName,
+                    relation: cleanRelation.isNotEmpty ? cleanRelation : 'Dependent',
                     gender: gender,
                     ageYears: int.tryParse(ageCtrl.text),
                   );
@@ -899,14 +990,16 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                if (subCtrl.text.trim().isEmpty || msgCtrl.text.trim().isEmpty) return;
+                final cleanSub = InputSanitizer.sanitizeClinicalNotes(subCtrl.text);
+                final cleanMsg = InputSanitizer.sanitizeClinicalNotes(msgCtrl.text);
+                if (cleanSub.isEmpty || cleanMsg.isEmpty) return;
                 try {
                   final repo = ref.read(patientPortalRepositoryProvider);
                   final selectedId = ref.read(selectedPortalPatientIdProvider);
                   await repo.createSupportTicket(
-                    subject: subCtrl.text.trim(),
+                    subject: cleanSub,
                     category: category,
-                    message: msgCtrl.text.trim(),
+                    message: cleanMsg,
                     dependentPatientId: selectedId,
                   );
                   Navigator.pop(ctx);

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/input_sanitizer.dart';
+import '../../../shared/widgets/empty_state_widget.dart';
 import '../models/laboratory_models.dart';
 import '../providers/laboratory_provider.dart';
 import '../widgets/specimen_label_dialog.dart';
@@ -276,7 +278,8 @@ class _LaboratoryWorkspaceViewState extends ConsumerState<LaboratoryWorkspaceVie
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 onChanged: (val) {
-                  ref.read(labOrdersFilterProvider.notifier).setSearch(val);
+                  final cleaned = InputSanitizer.sanitizeSearchQuery(val);
+                  ref.read(labOrdersFilterProvider.notifier).setSearch(cleaned);
                 },
               ),
             ),
@@ -329,20 +332,10 @@ class _LaboratoryWorkspaceViewState extends ConsumerState<LaboratoryWorkspaceVie
         ordersAsync.when(
           data: (orders) {
             if (orders.isEmpty) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(40),
-                alignment: Alignment.center,
-                child: Column(
-                  children: [
-                    Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade400),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No laboratory orders match this filter',
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
+              return const EmptyStateWidget(
+                title: 'No Orders in Queue',
+                message: 'No laboratory orders match the active department or status queue filters.',
+                icon: Icons.biotech_outlined,
               );
             }
 
@@ -419,6 +412,7 @@ class _LaboratoryWorkspaceViewState extends ConsumerState<LaboratoryWorkspaceVie
             style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            softWrap: true,
           ),
         ],
       ),
@@ -464,111 +458,145 @@ class _LaboratoryWorkspaceViewState extends ConsumerState<LaboratoryWorkspaceVie
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top row: IDs, Urgency, Status
-            Row(
+            // Top row: IDs, Urgency, Status using Wrap so it never overflows
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                // Tube indicator
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: tubeColor,
-                    shape: BoxShape.circle,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: tubeColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      order.orderNumber,
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.2),
+                    ),
+                    if (order.specimenId != null) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '• ${order.specimenId}',
+                        style: const TextStyle(fontSize: 12, color: Colors.black54, fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  order.orderNumber,
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.2),
-                ),
-                if (order.specimenId != null) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    '• ${order.specimenId}',
-                    style: const TextStyle(fontSize: 12, color: Colors.black54, fontFamily: 'monospace'),
-                  ),
-                ],
-                const Spacer(),
-                if (order.isSensitive) ...[
-                  Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.red.shade300),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (order.isSensitive)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.red.shade300),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.lock, size: 10, color: Colors.red),
+                            SizedBox(width: 3),
+                            Text('SENSITIVE', style: TextStyle(fontSize: 9.5, color: Colors.red, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    if (order.urgency == 'STAT')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('STAT', style: TextStyle(fontSize: 9.5, color: Colors.red, fontWeight: FontWeight.w900)),
+                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: statusColor, width: 1),
+                      ),
+                      child: Text(
+                        order.specimenStatus,
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: statusColor),
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.lock, size: 10, color: Colors.red),
-                        SizedBox(width: 3),
-                        Text('SENSITIVE', style: TextStyle(fontSize: 9.5, color: Colors.red, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ],
-                if (order.urgency == 'STAT') ...[
-                  Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade100,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text('STAT', style: TextStyle(fontSize: 9.5, color: Colors.red, fontWeight: FontWeight.w900)),
-                  ),
-                ],
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: statusColor, width: 1),
-                  ),
-                  child: Text(
-                    order.specimenStatus,
-                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: statusColor),
-                  ),
+                  ],
                 ),
               ],
             ),
 
             const SizedBox(height: 8),
 
-            // Middle row: Test name, Department, Patient Details
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        order.testName,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryBlue),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${order.department} • Specimen: ${order.specimenType}',
-                        style: const TextStyle(fontSize: 11.5, color: Colors.black54),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+            // Middle row: Test name, Department, Patient Details responsive layout
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 460;
+                final testInfo = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.testName,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryBlue),
+                      softWrap: true,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${order.department} • Specimen: ${order.specimenType}',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.black54),
+                      softWrap: true,
+                    ),
+                  ],
+                );
+
+                final patientInfo = Column(
+                  crossAxisAlignment: isNarrow ? CrossAxisAlignment.start : CrossAxisAlignment.end,
                   children: [
                     Text(
                       order.patientName,
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      softWrap: true,
                     ),
                     Text(
                       '${order.uhid} • ${order.patientAge ?? "--"}Y / ${order.patientGender ?? "--"}',
                       style: const TextStyle(fontSize: 11, color: Colors.black54),
+                      softWrap: true,
                     ),
                   ],
-                ),
-              ],
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      testInfo,
+                      const SizedBox(height: 6),
+                      patientInfo,
+                    ],
+                  );
+                } else {
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: testInfo),
+                      const SizedBox(width: 12),
+                      patientInfo,
+                    ],
+                  );
+                }
+              },
             ),
 
             if (order.rejectionReason != null) ...[

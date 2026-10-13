@@ -581,6 +581,7 @@ class DocumentService:
             if not clin_rec:
                 clin_rec = ClinicalRecord(
                     visit_id=visit.id,
+                    patient_id=visit.patient_id,
                     doctor_id=visit.doctor_id,
                     status="DRAFT",
                 )

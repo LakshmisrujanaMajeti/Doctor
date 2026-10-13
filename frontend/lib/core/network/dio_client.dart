@@ -9,8 +9,36 @@ final dioClientProvider = Provider<DioClient>((ref) {
   return DioClient();
 });
 
+class _CacheEntry {
+  final dynamic data;
+  final int statusCode;
+  final Headers headers;
+  final DateTime timestamp;
+  final Duration ttl;
+
+  _CacheEntry({
+    required this.data,
+    required this.statusCode,
+    required this.headers,
+    required this.timestamp,
+    required this.ttl,
+  });
+
+  bool get isExpired => DateTime.now().isAfter(timestamp.add(ttl));
+  bool get isGraceExpired => DateTime.now().isAfter(timestamp.add(const Duration(hours: 1)));
+}
+
 class DioClient {
   late final Dio dio;
+  static final Map<String, _CacheEntry> _cache = {};
+
+  static void clearCache() {
+    _cache.clear();
+  }
+
+  static void invalidatePath(String pathPrefix) {
+    _cache.removeWhere((key, _) => key.contains(pathPrefix));
+  }
 
   DioClient() {
     dio = Dio(
@@ -21,6 +49,81 @@ class DioClient {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+        },
+      ),
+    );
+
+    // Caching & Offline Resilience Interceptor
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          // Invalidate cache on mutations
+          if (options.method != 'GET') {
+            _cache.clear();
+            return handler.next(options);
+          }
+
+          // Check if cached entry is fresh
+          final cacheKey = options.uri.toString();
+          final cached = _cache[cacheKey];
+          if (cached != null && !cached.isExpired && options.headers['Cache-Control'] != 'no-cache') {
+            return handler.resolve(
+              Response(
+                requestOptions: options,
+                data: cached.data,
+                statusCode: cached.statusCode,
+                headers: cached.headers,
+              ),
+            );
+          }
+
+          return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          if (response.requestOptions.method == 'GET' && response.statusCode == 200) {
+            final path = response.requestOptions.path;
+            // Longer TTL for static catalogues and lists, shorter TTL for fast-moving queues
+            Duration ttl = const Duration(seconds: 45);
+            if (path.contains('/catalogue') || path.contains('/departments') || path.contains('/medicines')) {
+              ttl = const Duration(minutes: 5);
+            } else if (path.contains('/profile') || path.contains('/stats')) {
+              ttl = const Duration(seconds: 30);
+            }
+
+            final cacheKey = response.requestOptions.uri.toString();
+            _cache[cacheKey] = _CacheEntry(
+              data: response.data,
+              statusCode: response.statusCode ?? 200,
+              headers: response.headers,
+              timestamp: DateTime.now(),
+              ttl: ttl,
+            );
+          }
+          return handler.next(response);
+        },
+        onError: (DioException error, handler) async {
+          // Offline fallback: if network failure or timeout occurs on a GET request, serve cached copy if available
+          final isNetworkIssue = error.type == DioExceptionType.connectionTimeout ||
+              error.type == DioExceptionType.receiveTimeout ||
+              error.type == DioExceptionType.connectionError;
+
+          if (isNetworkIssue && error.requestOptions.method == 'GET') {
+            final cacheKey = error.requestOptions.uri.toString();
+            final cached = _cache[cacheKey];
+            if (cached != null && !cached.isGraceExpired) {
+              debugPrint('⚡ [DIO CACHE] Serving offline cached data for: $cacheKey');
+              return handler.resolve(
+                Response(
+                  requestOptions: error.requestOptions,
+                  data: cached.data,
+                  statusCode: cached.statusCode,
+                  headers: cached.headers,
+                ),
+              );
+            }
+          }
+
+          return handler.next(error);
         },
       ),
     );
