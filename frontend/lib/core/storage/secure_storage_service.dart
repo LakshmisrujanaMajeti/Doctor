@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -72,6 +73,51 @@ class SecureStorageService {
     return prefs.getString(keyCustomServerUrl);
   }
 
+  static const String keyUserData = 'opd_user_data';
+  static const String keyPatientsData = 'opd_patients_data';
+  static const String keyVisitsData = 'opd_visits_data';
+
+  static Future<void> saveUserData(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(keyUserData, jsonEncode(data));
+  }
+
+  static Future<Map<String, dynamic>?> getUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(keyUserData);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> clearUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(keyUserData);
+  }
+
+  static Future<void> savePatientsJson(String jsonStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(keyPatientsData, jsonStr);
+  }
+
+  static Future<String?> getPatientsJson() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(keyPatientsData);
+  }
+
+  static Future<void> saveVisitsJson(String jsonStr) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(keyVisitsData, jsonStr);
+  }
+
+  static Future<String?> getVisitsJson() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(keyVisitsData);
+  }
+
   static Future<void> clearTokens() async {
     try {
       await _secureStorage.delete(key: keyAccessToken);
@@ -83,5 +129,6 @@ class SecureStorageService {
       await prefs.remove(keyRefreshToken);
       await prefs.remove(keyUserRole);
     }
+    await clearUserData();
   }
 }

@@ -1,5 +1,7 @@
+import 'dart:convert';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/storage/secure_storage_service.dart';
 import '../models/visit_model.dart';
 import '../models/vitals_model.dart';
 
@@ -9,6 +11,25 @@ class VisitRepository {
   final List<OPDVisitModel> _localVisits = [];
 
   VisitRepository(this._dioClient);
+
+  Future<void> _loadCacheIfNeeded() async {
+    if (_localVisits.isEmpty) {
+      try {
+        final raw = await SecureStorageService.getVisitsJson();
+        if (raw != null && raw.isNotEmpty) {
+          final list = jsonDecode(raw) as List<dynamic>;
+          _localVisits.addAll(list.map((m) => OPDVisitModel.fromJson(m as Map<String, dynamic>)));
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _saveCache() async {
+    try {
+      final jsonList = _localVisits.map((v) => v.toJson()).toList();
+      await SecureStorageService.saveVisitsJson(jsonEncode(jsonList));
+    } catch (_) {}
+  }
 
   Future<List<OPDVisitModel>> getVisits({String? status, String? departmentId}) async {
     try {
@@ -22,15 +43,23 @@ class VisitRepository {
 
       if (res.data['status'] == 'success') {
         final list = res.data['data'] as List<dynamic>;
-        return list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
+        final fetched = list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
+        if ((status == null || status.isEmpty) && (departmentId == null || departmentId.isEmpty)) {
+          _localVisits.clear();
+          _localVisits.addAll(fetched);
+          await _saveCache();
+        }
+        return fetched;
       }
     } catch (_) {}
+
+    await _loadCacheIfNeeded();
 
     // Fallback
     if (status != null && status.isNotEmpty) {
       return _localVisits.where((v) => v.status == status).toList();
     }
-    return _localVisits;
+    return List.from(_localVisits);
   }
 
   Future<OPDVisitModel> createVisit({
@@ -55,9 +84,14 @@ class VisitRepository {
       );
 
       if (res.data['status'] == 'success') {
-        return OPDVisitModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        final created = OPDVisitModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        _localVisits.insert(0, created);
+        await _saveCache();
+        return created;
       }
     } catch (_) {}
+
+    await _loadCacheIfNeeded();
 
     final token = _localVisits.length + 1;
     final newVisit = OPDVisitModel(
@@ -76,7 +110,8 @@ class VisitRepository {
       doctorName: 'Dr. Sarah Chen, MD',
       departmentName: 'General Medicine',
     );
-    _localVisits.add(newVisit);
+    _localVisits.insert(0, newVisit);
+    await _saveCache();
     return newVisit;
   }
 
@@ -88,10 +123,25 @@ class VisitRepository {
       );
 
       if (res.data['status'] == 'success') {
-        return VitalSignsModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        final savedVitals = VitalSignsModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        _updateLocalVisitWithVitals(savedVitals);
+        return savedVitals;
       }
     } catch (_) {}
 
+    _updateLocalVisitWithVitals(vitals);
     return vitals;
+  }
+
+  Future<void> _updateLocalVisitWithVitals(VitalSignsModel vitals) async {
+    await _loadCacheIfNeeded();
+    final idx = _localVisits.indexWhere((v) => v.id == vitals.visitId);
+    if (idx != -1) {
+      _localVisits[idx] = _localVisits[idx].copyWith(
+        vitals: vitals,
+        status: 'TRIAGED',
+      );
+      await _saveCache();
+    }
   }
 }

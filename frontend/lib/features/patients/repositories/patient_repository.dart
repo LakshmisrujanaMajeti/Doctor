@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/storage/secure_storage_service.dart';
 import '../models/patient_model.dart';
 
 class PatientRepository {
@@ -11,6 +13,25 @@ class PatientRepository {
 
   PatientRepository(this._dioClient);
 
+  Future<void> _loadCacheIfNeeded() async {
+    if (_localPatients.isEmpty) {
+      try {
+        final raw = await SecureStorageService.getPatientsJson();
+        if (raw != null && raw.isNotEmpty) {
+          final list = jsonDecode(raw) as List<dynamic>;
+          _localPatients.addAll(list.map((m) => PatientModel.fromJson(m as Map<String, dynamic>)));
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _saveCache() async {
+    try {
+      final jsonList = _localPatients.map((p) => p.toJson()).toList();
+      await SecureStorageService.savePatientsJson(jsonEncode(jsonList));
+    } catch (_) {}
+  }
+
   Future<List<PatientModel>> getPatients({String? query}) async {
     try {
       final res = await _dioClient.dio.get(
@@ -20,9 +41,17 @@ class PatientRepository {
 
       if (res.data['status'] == 'success') {
         final list = res.data['data'] as List<dynamic>;
-        return list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
+        final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
+        if (query == null || query.isEmpty) {
+          _localPatients.clear();
+          _localPatients.addAll(fetched);
+          await _saveCache();
+        }
+        return fetched;
       }
     } catch (_) {}
+
+    await _loadCacheIfNeeded();
 
     // Fallback search in local items
     if (query != null && query.isNotEmpty) {
@@ -147,6 +176,7 @@ class PatientRepository {
       createdAt: DateTime.now(),
     );
     _localPatients.insert(0, newPat);
+    await _saveCache();
     return newPat;
   }
 

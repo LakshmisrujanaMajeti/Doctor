@@ -86,12 +86,60 @@ class OPDVisitModel {
     );
   }
 
+  OPDVisitModel copyWith({
+    String? id,
+    String? visitNumber,
+    String? patientId,
+    String? doctorId,
+    String? departmentId,
+    int? queueToken,
+    String? triagePriority,
+    String? status,
+    double? consultationFee,
+    String? paymentStatus,
+    String? notes,
+    DateTime? visitDate,
+    PatientModel? patient,
+    VitalSignsModel? vitals,
+    String? doctorName,
+    String? departmentName,
+  }) {
+    return OPDVisitModel(
+      id: id ?? this.id,
+      visitNumber: visitNumber ?? this.visitNumber,
+      patientId: patientId ?? this.patientId,
+      doctorId: doctorId ?? this.doctorId,
+      departmentId: departmentId ?? this.departmentId,
+      queueToken: queueToken ?? this.queueToken,
+      triagePriority: triagePriority ?? this.triagePriority,
+      status: status ?? this.status,
+      consultationFee: consultationFee ?? this.consultationFee,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      notes: notes ?? this.notes,
+      visitDate: visitDate ?? this.visitDate,
+      patient: patient ?? this.patient,
+      vitals: vitals ?? this.vitals,
+      doctorName: doctorName ?? this.doctorName,
+      departmentName: departmentName ?? this.departmentName,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
+    'id': id,
+    'visit_number': visitNumber,
     'patient_id': patientId,
     'doctor_id': doctorId,
     'department_id': departmentId,
+    'queue_token': queueToken,
     'triage_priority': triagePriority,
+    'status': status,
     'consultation_fee': consultationFee,
+    'payment_status': paymentStatus,
     'notes': notes,
+    'visit_date': visitDate.toIso8601String(),
+    'patient': patient?.toJson(),
+    'vitals': vitals?.toJson(),
+    'doctor_name': doctorName,
+    'department_name': departmentName,
   };
 }
