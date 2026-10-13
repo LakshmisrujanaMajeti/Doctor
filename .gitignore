@@ -51,3 +51,5 @@ frontend/**/*.iml
 frontend/*.iml
 frontend/app.*.symbols
 frontend/app.*.map.json
+apk_builds/
+*.apk
