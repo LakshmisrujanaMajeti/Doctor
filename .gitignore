@@ -1,0 +1,53 @@
+# Operating System
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.kiro/
+
+# Backend (Python / FastAPI)
+backend/venv/
+backend/env/
+backend/ENV/
+backend/.env
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+backend/storage/*
+!backend/storage/.gitkeep
+backend/__pycache__/
+backend/*/__pycache__/
+backend/*/*/__pycache__/
+backend/*/*/*/__pycache__/
+backend/*/*/*/*/__pycache__/
+backend/.pytest_cache/
+*.py[cod]
+*$py.class
+backend/test_clean_init.db
+
+# Frontend (Flutter / Dart)
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+frontend/coverage/
+frontend/android/app/debug/
+frontend/android/app/profile/
+frontend/android/app/release/
+frontend/ios/Flutter/.last_build_id
+frontend/**/*.iml
+frontend/*.iml
+frontend/app.*.symbols
+frontend/app.*.map.json
