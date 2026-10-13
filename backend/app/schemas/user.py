@@ -32,4 +32,5 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: str
+    patient_id: Optional[str] = None
     role: Optional[RoleRead] = None

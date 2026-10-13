@@ -42,16 +42,39 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final email = _emailController.text.trim();
+    if (_selectedRole != 'patient' && email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.triageEmergency,
+          content: Text('Staff registration requires a valid email address.'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
       final authNotifier = ref.read(authProvider.notifier);
-      final success = await authNotifier.registerPatient(
-        fullName: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-        password: _passwordController.text,
-      );
+      final bool success;
+
+      if (_selectedRole == 'patient') {
+        success = await authNotifier.registerPatient(
+          fullName: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          email: email.isNotEmpty ? email : null,
+          password: _passwordController.text,
+        );
+      } else {
+        success = await authNotifier.registerStaff(
+          fullName: _nameController.text.trim(),
+          email: email,
+          password: _passwordController.text,
+          roleName: _selectedRole,
+          phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        );
+      }
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -66,6 +89,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       if (mounted) setState(() => _isSaving = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

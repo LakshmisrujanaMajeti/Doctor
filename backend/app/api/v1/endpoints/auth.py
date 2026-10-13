@@ -1,7 +1,10 @@
 from typing import Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.config import settings
+from app.core.security import create_access_token, generate_refresh_token_string, hash_token
 from app.core.responses import success_response
 from app.core.dependencies import get_current_user
 from app.core.exceptions import BadRequestException
@@ -18,7 +21,7 @@ from app.schemas.auth import (
 from app.schemas.user import UserRead
 from app.services.auth_service import AuthService
 from app.services.otp_service import OTPService
-from app.models.user import User
+from app.models.user import User, RefreshTokenSession
 
 router = APIRouter()
 
@@ -33,11 +36,41 @@ def register(request_in: RegisterRequest, db: Session = Depends(get_db)):
         role_name=request_in.role_name or "receptionist",
         phone=request_in.phone,
     )
+
+    # Issue access & refresh token for instant authentication
+    access_token = create_access_token(
+        subject=user.id,
+        extra_claims={
+            "email": user.email,
+            "role": user.role.name if user.role else "receptionist",
+            "name": user.full_name,
+        }
+    )
+    raw_refresh_token = generate_refresh_token_string()
+    refresh_hash = hash_token(raw_refresh_token)
+    expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    session = RefreshTokenSession(
+        user_id=user.id,
+        token_hash=refresh_hash,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    db.commit()
+
+    user_dict = UserRead.model_validate(user).model_dump()
+    user_dict["access_token"] = access_token
+    user_dict["refresh_token"] = raw_refresh_token
+    user_dict["token_type"] = "bearer"
+    user_dict["expires_in"] = 1800
+    user_dict["user"] = UserRead.model_validate(user).model_dump()
+
     return success_response(
-        data=UserRead.model_validate(user).model_dump(),
+        data=user_dict,
         message="User registered successfully",
         status_code=201
     )
+
 
 
 @router.post("/register-patient", summary="Self-Registration for Patients (with UHID)")
@@ -46,17 +79,21 @@ def register_patient(request_in: PatientRegisterRequest, db: Session = Depends(g
         db=db,
         req=request_in,
     )
+    user_dict = UserRead.model_validate(user).model_dump()
+    uhid = user.patient.uhid if user.patient else None
     return success_response(
         data={
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": 1800,
-            "user": UserRead.model_validate(user).model_dump(),
+            "uhid": uhid,
+            "user": user_dict,
         },
         message="Patient registered successfully",
         status_code=201
     )
+
 
 
 @router.post("/login", summary="Login with Email or Phone Number")

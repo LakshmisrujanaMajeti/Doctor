@@ -95,6 +95,58 @@ class AuthRepository {
     }
   }
 
+  Future<UserModel> registerStaff({
+    required String fullName,
+    required String email,
+    required String password,
+    required String roleName,
+    String? phone,
+  }) async {
+    try {
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.register,
+        data: {
+          'full_name': fullName,
+          'email': email,
+          'password': password,
+          'role_name': roleName,
+          if (phone != null && phone.isNotEmpty) 'phone': phone,
+        },
+      );
+
+      if (response.data['status'] == 'success') {
+        final data = response.data['data'];
+        final accessToken = data['access_token'] as String?;
+        final refreshToken = data['refresh_token'] as String?;
+        final userRaw = data['user'] ?? data;
+        final user = UserModel.fromJson(userRaw as Map<String, dynamic>);
+
+        if (accessToken != null && refreshToken != null) {
+          await DioClient.saveTokens(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            role: user.roleName,
+          );
+        } else {
+          return await login(email, password);
+        }
+
+        return user;
+      } else {
+        throw Exception(response.data['message'] ?? 'Staff registration failed');
+      }
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data is Map) {
+        final msg = e.response?.data['message'] as String?;
+        if (msg != null && msg.isNotEmpty) {
+          throw Exception(msg);
+        }
+      }
+      throw Exception('Staff registration error. Please check your information and try again.');
+    }
+  }
+
+
   Future<String> forgotPassword(String identifier) async {
     try {
       final response = await _dioClient.dio.post(

@@ -90,6 +90,37 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<bool> registerStaff({
+    required String fullName,
+    required String email,
+    required String password,
+    required String roleName,
+    String? phone,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final user = await _repository.registerStaff(
+        fullName: fullName,
+        email: email,
+        password: password,
+        roleName: roleName,
+        phone: phone,
+      );
+      state = state.copyWith(
+        isAuthenticated: true,
+        user: user,
+        isLoading: false,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
   Future<String?> forgotPassword(String identifier) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
