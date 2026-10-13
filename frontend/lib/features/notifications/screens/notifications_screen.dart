@@ -28,7 +28,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    _notifications = List.from(MockPresentationData.sampleNotifications);
+    _notifications = [];
   }
 
   void _markAllAsRead() {
@@ -270,22 +270,31 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
           // Notification List
           Expanded(
-            child: filtered.isEmpty
-                ? Center(
+            child: _notifications.isEmpty
+                ? const Center(
                     child: EmptyStateWidget(
                       icon: Icons.notifications_none_rounded,
-                      title: 'No Alerts in this Category',
+                      title: 'No Notifications',
                       message:
-                          'All outpatient updates for this category have been cleared or read.',
-                      actionLabel: 'View All Notifications',
-                      onAction: () {
-                        setState(() {
-                          _selectedCategory = 'all';
-                        });
-                      },
+                          'All clinical queues, triage alerts, and lab results are up to date.',
                     ),
                   )
-                : ListView.separated(
+                : (filtered.isEmpty
+                    ? Center(
+                        child: EmptyStateWidget(
+                          icon: Icons.notifications_none_rounded,
+                          title: 'No Alerts in this Category',
+                          message:
+                              'All outpatient updates for this category have been cleared or read.',
+                          actionLabel: 'View All Notifications',
+                          onAction: () {
+                            setState(() {
+                              _selectedCategory = 'all';
+                            });
+                          },
+                        ),
+                      )
+                    : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: filtered.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 10),
@@ -387,7 +396,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         ),
                       );
                     },
-                  ),
+                  )),
           ),
         ],
       ),

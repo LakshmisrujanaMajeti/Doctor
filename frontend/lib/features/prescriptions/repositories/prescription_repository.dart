@@ -16,46 +16,6 @@ class PrescriptionRepository {
       }
     } catch (_) {}
 
-    // Fallback demo prescription for offline resilience
-    if (visitId == 'demo-vis-1') {
-      return [
-        PrescriptionModel(
-          id: 'rx-1',
-          visitId: 'demo-vis-1',
-          patientId: 'demo-pat-1',
-          doctorId: 'demo-doc-1',
-          status: 'SIGNED',
-          version: 1,
-          notes: 'Take with warm water',
-          items: [
-            PrescriptionItemModel(
-              id: 'item-1',
-              medicineName: 'Paracetamol',
-              form: 'Tablet',
-              dosage: '650 mg',
-              route: 'Oral',
-              frequency: 'TID',
-              durationDays: 3,
-              quantity: 9,
-              timing: 'After Food',
-              instructions: 'When in pain or fever',
-            ),
-            PrescriptionItemModel(
-              id: 'item-2',
-              medicineName: 'Cetirizine',
-              form: 'Tablet',
-              dosage: '10 mg',
-              route: 'Oral',
-              frequency: 'OD',
-              durationDays: 5,
-              quantity: 5,
-              timing: 'Bedtime',
-              instructions: 'May cause mild drowsiness',
-            ),
-          ],
-        )
-      ];
-    }
     return [];
   }
 

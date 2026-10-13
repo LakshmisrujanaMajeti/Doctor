@@ -6,42 +6,8 @@ import '../models/clinical_record_model.dart';
 class ClinicalRepository {
   final DioClient _dioClient;
 
-  // Local fallback storage for demo visits
-  final Map<String, ClinicalRecordModel> _localRecords = {
-    'demo-vis-1': ClinicalRecordModel(
-      id: 'clinic-1',
-      visitId: 'demo-vis-1',
-      patientId: 'demo-pat-1',
-      doctorId: 'demo-doc-1',
-      presentingComplaint: 'Throat irritation and mild dry cough for 3 days',
-      historyOfPresentIllness: 'Symptoms started after exposure to cool dust. No chest pain or dyspnea.',
-      pastMedicalHistory: 'Mild seasonal allergies. Essential hypertension controlled on medication.',
-      allergies: 'No known drug allergies (NKDA)',
-      hypertensionHistory: 'Hypertensive for 4 years on monotherapy',
-      diabetesHistory: 'No history of diabetes mellitus',
-      asthmaHistory: 'No history of asthma',
-      tuberculosisHistory: 'No personal or contact history',
-      smokingHistory: 'Non-smoker',
-      alcoholHistory: 'Social, 1-2 units/week',
-      familyHistory: 'Father: CAD, Hypertension',
-      generalExamination: 'Conscious, oriented, afebrile. No pallor, icterus, cyanosis, or edema.',
-      respiratoryExamination: 'Bilateral vesicular breath sounds, no rhonchi or crepitations.',
-      cardiovascularExamination: 'Normal S1 S2 heard, regular rhythm.',
-      gastrointestinalExamination: 'Abdomen soft, non-tender, no organomegaly.',
-      cnsExamination: 'Conscious and alert, no focal neurological deficits.',
-      otherExaminationFindings: 'Oropharynx mildly hyperemic. Tonsils not enlarged.',
-      provisionalDiagnosis: 'Acute Viral Pharyngitis',
-      finalDiagnosis: 'Acute Viral Pharyngitis (J02.9)',
-      icd10Code: 'J02.9',
-      carePlan: 'Advised warm water gargles, voice rest, and 5-day symptomatic treatment.',
-      investigationsRequested: 'CBC, CRP (Optional if symptoms persist beyond 5 days)',
-      dietaryAdvice: 'Avoid chilled beverages and oily spicy foods.',
-      followUpDate: '2026-10-19',
-      status: 'FINALIZED',
-      version: 1,
-      signedAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-  };
+  // Local offline record cache
+  final Map<String, ClinicalRecordModel> _localRecords = {};
 
   ClinicalRepository(this._dioClient);
 

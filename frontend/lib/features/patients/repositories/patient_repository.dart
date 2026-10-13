@@ -6,80 +6,8 @@ import '../models/patient_model.dart';
 class PatientRepository {
   final DioClient _dioClient;
 
-  // Local fallback cache
-  final List<PatientModel> _localPatients = [
-    PatientModel(
-      id: 'demo-pat-1',
-      uhid: 'UHID-2026-00001',
-      hospitalRegNum: 'REG-2026-00001',
-      fullName: 'Johnathan Reynolds',
-      parentSpouseName: 'Thomas Reynolds',
-      parentSpouseRelation: 'S/o',
-      ageYears: 38,
-      ageMonths: 0,
-      gender: 'MALE',
-      phone: '+15551234567',
-      email: 'johnathan@example.com',
-      bloodGroup: 'O+',
-      address: '123 Hospital Ave, Metro Health District',
-      city: 'Metro City',
-      state: 'State Health Region',
-      postalCode: '500001',
-      barcodeValue: 'BAR-UHID-2026-00001',
-      qrCodeData: 'OPDCONNECT+UHID-2026-00001+REG-2026-00001',
-      emergencyContactName: 'Mary Reynolds',
-      emergencyContactPhone: '+15559998888',
-      emergencyContactRelation: 'Spouse',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    PatientModel(
-      id: 'demo-pat-2',
-      uhid: 'UHID-2026-00002',
-      hospitalRegNum: 'REG-2026-00002',
-      fullName: 'Priya Sharma',
-      parentSpouseName: 'Rajesh Sharma',
-      parentSpouseRelation: 'W/o',
-      ageYears: 32,
-      ageMonths: 0,
-      gender: 'FEMALE',
-      phone: '+15559876543',
-      email: 'priya@example.com',
-      bloodGroup: 'B+',
-      address: '45 Lake View Road, Metropolis',
-      city: 'Metropolis',
-      state: 'Central Province',
-      postalCode: '500045',
-      barcodeValue: 'BAR-UHID-2026-00002',
-      qrCodeData: 'OPDCONNECT+UHID-2026-00002+REG-2026-00002',
-      emergencyContactName: 'Raj Sharma',
-      emergencyContactPhone: '+15557776666',
-      emergencyContactRelation: 'Brother',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    PatientModel(
-      id: 'demo-pat-3',
-      uhid: 'UHID-2026-00003',
-      hospitalRegNum: 'REG-2026-00003',
-      fullName: 'Robert Miller',
-      parentSpouseName: 'George Miller',
-      parentSpouseRelation: 'S/o',
-      ageYears: 60,
-      ageMonths: 0,
-      gender: 'MALE',
-      phone: '+15554567890',
-      bloodGroup: 'A+',
-      address: '77 Pine Street, Springfield',
-      city: 'Springfield',
-      state: 'Northern Territory',
-      postalCode: '500077',
-      barcodeValue: 'BAR-UHID-2026-00003',
-      qrCodeData: 'OPDCONNECT+UHID-2026-00003+REG-2026-00003',
-      emergencyContactName: 'Linda Miller',
-      emergencyContactPhone: '+15553332222',
-      emergencyContactRelation: 'Daughter',
-      createdAt: DateTime.now(),
-    ),
-  ];
+  // Local offline cache
+  final List<PatientModel> _localPatients = [];
 
   PatientRepository(this._dioClient);
 
@@ -194,7 +122,7 @@ class PatientRepository {
     final generatedUhid = 'UHID-2026-${(_localPatients.length + 1).toString().padLeft(5, '0')}';
     final generatedReg = 'REG-2026-${(_localPatients.length + 1).toString().padLeft(5, '0')}';
     final newPat = PatientModel(
-      id: 'demo-pat-${_localPatients.length + 1}',
+      id: 'pat-${DateTime.now().millisecondsSinceEpoch}',
       uhid: generatedUhid,
       hospitalRegNum: patient.hospitalRegNum ?? generatedReg,
       fullName: patient.fullName,

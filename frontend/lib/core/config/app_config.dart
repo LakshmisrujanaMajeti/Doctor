@@ -16,11 +16,17 @@ class AppConfig {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4d2lkcWF0c3h6c3J1bGF4eGFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3NzgwODgsImV4cCI6MjEwNzM1NDA4OH0.aPYCUJxHYwgYvTAjaiyYjD4G_s5dICLLjXLOYdkcXhE',
   );
 
+  /// Mutable runtime server URL configured via server settings or storage
+  static String? customServerUrl;
+
   /// Default API base URL for FastAPI backend
-  /// Uses 10.0.2.2 for Android emulators, 127.0.0.1 for desktop/iOS/web
+  /// Uses custom server URL if configured, 10.0.2.2 for Android emulators, 127.0.0.1 for desktop/iOS/web
   static String get apiBaseUrl {
-    const customUrl = String.fromEnvironment('API_BASE_URL');
-    if (customUrl.isNotEmpty) return customUrl;
+    if (customServerUrl != null && customServerUrl!.trim().isNotEmpty) {
+      return customServerUrl!.trim();
+    }
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) return envUrl;
 
     if (kIsWeb) return 'http://localhost:8000/api/v1';
     if (defaultTargetPlatform == TargetPlatform.android) {

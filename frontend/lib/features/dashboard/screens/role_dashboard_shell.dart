@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/data/mock_presentation_data.dart';
+import '../../../core/config/app_config.dart';
+import '../../../routing/route_names.dart';
+import '../../../shared/widgets/server_config_dialog.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_card.dart';
@@ -119,7 +121,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             // Quick Role Switcher Pill (One tap to test any role)
             InkWell(
               borderRadius: BorderRadius.circular(20),
-              onTap: () => _showRoleSwitcherSheet(context, ref, currentRole),
+              onTap: () => _showUserProfileSheet(context, ref, authState, currentRole),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
@@ -1345,12 +1347,14 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
     );
   }
 
-  void _showRoleSwitcherSheet(
+  void _showUserProfileSheet(
     BuildContext context,
     WidgetRef ref,
+    AuthState authState,
     String currentRole,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = authState.user;
 
     showModalBottomSheet(
       context: context,
@@ -1365,7 +1369,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
                 child: Container(
@@ -1378,106 +1382,97 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                   ),
                 ),
               ),
-              const Text(
-                'Switch Clinical Role Perspective',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.15),
+                    child: Icon(_getRoleIcon(currentRole), color: AppColors.primaryBlue, size: 28),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.fullName.isNotEmpty == true ? user!.fullName : 'Hospital User',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          user?.email.isNotEmpty == true ? user!.email : (user?.phone ?? 'Active Session'),
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      currentRole.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Select a hospital role to instantly experience tailored dashboards, queues, and workflows.',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: isDark
-                      ? AppColors.darkTextSecondary
-                      : AppColors.lightTextSecondary,
-                ),
+              const SizedBox(height: 24),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.dns_rounded, color: AppColors.primaryBlue),
+                title: const Text('Server Connection & Diagnostics', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text(AppConfig.apiBaseUrl, style: const TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ServerConfigDialog.show(context);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.settings_outlined, color: Colors.grey),
+                title: const Text('System Preferences', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: const Text('Appearance, notifications, security', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push('/settings');
+                },
               ),
               const SizedBox(height: 20),
-              ...MockPresentationData.rolePresets.map((preset) {
-                final isSelected = currentRole == preset.roleKey;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(
-                        color: isSelected
-                            ? AppColors.primaryBlue
-                            : Colors.transparent,
-                        width: 1.5,
-                      ),
-                    ),
-                    tileColor: isSelected
-                        ? AppColors.primaryBlue.withValues(alpha: 0.1)
-                        : (isDark
-                            ? const Color(0xFF0F172A)
-                            : const Color(0xFFF8FAFC)),
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primaryBlue
-                            : (isDark
-                                ? const Color(0xFF334155)
-                                : const Color(0xFFE2E8F0)),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        preset.icon,
-                        size: 20,
-                        color: isSelected ? Colors.white : AppColors.primaryBlue,
-                      ),
-                    ),
-                    title: Text(
-                      preset.title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: isSelected ? AppColors.primaryBlue : null,
-                      ),
-                    ),
-                    subtitle: Text(
-                      preset.subtitle,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_circle_rounded,
-                            color: AppColors.primaryBlue)
-                        : null,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _applySimulatedRole(ref, preset);
-                    },
-                  ),
-                );
-              }),
-              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.triageEmergency,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('Sign Out of Hospital Session', style: TextStyle(fontWeight: FontWeight.w700)),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await ref.read(authProvider.notifier).logout();
+                  if (context.mounted) {
+                    context.goNamed(RouteNames.welcome);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         );
       },
-    );
-  }
-
-  void _applySimulatedRole(WidgetRef ref, RolePreset preset) {
-    final authNotifier = ref.read(authProvider.notifier);
-    final current = ref.read(authProvider);
-
-    final updated = UserModel(
-      id: current.user?.id ?? 'simulated-user',
-      email: preset.email,
-      fullName: preset.subtitle.split('(').first.trim(),
-      phone: current.user?.phone ?? '+1 (555) 019-2831',
-      roleName: preset.roleKey,
-    );
-
-    authNotifier.setSimulatedUser(updated);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Switched to ${preset.title}'),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
     );
   }
 

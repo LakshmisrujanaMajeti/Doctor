@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/data/mock_presentation_data.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../routing/route_names.dart';
 import '../../../shared/widgets/error_banner_widget.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_text_field.dart';
+import '../../../shared/widgets/server_config_dialog.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -21,8 +21,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'dr.chen@opdconnect.com');
-  final _passwordController = TextEditingController(text: 'Doctor@123456');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _rememberMe = true;
 
   @override
@@ -32,24 +32,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _fillCredentials(String email, String password) {
-    setState(() {
-      _emailController.text = email;
-      _passwordController.text = password;
-    });
-  }
-
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final sanitizedIdentifier = InputSanitizer.sanitizeText(_emailController.text.trim());
+    final raw = _emailController.text.trim();
+    final sanitizedIdentifier = raw.contains('@')
+        ? InputSanitizer.sanitizeEmail(raw)
+        : InputSanitizer.sanitizeText(raw);
+
     final success = await ref.read(authProvider.notifier).login(
       sanitizedIdentifier,
       _passwordController.text,
     );
 
     if (success && mounted) {
-      // Use goNamed so user cannot return to login via Back button
       context.goNamed(RouteNames.dashboard);
     }
   }
@@ -62,6 +58,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sign In'),
+        actions: [
+          IconButton(
+            tooltip: 'Server Connection Settings',
+            icon: const Icon(Icons.dns_rounded),
+            onPressed: () => ServerConfigDialog.show(context),
+          ),
+        ],
       ),
       body: MedicalIllustratorBackground(
         variant: MedicalBackgroundVariant.auth,
@@ -182,50 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       icon: Icons.login_rounded,
                       onPressed: _handleLogin,
                     ),
-                    const SizedBox(height: 28),
-
-                    // Quick Demo Accounts Chips
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.bolt_rounded, size: 18, color: Colors.amber[700]),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Quick Demo Accounts (1-Tap Fill)',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: MockPresentationData.rolePresets.map((preset) {
-                              return ActionChip(
-                                avatar: Icon(preset.icon, size: 16),
-                                label: Text(
-                                  preset.title,
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                                ),
-                                onPressed: () => _fillCredentials(preset.email, preset.password),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
                     // Register Link
                     Row(

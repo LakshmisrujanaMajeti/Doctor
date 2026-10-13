@@ -51,7 +51,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
       if (authState.isAuthenticated) {
         context.goNamed(RouteNames.dashboard);
       } else {
-        context.goNamed(RouteNames.onboarding);
+        context.goNamed(RouteNames.welcome);
       }
     } catch (e) {
       debugPrint('Navigation error: $e');

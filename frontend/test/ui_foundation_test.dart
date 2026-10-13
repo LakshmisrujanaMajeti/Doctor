@@ -251,7 +251,7 @@ void main() {
 
       expect(find.text('Profile & Hospital Settings'), findsOneWidget);
       expect(find.text('Dark Mode'), findsOneWidget);
-      expect(find.text('Simulate Clinical Role Perspective'), findsOneWidget);
+      expect(find.text('Hospital Infrastructure Status'), findsOneWidget);
       expect(find.text('Sign Out of OPD Connect+'), findsOneWidget);
     });
   });

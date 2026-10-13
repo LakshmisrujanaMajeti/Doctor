@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/auth/models/auth_state.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/auth/screens/forgot_password_screen.dart';
 import '../features/auth/screens/login_screen.dart';
@@ -38,22 +39,39 @@ import '../shared/screens/not_found_screen.dart';
 import '../shared/screens/offline_screen.dart';
 import '../shared/screens/unauthorized_screen.dart';
 
+class RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  RouterNotifier(this._ref) {
+    _ref.listen<AuthState>(authProvider, (_, __) {
+      notifyListeners();
+    });
+  }
+}
+
+final routerNotifierProvider = Provider<RouterNotifier>((ref) {
+  return RouterNotifier(ref);
+});
+
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final notifier = ref.watch(routerNotifierProvider);
 
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: notifier,
     debugLogDiagnostics: false,
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       final isAuth = authState.isAuthenticated;
       final path = state.matchedLocation;
 
-      // 1. Prevent authenticated users from returning to login / welcome / splash
+      // 1. Prevent authenticated users from returning to login / welcome / splash / profile-setup
       if (isAuth &&
           (path == '/login' ||
               path == '/welcome' ||
               path == '/splash' ||
-              path == '/onboarding')) {
+              path == '/onboarding' ||
+              path == '/profile-setup')) {
         return '/dashboard';
       }
 

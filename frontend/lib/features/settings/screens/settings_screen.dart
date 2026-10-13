@@ -4,11 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/data/mock_presentation_data.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_card.dart';
-import '../../auth/models/auth_state.dart';
+import '../../../shared/widgets/server_config_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 
@@ -21,7 +20,7 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
     final user = authState.user;
-    final currentRole = user?.roleName.toLowerCase() ?? 'receptionist';
+    final roleDisplay = (user?.roleName.isNotEmpty == true ? user!.roleName : 'Staff').toUpperCase();
 
     return Scaffold(
       appBar: AppBar(
@@ -109,7 +108,7 @@ class SettingsScreen extends ConsumerWidget {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  currentRole.toUpperCase(),
+                                  roleDisplay,
                                   style: const TextStyle(
                                     color: AppColors.primaryBlue,
                                     fontWeight: FontWeight.w800,
@@ -159,73 +158,6 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 24),
-
-          // Role Switcher Demo Tool (Allows instantaneous exploration of all 5 perspectives)
-          const Text(
-            'Simulate Clinical Role Perspective',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Switch perspective to explore role-specific queues, actions, and KPI views.',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? AppColors.darkTextSecondary
-                  : AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          OpdCard(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: MockPresentationData.rolePresets.map((preset) {
-                final isSelected = currentRole == preset.roleKey;
-                return ChoiceChip(
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        preset.icon,
-                        size: 16,
-                        color: isSelected
-                            ? Colors.white
-                            : AppColors.primaryBlue,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(preset.title),
-                    ],
-                  ),
-                  selected: isSelected,
-                  selectedColor: AppColors.primaryBlue,
-                  labelStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight:
-                        isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? Colors.white : null,
-                  ),
-                  onSelected: (val) {
-                    if (val) {
-                      _switchRole(ref, preset);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Active perspective changed to: ${preset.title}',
-                          ),
-                          behavior: SnackBarBehavior.floating,
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 24),
 
           // App Appearance
           const Text(
@@ -275,19 +207,15 @@ class SettingsScreen extends ConsumerWidget {
                       style: TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text(AppConfig.apiBaseUrl,
                       style: const TextStyle(fontSize: 12)),
-                  trailing: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.statusCompleted.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('RUNNING :8000',
-                        style: TextStyle(
-                            color: AppColors.statusCompleted,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 11)),
+                  trailing: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.tune_rounded, size: 20, color: AppColors.primaryBlue),
+                      SizedBox(width: 4),
+                      Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey),
+                    ],
                   ),
+                  onTap: () => ServerConfigDialog.show(context),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -451,21 +379,5 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  void _switchRole(WidgetRef ref, RolePreset preset) {
-    final authNotifier = ref.read(authProvider.notifier);
-    final current = ref.read(authProvider);
-
-    final updatedUser = UserModel(
-      id: current.user?.id ?? 'simulated-user',
-      email: preset.email,
-      fullName: preset.subtitle.split('(').first.trim(),
-      phone: current.user?.phone ?? '+1 (555) 234-5678',
-      roleName: preset.roleKey,
-    );
-
-    // Update state to use new role
-    authNotifier.setSimulatedUser(updatedUser);
   }
 }

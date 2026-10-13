@@ -40,6 +40,11 @@ class DioClient {
     _cache.removeWhere((key, _) => key.contains(pathPrefix));
   }
 
+  void updateBaseUrl(String newUrl) {
+    dio.options.baseUrl = newUrl;
+    clearCache();
+  }
+
   DioClient() {
     dio = Dio(
       BaseOptions(

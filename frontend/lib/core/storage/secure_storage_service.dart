@@ -60,6 +60,18 @@ class SecureStorageService {
     }
   }
 
+  static const String keyCustomServerUrl = 'opd_custom_server_url';
+
+  static Future<void> saveServerUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(keyCustomServerUrl, url);
+  }
+
+  static Future<String?> getServerUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(keyCustomServerUrl);
+  }
+
   static Future<void> clearTokens() async {
     try {
       await _secureStorage.delete(key: keyAccessToken);

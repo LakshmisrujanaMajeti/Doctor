@@ -52,8 +52,8 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
     try {
       final createdVisit = await ref.read(visitRepositoryProvider).createVisit(
         patientId: _selectedPatient!.id,
-        doctorId: 'demo-doc-1',
-        departmentId: 'dept-1',
+        doctorId: 'default',
+        departmentId: _selectedDepartment,
         triagePriority: _triagePriority,
         consultationFee: double.tryParse(_feeController.text.trim()) ?? 500.0,
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,

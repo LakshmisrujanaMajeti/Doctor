@@ -3,12 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_config.dart';
+import 'core/storage/secure_storage_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/dashboard/providers/dashboard_provider.dart';
 import 'routing/app_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load saved custom server URL if configured
+  try {
+    final savedUrl = await SecureStorageService.getServerUrl();
+    if (savedUrl != null && savedUrl.trim().isNotEmpty) {
+      AppConfig.customServerUrl = savedUrl.trim();
+    }
+  } catch (e) {
+    debugPrint('Server URL restore note: $e');
+  }
 
   // Initialize Supabase client
   try {

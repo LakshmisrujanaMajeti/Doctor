@@ -37,13 +37,26 @@ class VisitService:
         if not patient:
             raise NotFoundException(f"Patient with ID '{visit_in.patient_id}' not found")
 
-        doctor = db.query(Doctor).filter(Doctor.id == visit_in.doctor_id).first()
-        if not doctor:
-            raise NotFoundException(f"Doctor with ID '{visit_in.doctor_id}' not found")
-
         dept = db.query(Department).filter(Department.id == visit_in.department_id).first()
         if not dept:
+            dept = db.query(Department).filter(
+                (Department.code == visit_in.department_id) |
+                (Department.name.ilike(f"%{visit_in.department_id}%"))
+            ).first()
+        if not dept:
+            dept = db.query(Department).filter(Department.is_active == True).first()
+        if not dept:
             raise NotFoundException(f"Department with ID '{visit_in.department_id}' not found")
+
+        doctor = db.query(Doctor).filter(Doctor.id == visit_in.doctor_id).first()
+        if not doctor:
+            doctor = db.query(Doctor).filter(Doctor.department_id == dept.id, Doctor.is_available == True).first()
+        if not doctor:
+            doctor = db.query(Doctor).filter(Doctor.is_available == True).first()
+        if not doctor:
+            doctor = db.query(Doctor).first()
+        if not doctor:
+            raise NotFoundException(f"Doctor with ID '{visit_in.doctor_id}' not found")
 
         visit_num = VisitService.generate_visit_number(db)
         queue_tok = VisitService.get_next_queue_token(db, doctor.id, datetime.utcnow().date())
@@ -51,8 +64,8 @@ class VisitService:
         visit = OPDVisit(
             visit_number=visit_num,
             patient_id=visit_in.patient_id,
-            doctor_id=visit_in.doctor_id,
-            department_id=visit_in.department_id,
+            doctor_id=doctor.id,
+            department_id=dept.id,
             queue_token=queue_tok,
             triage_priority=visit_in.triage_priority,
             consultation_fee=visit_in.consultation_fee,
