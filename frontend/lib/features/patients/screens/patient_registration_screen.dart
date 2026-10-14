@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
@@ -8,6 +9,7 @@ import '../../../shared/widgets/opd_text_field.dart';
 import '../models/patient_model.dart';
 import '../providers/patient_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
+import '../../admin_portal/providers/admin_portal_provider.dart';
 
 class PatientRegistrationScreen extends ConsumerStatefulWidget {
   const PatientRegistrationScreen({super.key});
@@ -375,8 +377,12 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
         newPatient,
         allowDuplicate: allowDuplicate,
       );
+      ref.read(patientSearchQueryProvider.notifier).setQuery('');
       ref.invalidate(patientListProvider);
       ref.invalidate(dashboardStatsProvider);
+      ref.invalidate(adminDashboardSummaryProvider);
+      ref.invalidate(adminRegistrationsReportProvider);
+      ref.invalidate(adminBillingReportProvider);
 
       if (mounted) {
         _showSuccessCard(registered);
@@ -409,7 +415,13 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
           children: [
             const Icon(Icons.check_circle, color: AppColors.triageNormal, size: 28),
             const SizedBox(width: 8),
-            const Text('Registration Completed'),
+            const Expanded(
+              child: Text(
+                'Registration Completed',
+                style: TextStyle(fontSize: 18),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -467,9 +479,10 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
         title: const Text('OPD Patient Registration', style: TextStyle(fontWeight: FontWeight.bold)),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
+          labelColor: AppColors.primaryTeal,
+          unselectedLabelColor: AppColors.textSecondary,
+          indicatorColor: AppColors.primaryTeal,
+          indicatorWeight: 3,
           tabs: const [
             Tab(icon: Icon(Icons.person), text: 'Demographics'),
             Tab(icon: Icon(Icons.contact_phone), text: 'Contact & Addr'),
@@ -670,10 +683,14 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             key: const Key('patient_phone_input'),
             controller: _phoneController,
             label: 'Contact Phone Number *',
-            hint: 'e.g. +919876543210',
+            hint: 'e.g. 9876543210 (10 digits)',
             keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
             prefixIcon: const Icon(Icons.phone_outlined),
-            validator: (v) => v == null || v.trim().isEmpty ? 'Phone number is required' : null,
+            validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Contact Phone Number'),
           ),
           const SizedBox(height: 12),
           OPDTextField(
@@ -682,6 +699,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             hint: 'patient@example.com',
             keyboardType: TextInputType.emailAddress,
             prefixIcon: const Icon(Icons.email_outlined),
+            validator: (v) => InputSanitizer.validateEmail(v, isRequired: false),
           ),
           const SizedBox(height: 12),
           OPDTextField(
@@ -760,10 +778,15 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
           const SizedBox(height: 12),
           OPDTextField(
             controller: _emergencyPhoneController,
-            label: 'Emergency Phone Number',
-            hint: 'Contact number',
+            label: 'Emergency Phone Number (Optional, 10 Digits)',
+            hint: 'e.g. 9876543210',
             keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
             prefixIcon: const Icon(Icons.phone_in_talk_outlined),
+            validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Emergency Phone Number'),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(

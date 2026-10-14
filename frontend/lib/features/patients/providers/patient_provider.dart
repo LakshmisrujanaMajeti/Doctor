@@ -22,3 +22,8 @@ final patientListProvider = FutureProvider<List<PatientModel>>((ref) async {
   final query = ref.watch(patientSearchQueryProvider);
   return repository.getPatients(query: query);
 });
+
+final patientDetailProvider = FutureProvider.family<PatientModel?, String>((ref, patientId) async {
+  final repository = ref.watch(patientRepositoryProvider);
+  return repository.getPatientById(patientId);
+});

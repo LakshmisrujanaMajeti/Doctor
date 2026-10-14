@@ -29,6 +29,8 @@ class RouteNames {
   static const String profile = 'profile';
   static const String settings = 'settings';
   static const String patientPortal = 'patientPortal';
+  static const String patientTokenAccess = 'patientTokenAccess';
+  static const String digitalOpdBooklet = 'digitalOpdBooklet';
   static const String adminPortal = 'adminPortal';
 
   // System State Screens

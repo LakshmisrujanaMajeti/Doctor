@@ -1,6 +1,7 @@
 from datetime import datetime, date
+import re
 from typing import List, Optional
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from app.core.exceptions import NotFoundException, BadRequestException
 from app.models.visit import OPDVisit, VitalSigns
@@ -84,6 +85,14 @@ class VisitService:
             details_json=f'{{"visit_number": "{visit.visit_number}", "token": {visit.queue_token}}}'
         ))
         db.commit()
+
+        # Real-time Cloud Sync to Supabase
+        try:
+            from app.services.supabase_sync_service import SupabaseSyncService
+            SupabaseSyncService.sync_visit(visit)
+        except Exception as se:
+            logger.debug(f"Supabase visit sync notice: {se}")
+
         return visit
 
     @staticmethod
@@ -154,6 +163,7 @@ class VisitService:
         department_id: Optional[str] = None,
         status: Optional[str] = None,
         patient_id: Optional[str] = None,
+        query: Optional[str] = None,
         skip: int = 0,
         limit: int = 50,
     ) -> List[OPDVisit]:
@@ -166,6 +176,41 @@ class VisitService:
             stmt = stmt.filter(OPDVisit.status == status)
         if patient_id:
             stmt = stmt.filter(OPDVisit.patient_id == patient_id)
+        if query:
+            clean = query.strip()
+            pattern = f"%{clean}%"
+            conditions = [
+                OPDVisit.visit_number.ilike(pattern),
+            ]
+
+            # Check if query contains token number (e.g. "1", "#1", "token 1", "tok 2")
+            token_num = None
+            if clean.lstrip('#').isdigit():
+                token_num = int(clean.lstrip('#'))
+            else:
+                m = re.search(r'\b(?:token|tok|queue)?\s*[:#-]?\s*(\d+)\b', clean, re.IGNORECASE)
+                if m:
+                    token_num = int(m.group(1))
+
+            if token_num is not None:
+                conditions.append(OPDVisit.queue_token == token_num)
+
+            # Match on patient name, UHID, or phone
+            matching_patient_ids = [
+                p[0] for p in db.query(Patient.id).filter(
+                    or_(
+                        Patient.full_name.ilike(pattern),
+                        Patient.uhid.ilike(pattern),
+                        Patient.phone.ilike(pattern),
+                        Patient.hospital_reg_num.ilike(pattern),
+                    )
+                ).all()
+            ]
+            if matching_patient_ids:
+                conditions.append(OPDVisit.patient_id.in_(matching_patient_ids))
+
+            stmt = stmt.filter(or_(*conditions))
+
         return stmt.order_by(OPDVisit.visit_date.desc(), OPDVisit.queue_token.asc()).offset(skip).limit(limit).all()
 
     @staticmethod

@@ -31,6 +31,33 @@ class DependentProfileItem(BaseSchema):
     registration_date: datetime
 
 
+class PatientQuickAccessRequest(BaseSchema):
+    identifier: str = Field(..., description="UHID, Queue Token #, Phone, or Visit Number")
+
+
+class PatientActiveVisitSummary(BaseSchema):
+    id: str
+    visit_number: str
+    queue_token: int
+    status: str
+    triage_priority: str
+    doctor_name: str
+    department_name: str
+    room_number: str
+    patients_ahead: int
+    visit_date: str
+    payment_status: str
+    consultation_fee: float
+
+
+class PatientQuickAccessResponse(BaseSchema):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int = 86400
+    patient: PatientRead
+    active_visit: Optional[PatientActiveVisitSummary] = None
+
+
 class PatientPortalProfileResponse(BaseSchema):
     patient: PatientRead
     dependents: List[DependentProfileItem]
@@ -176,6 +203,18 @@ class UserRoleUpdateRequest(BaseSchema):
     additional_permission_codes: Optional[List[str]] = None
 
 
+class AdminUserUpdateRequest(BaseSchema):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    role_name: Optional[str] = None
+    department_name: Optional[str] = None
+    room_number: Optional[str] = None
+    qualification: Optional[str] = None
+    consultation_fee: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 class SystemConfigItem(BaseSchema):
     config_key: str
     config_value: str
@@ -197,3 +236,20 @@ class BackupGuidanceResponse(BaseSchema):
     guidance_checklist: List[str]
     cron_specification: str
     restore_procedure_steps: List[str]
+
+
+class AvailableSlotItem(BaseSchema):
+    slot_time: str
+    is_available: bool = True
+    booked_count: int = 0
+    max_capacity: int = 5
+
+
+class BookSlotRequest(BaseSchema):
+    patient_id: Optional[str] = None
+    department_id: str
+    doctor_id: Optional[str] = None
+    slot_date: str
+    slot_time: str
+    chief_complaint: Optional[str] = None
+

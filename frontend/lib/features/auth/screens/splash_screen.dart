@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../routing/route_names.dart';
+import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -26,7 +27,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 800),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
@@ -39,20 +40,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
     _animController.forward();
 
-    // Auto navigate after splash display
-    _timer = Timer(const Duration(milliseconds: 1800), _handleNavigation);
+    // High performance splash: 1.2s displays hospital branding crisply while loading instantly
+    _timer = Timer(const Duration(milliseconds: 1200), _handleNavigation);
   }
 
   void _handleNavigation() {
     if (!mounted) return;
     try {
-      final authState = ref.read(authProvider);
-
-      if (authState.isAuthenticated) {
-        context.goNamed(RouteNames.dashboard);
-      } else {
-        context.goNamed(RouteNames.welcome);
-      }
+      context.goNamed(RouteNames.login);
     } catch (e) {
       debugPrint('Navigation error: $e');
     }
@@ -71,85 +66,99 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBg : Colors.white,
-      body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: ScaleTransition(
-            scale: _scaleAnimation,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Medical Emblem
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primaryBlue, AppColors.accentTeal],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryBlue.withValues(alpha: 0.35),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
+      body: SafeArea(
+        child: Center(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Official Hospital Logo
+                    const SmvmchHospitalLogo(size: 130),
+                    const SizedBox(height: 24),
+
+                    // Official Hospital Title
+                    const Text(
+                      'SRI MANAKULA VINAYAGAR\nMEDICAL COLLEGE & HOSPITAL',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: AppColors.hospitalMaroon,
+                        height: 1.3,
                       ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.local_hospital_rounded,
-                      color: Colors.white,
-                      size: 54,
                     ),
-                  ),
-                ),
-                const SizedBox(height: 28),
+                    const SizedBox(height: 10),
 
-                // Title
-                const Text(
-                  AppStrings.appName,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Tagline
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryBlueLight.withValues(alpha: isDark ? 0.08 : 0.8),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    AppStrings.tagline,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryBlue,
-                      letterSpacing: 0.3,
+                    // App Name
+                    const Text(
+                      AppStrings.appName,
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                        color: AppColors.primaryTeal,
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 48),
+                    const SizedBox(height: 6),
 
-                // Loading Spinner
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isDark ? const Color(0xFF4589FF) : AppColors.primaryBlue,
+                    // Tamil Title & Subtitle
+                    Text(
+                      'ஸ்ரீ மணக்குள விநாயகர் மருத்துவக் கல்லூரி மற்றும் மருத்துவமனை',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.grey[400] : Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+
+                    // Tagline
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryTeal.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.primaryTeal.withOpacity(0.3)),
+                      ),
+                      child: const Text(
+                        AppStrings.tagline,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryTeal,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+
+                    // 5-Second Linear Progress Loader
+                    SizedBox(
+                      width: 180,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: const LinearProgressIndicator(
+                          minHeight: 4,
+                          backgroundColor: Color(0xFFE2E8F0),
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryTeal),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Kalitheerthalkuppam, Puducherry - 605 107',
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.grey[500] : Colors.grey[600]),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

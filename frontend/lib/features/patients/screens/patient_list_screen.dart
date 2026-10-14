@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
+import '../../../shared/widgets/confirmation_dialog.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 import '../models/patient_model.dart';
 import '../providers/patient_provider.dart';
 
@@ -30,7 +33,12 @@ class PatientListScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add_rounded),
         label: const Text('New Patient'),
-        onPressed: () => context.push('/patients/new'),
+        onPressed: () async {
+          await context.push('/patients/new');
+          ref.read(patientSearchQueryProvider.notifier).setQuery('');
+          ref.invalidate(patientListProvider);
+          ref.invalidate(dashboardStatsProvider);
+        },
       ),
       body: MedicalIllustratorBackground(
         variant: MedicalBackgroundVariant.portal,
@@ -65,7 +73,12 @@ class PatientListScreen extends ConsumerWidget {
                       message: 'Try searching with a different UHID or register a new patient.',
                       icon: Icons.person_search_rounded,
                       actionLabel: 'Register Patient',
-                      onAction: () => context.push('/patients/new'),
+                      onAction: () async {
+                        await context.push('/patients/new');
+                        ref.read(patientSearchQueryProvider.notifier).setQuery('');
+                        ref.invalidate(patientListProvider);
+                        ref.invalidate(dashboardStatsProvider);
+                      },
                     );
                   }
 
@@ -81,7 +94,7 @@ class PatientListScreen extends ConsumerWidget {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(14),
                         onTap: () {
-                          _showPatientOptions(context, patient);
+                          _showPatientOptions(context, ref, patient);
                         },
                         child: Padding(
                           padding: const EdgeInsets.all(14),
@@ -204,7 +217,7 @@ class PatientListScreen extends ConsumerWidget {
   );
   }
 
-  void _showPatientOptions(BuildContext context, PatientModel patient) {
+  void _showPatientOptions(BuildContext context, WidgetRef ref, PatientModel patient) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -243,7 +256,15 @@ class PatientListScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              const Divider(height: 24),
+              ListTile(
+                leading: const Icon(Icons.auto_stories_rounded, color: AppColors.hospitalMaroon),
+                title: const Text('Digital Out Patient Book', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.hospitalMaroon)),
+                subtitle: const Text('View 7-page official booklet: Cover, Barcodes, Assessment, Rx, Bill, Labs'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push('/patients/${patient.id}/booklet');
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.confirmation_number_rounded, color: AppColors.primaryTeal),
                 title: const Text('Book OPD Visit & Issue Token'),
@@ -255,11 +276,29 @@ class PatientListScreen extends ConsumerWidget {
               ),
               ListTile(
                 leading: const Icon(Icons.badge_outlined, color: AppColors.secondaryNavy),
-                title: const Text('View OPD Booklet Card'),
+                title: const Text('View OPD Barcode ID Card'),
                 subtitle: Text('${patient.parentSpouseRelation ?? "S/o"}: ${patient.parentSpouseName ?? "N/A"} • ${patient.phone}'),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showBarcodeDialog(context, patient);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue),
+                title: const Text('Edit Patient Demographics'),
+                subtitle: const Text('Update full name, phone number, age, gender, address'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showEditPatientDialog(context, ref, patient);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.triageEmergency),
+                title: const Text('Delete Patient Record', style: TextStyle(color: AppColors.triageEmergency, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Permanently remove this registration'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDeletePatient(context, ref, patient);
                 },
               ),
             ],
@@ -267,6 +306,144 @@ class PatientListScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  void _showEditPatientDialog(BuildContext context, WidgetRef ref, PatientModel patient) {
+    final nameCtrl = TextEditingController(text: patient.fullName);
+    final phoneCtrl = TextEditingController(text: patient.phone);
+    final ageCtrl = TextEditingController(text: patient.ageYears != null ? '${patient.ageYears}' : '');
+    final addressCtrl = TextEditingController(text: patient.address ?? '');
+    final relationNameCtrl = TextEditingController(text: patient.parentSpouseName ?? '');
+    String selectedGender = patient.gender.toUpperCase();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Edit ${patient.fullName}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(labelText: 'Phone Number (10 Digits) *', isDense: true),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: ageCtrl,
+                        decoration: const InputDecoration(labelText: 'Age (Years)', isDense: true),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: ['MALE', 'FEMALE', 'OTHER'].contains(selectedGender) ? selectedGender : 'OTHER',
+                        decoration: const InputDecoration(labelText: 'Gender', isDense: true),
+                        items: const [
+                          DropdownMenuItem(value: 'MALE', child: Text('Male')),
+                          DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
+                          DropdownMenuItem(value: 'OTHER', child: Text('Other')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => selectedGender = val);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: relationNameCtrl,
+                  decoration: const InputDecoration(labelText: 'Father / Spouse Name', isDense: true),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: addressCtrl,
+                  decoration: const InputDecoration(labelText: 'Address', isDense: true),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameCtrl.text.trim().isEmpty || phoneCtrl.text.trim().isEmpty) return;
+                final updated = patient.copyWith(
+                  fullName: nameCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim(),
+                  ageYears: int.tryParse(ageCtrl.text.trim()),
+                  gender: selectedGender,
+                  parentSpouseName: relationNameCtrl.text.trim().isEmpty ? null : relationNameCtrl.text.trim(),
+                  address: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
+                );
+                try {
+                  await ref.read(patientRepositoryProvider).updatePatient(updated);
+                  ref.invalidate(patientListProvider);
+                  ref.invalidate(dashboardStatsProvider);
+                  if (context.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Patient "${updated.fullName}" updated successfully!')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to update patient: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeletePatient(BuildContext context, WidgetRef ref, PatientModel patient) async {
+    final confirm = await showOpdConfirmDialog(
+      context: context,
+      title: 'Delete Patient?',
+      message: 'Are you sure you want to permanently delete patient "${patient.fullName}" (UHID: ${patient.uhid})? This will permanently remove the record and cannot be undone.',
+      confirmText: 'Delete Record',
+      isDestructive: true,
+    );
+    if (confirm == true) {
+      try {
+        await ref.read(patientRepositoryProvider).deletePatient(patient.id);
+        ref.invalidate(patientListProvider);
+        ref.invalidate(dashboardStatsProvider);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Patient "${patient.fullName}" deleted successfully.')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete patient: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
   }
 
   void _showBarcodeDialog(BuildContext context, PatientModel patient) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/config/app_config.dart';
 import '../../../routing/route_names.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
+import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_card.dart';
@@ -37,6 +39,31 @@ class RoleDashboardShell extends ConsumerStatefulWidget {
 
 class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
   int _currentTabIndex = 0;
+  Timer? _realtimeRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-refresh realtime OPD queue metrics and clinical consultations periodically
+    _realtimeRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) {
+        final role = ref.read(authProvider).user?.roleName.toLowerCase() ?? 'receptionist';
+        if (role != 'patient') {
+          ref.invalidate(dashboardStatsProvider);
+          ref.invalidate(visitListProvider);
+          ref.invalidate(doctorDashboardProvider);
+        } else {
+          ref.invalidate(visitListProvider);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _realtimeRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,42 +96,62 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
+          titleSpacing: 10,
           title: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.local_hospital_rounded,
-                  color: AppColors.primaryBlue,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
+              const SmvmchHospitalLogo(size: 32),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      AppStrings.appName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            AppStrings.appName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.circle, color: Colors.green, size: 5),
+                              SizedBox(width: 2.5),
+                              Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
-                      AppStrings.tagline,
+                      AppStrings.hospitalFullName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 9.5,
                         fontWeight: FontWeight.w500,
                         color: isDark
                             ? AppColors.darkTextSecondary
@@ -123,7 +170,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
               borderRadius: BorderRadius.circular(20),
               onTap: () => _showUserProfileSheet(context, ref, authState, currentRole),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.primaryBlue.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
@@ -136,44 +183,46 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                   children: [
                     Icon(
                       _getRoleIcon(currentRole),
-                      size: 14,
+                      size: 13,
                       color: AppColors.primaryBlue,
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 4),
                     Text(
                       currentRole.toUpperCase(),
                       style: const TextStyle(
                         color: AppColors.primaryBlue,
                         fontWeight: FontWeight.w800,
-                        fontSize: 10.5,
-                        letterSpacing: 0.5,
+                        fontSize: 10,
+                        letterSpacing: 0.4,
                       ),
                     ),
-                    const SizedBox(width: 2),
                     const Icon(
                       Icons.arrow_drop_down,
-                      size: 16,
+                      size: 15,
                       color: AppColors.primaryBlue,
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 2),
 
             // Notifications Icon with Badge
             IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               tooltip: 'Hospital Notifications',
               icon: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  const Icon(Icons.notifications_outlined, size: 22),
+                  const Icon(Icons.notifications_outlined, size: 21),
                   Positioned(
                     top: -2,
                     right: -2,
                     child: Container(
-                      width: 8,
-                      height: 8,
+                      width: 7,
+                      height: 7,
                       decoration: const BoxDecoration(
                         color: AppColors.triageEmergency,
                         shape: BoxShape.circle,
@@ -187,11 +236,14 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
 
             // Settings Icon
             IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               tooltip: 'Settings & Profile',
-              icon: const Icon(Icons.settings_outlined, size: 22),
+              icon: const Icon(Icons.settings_outlined, size: 21),
               onPressed: () => context.push('/settings'),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 4),
           ],
         ),
         body: MedicalIllustratorBackground(
@@ -207,7 +259,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 96),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -226,23 +278,34 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                   const LaboratoryWorkspaceView(),
                 ] else if (currentRole == 'pharmacist') ...[
                   const PharmacyWorkspaceView(),
+                ] else if (currentRole == 'billing') ...[
+                  const BillingWorkspaceView(),
                 ] else ...[
                   // 2. Role-Aware KPI Metrics Grid
-                  statsAsync.when(
-                    data: (stats) => _buildRoleMetricsGrid(
+                  if (currentRole == 'patient') ...[
+                    _buildRoleMetricsGrid(
                       context: context,
                       role: currentRole,
-                      stats: stats,
+                      stats: const DashboardStatsModel(),
                       visitsAsync: visitsAsync,
                     ),
-                    loading: () => const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: CircularProgressIndicator(),
+                  ] else ...[
+                    statsAsync.when(
+                      data: (stats) => _buildRoleMetricsGrid(
+                        context: context,
+                        role: currentRole,
+                        stats: stats,
+                        visitsAsync: visitsAsync,
                       ),
+                      loading: () => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      error: (err, stack) => const SizedBox(),
                     ),
-                    error: (err, stack) => const SizedBox(),
-                  ),
+                  ],
                   const SizedBox(height: 24),
 
                   // 3. Role-Aware Quick Action Hub
@@ -267,37 +330,88 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           ),
         ),
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _currentTabIndex,
-          onDestinationSelected: (idx) {
-            setState(() => _currentTabIndex = idx);
-            if (idx == 1) context.push('/queue');
-            if (idx == 2) context.push('/patients');
-            if (idx == 3) context.push('/notifications');
-            if (idx == 4) context.push('/settings');
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dashboard_rounded),
-              label: 'Dashboard',
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            border: Border(
+              top: BorderSide(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.queue_play_next_rounded),
-              label: 'OPD Queue',
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            bottom: true,
+            child: NavigationBarTheme(
+              data: NavigationBarThemeData(
+                height: 60,
+                indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.14),
+                labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                  final isSelected = states.contains(WidgetState.selected);
+                  return TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected
+                        ? AppColors.primaryBlue
+                        : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                  );
+                }),
+                iconTheme: WidgetStateProperty.resolveWith((states) {
+                  final isSelected = states.contains(WidgetState.selected);
+                  return IconThemeData(
+                    size: 22,
+                    color: isSelected
+                        ? AppColors.primaryBlue
+                        : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                  );
+                }),
+              ),
+              child: NavigationBar(
+                height: 60,
+                elevation: 0,
+                backgroundColor: Colors.transparent,
+                selectedIndex: _currentTabIndex,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                onDestinationSelected: (idx) {
+                  setState(() => _currentTabIndex = idx);
+                  if (idx == 1) context.push('/queue');
+                  if (idx == 2) context.push('/patients');
+                  if (idx == 3) context.push('/notifications');
+                  if (idx == 4) context.push('/settings');
+                },
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_rounded),
+                    label: 'Dashboard',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.queue_play_next_rounded),
+                    label: 'Queue',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.people_alt_rounded),
+                    label: 'Patients',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.notifications_rounded),
+                    label: 'Alerts',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.person_rounded),
+                    label: 'Profile',
+                  ),
+                ],
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.people_alt_rounded),
-              label: 'Patients',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.notifications_rounded),
-              label: 'Alerts',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -316,6 +430,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
       'nurse': 'Triage Station • Vital checks and priority escalation active',
       'admin': 'OPD Management Console • Hospital system health optimal',
       'patient': 'Personal Health Hub • Live OPD token and visit tracking',
+      'laboratory': 'Diagnostic Pathology Desk • Automated analyzer queue ready',
+      'lab_tech': 'Diagnostic Pathology Desk • Automated analyzer queue ready',
+      'pharmacist': 'Outpatient Pharmacy Counter • Dispensing & stock active',
+      'billing': 'Central Billing Counter • Invoices, payments & collections',
     };
 
     final roleGradients = {
@@ -324,6 +442,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
       'nurse': [const Color(0xFF0284C7), const Color(0xFF0369A1)],
       'admin': [const Color(0xFF334155), const Color(0xFF0F172A)],
       'patient': [const Color(0xFF0F62FE), const Color(0xFF00A896)],
+      'laboratory': [const Color(0xFF6366F1), const Color(0xFF4338CA)],
+      'lab_tech': [const Color(0xFF6366F1), const Color(0xFF4338CA)],
+      'pharmacist': [const Color(0xFF0D9488), const Color(0xFF0F766E)],
+      'billing': [const Color(0xFF15803D), const Color(0xFF166534)],
     };
 
     final colors = isDark
@@ -663,7 +785,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                     icon: Icons.biotech_rounded,
                     color: AppColors.primaryBlue,
                     subtitle: 'Awaiting Run',
-                    onTap: () => context.push('/notifications'),
+                    onTap: () => context.push('/laboratory'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -674,7 +796,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                     icon: Icons.warning_amber_rounded,
                     color: AppColors.triageEmergency,
                     subtitle: 'Critical Alerts',
-                    onTap: () => context.push('/notifications'),
+                    onTap: () => context.push('/laboratory'),
                   ),
                 ),
               ],
@@ -689,7 +811,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                     icon: Icons.task_alt_rounded,
                     color: AppColors.statusCompleted,
                     subtitle: 'Verified & Sent',
-                    onTap: () => context.push('/notifications'),
+                    onTap: () => context.push('/laboratory'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -700,7 +822,64 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                     icon: Icons.timer_outlined,
                     color: AppColors.accentTeal,
                     subtitle: 'Average Turnaround',
-                    onTap: () => context.push('/notifications'),
+                    onTap: () => context.push('/laboratory'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+
+      case 'billing':
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: StatMetricCard(
+                    title: 'Active Invoices',
+                    value: '${stats.waiting + stats.triaged}',
+                    icon: Icons.receipt_long_rounded,
+                    color: AppColors.primaryBlue,
+                    subtitle: 'Pending Collection',
+                    onTap: () => context.push('/billing'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: StatMetricCard(
+                    title: 'Settled Today',
+                    value: stats.completed.toString(),
+                    icon: Icons.check_circle_rounded,
+                    color: AppColors.statusCompleted,
+                    subtitle: 'Paid Invoices',
+                    onTap: () => context.push('/billing'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: StatMetricCard(
+                    title: 'Patient Slips',
+                    value: stats.totalVisits.toString(),
+                    icon: Icons.assignment_turned_in_rounded,
+                    color: AppColors.accentTeal,
+                    subtitle: 'Counter Registrations',
+                    onTap: () => context.push('/billing'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: StatMetricCard(
+                    title: 'Revenue Audit',
+                    value: 'Optimal',
+                    icon: Icons.account_balance_wallet_rounded,
+                    color: const Color(0xFF8B5CF6),
+                    subtitle: 'Daily Reconciliation',
+                    onTap: () => context.push('/billing'),
                   ),
                 ),
               ],
@@ -1001,21 +1180,21 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           'desc': 'Review test requests',
           'icon': Icons.biotech_rounded,
           'color': AppColors.primaryBlue,
-          'onTap': () => context.push('/notifications'),
+          'onTap': () => context.push('/laboratory'),
         },
         {
           'title': 'Enter Test Results',
           'desc': 'CBC, Blood Sugar, Urine',
           'icon': Icons.edit_note_rounded,
           'color': AppColors.accentTeal,
-          'onTap': () => context.push('/notifications'),
+          'onTap': () => context.push('/laboratory'),
         },
         {
           'title': 'Flag Abnormal Value',
           'desc': 'Critical panic alert to MD',
           'icon': Icons.warning_amber_rounded,
           'color': AppColors.triageEmergency,
-          'onTap': () => context.push('/notifications'),
+          'onTap': () => context.push('/laboratory'),
         },
         {
           'title': 'Patient Directory',
@@ -1053,6 +1232,37 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           'desc': 'Dosage and allergy check',
           'icon': Icons.folder_shared_rounded,
           'color': const Color(0xFF0284C7),
+          'onTap': () => context.push('/patients'),
+        },
+      ];
+    } else if (role == 'billing') {
+      actions = [
+        {
+          'title': 'Billing Counter',
+          'desc': 'Issue receipts & invoices',
+          'icon': Icons.receipt_long_rounded,
+          'color': Colors.green.shade700,
+          'onTap': () => context.push('/billing'),
+        },
+        {
+          'title': 'Process Payments',
+          'desc': 'Cash, UPI, Card checkout',
+          'icon': Icons.point_of_sale_rounded,
+          'color': AppColors.primaryBlue,
+          'onTap': () => context.push('/billing'),
+        },
+        {
+          'title': 'Financial Reports',
+          'desc': 'Daily collection audit',
+          'icon': Icons.analytics_rounded,
+          'color': AppColors.accentTeal,
+          'onTap': () => context.push('/billing'),
+        },
+        {
+          'title': 'Patient Directory',
+          'desc': 'Lookup UHID past slips',
+          'icon': Icons.folder_shared_rounded,
+          'color': const Color(0xFF8B5CF6),
           'onTap': () => context.push('/patients'),
         },
       ];
@@ -1218,11 +1428,15 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              role == 'patient'
-                  ? 'Your Active Outpatient Token'
-                  : 'Active OPD Patient Stream',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            Expanded(
+              child: Text(
+                role == 'patient'
+                    ? 'Your Active Outpatient Token'
+                    : 'Active OPD Patient Stream',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+              ),
             ),
             TextButton.icon(
               onPressed: () => context.push('/queue'),
@@ -1234,7 +1448,24 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
         const SizedBox(height: 8),
 
         visitsAsync.when(
-          data: (visits) {
+          data: (allVisits) {
+            final user = ref.read(authProvider).user;
+            final visits = role == 'patient'
+                ? allVisits.where((v) {
+                    final uid = user?.id ?? '';
+                    final uPhone = user?.phone ?? '';
+                    final uName = user?.fullName.toLowerCase() ?? '';
+                    final pat = v.patient;
+                    if (v.patientId == uid) return true;
+                    if (pat != null) {
+                      if (pat.id == uid || pat.uhid.toLowerCase() == uid.toLowerCase()) return true;
+                      if (uPhone.isNotEmpty && pat.phone == uPhone) return true;
+                      if (uName.isNotEmpty && pat.fullName.toLowerCase().contains(uName)) return true;
+                    }
+                    return false;
+                  }).toList()
+                : allVisits;
+
             if (visits.isEmpty) {
               return OpdCard(
                 padding: const EdgeInsets.all(28),
@@ -1242,18 +1473,21 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                   child: Column(
                     children: [
                       Icon(
-                        Icons.check_circle_outline_rounded,
+                        role == 'patient' ? Icons.confirmation_number_outlined : Icons.check_circle_outline_rounded,
                         size: 40,
                         color: AppColors.accentTeal,
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'No Patients In Active Queue',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      Text(
+                        role == 'patient' ? 'No Active Outpatient Token Today' : 'No Patients In Active Queue',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'All tokens have been triaged or attended.',
+                        role == 'patient'
+                            ? 'Your past consultations and digital booklet are saved in the Patient Portal.'
+                            : 'All tokens have been triaged or attended.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark
@@ -1261,6 +1495,15 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                               : AppColors.lightTextSecondary,
                         ),
                       ),
+                      if (role == 'patient') ...[
+                        const SizedBox(height: 14),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, foregroundColor: Colors.white),
+                          icon: const Icon(Icons.folder_shared_rounded, size: 16),
+                          label: const Text('Open Patient Health Records'),
+                          onPressed: () => context.push('/patient/portal'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1434,17 +1677,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
               const SizedBox(height: 12),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.dns_rounded, color: AppColors.primaryBlue),
-                title: const Text('Server Connection & Diagnostics', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: Text(AppConfig.apiBaseUrl, style: const TextStyle(fontSize: 11)),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ServerConfigDialog.show(context);
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.settings_outlined, color: Colors.grey),
                 title: const Text('System Preferences', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                 subtitle: const Text('Appearance, notifications, security', style: TextStyle(fontSize: 11)),
@@ -1495,6 +1727,8 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
         return Icons.biotech_rounded;
       case 'pharmacist':
         return Icons.medication_rounded;
+      case 'billing':
+        return Icons.receipt_long_rounded;
       case 'receptionist':
       default:
         return Icons.desk_rounded;
@@ -1516,6 +1750,8 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
         return 'Marcus Vance (Lab Tech)';
       case 'pharmacist':
         return 'Elena Rostova (Pharmacist)';
+      case 'billing':
+        return 'Anita Sharma (Billing Counter)';
       case 'receptionist':
       default:
         return 'Receptionist Desk (OPD)';

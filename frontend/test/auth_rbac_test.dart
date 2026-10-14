@@ -6,6 +6,7 @@ import 'package:opd_connect/features/auth/models/auth_state.dart';
 import 'package:opd_connect/features/auth/providers/auth_provider.dart';
 import 'package:opd_connect/features/dashboard/screens/role_dashboard_shell.dart';
 import 'package:opd_connect/core/storage/secure_storage_service.dart';
+import 'package:opd_connect/core/constants/app_strings.dart';
 
 void main() {
   group('Auth & RBAC Role Dashboard Shell Tests', () {
@@ -75,7 +76,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.byType(RoleDashboardShell), findsOneWidget);
-        expect(find.text('OPD Connect+'), findsOneWidget);
+        expect(find.text(AppStrings.appName), findsOneWidget);
       });
     }
   });

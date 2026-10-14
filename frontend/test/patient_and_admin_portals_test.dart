@@ -139,6 +139,26 @@ class MockPatientPortalRepository extends PatientPortalRepository {
       ),
     ];
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getVisits({String? patientId}) async {
+    return const [
+      {
+        'id': 'vis-101',
+        'visit_number': 'VIS-20261012-0001',
+        'queue_token': 14,
+        'doctor_name': 'Dr. Sarah Chen',
+        'department_name': 'General OPD',
+        'visit_date': '2026-10-12',
+        'status': 'WAITING',
+      }
+    ];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getDocuments({String? patientId}) async {
+    return const [];
+  }
 }
 
 class MockAdminPortalRepository extends AdminPortalRepository {

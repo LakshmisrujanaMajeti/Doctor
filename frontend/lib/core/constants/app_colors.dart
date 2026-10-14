@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Brand Healthcare Palette: Healthcare Blue & Subtle Teal Accents
+  // Brand Healthcare Palette: Sri Manakula Vinayagar Medical College Hospital
+  static const Color hospitalMaroon = Color(0xFF6B1D48);   // Regal SMVMCH seal maroon
+  static const Color hospitalMaroonDark = Color(0xFF4A1032);
+  static const Color hospitalMaroonLight = Color(0xFFFDF2F7);
+  static const Color hospitalGold = Color(0xFFD97706);     // Auspicious crest gold
+  static const Color hospitalNavy = Color(0xFF1E295A);     // Academic medical navy
+  static const Color hospitalGreen = Color(0xFF10B981);    // OPD clinical active green
+
   static const Color primaryBlue = Color(0xFF0F62FE);      // Clean medical blue
   static const Color primaryBlueDark = Color(0xFF0043CE);  // Deep hospital navy
   static const Color primaryBlueLight = Color(0xFFEDF5FF); // Soft healthcare blue wash

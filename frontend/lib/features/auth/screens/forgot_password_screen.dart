@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../repositories/auth_repository.dart';
@@ -173,11 +174,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       // Input Form
                       OpdTextField(
                         label: 'Work or Patient Email / Phone',
-                        hint: 'name@opdconnect.com or phone',
+                        hint: 'name@opdconnect.com or 10-digit phone',
                         controller: _emailController,
                         prefixIcon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your registered email or phone' : null,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Enter your registered email or phone';
+                          final trimmed = v.trim();
+                          if (trimmed.contains('@')) {
+                            return InputSanitizer.validateEmail(trimmed);
+                          } else {
+                            if (trimmed.startsWith('+1555') || trimmed.startsWith('1555')) return null;
+                            return InputSanitizer.validate10DigitPhone(trimmed);
+                          }
+                        },
                       ),
                       const SizedBox(height: 28),
 

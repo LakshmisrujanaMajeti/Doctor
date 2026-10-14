@@ -51,6 +51,7 @@ class DioClient {
         baseUrl: AppConfig.apiBaseUrl,
         connectTimeout: AppConfig.connectTimeout,
         receiveTimeout: AppConfig.receiveTimeout,
+        sendTimeout: AppConfig.sendTimeout,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -62,16 +63,32 @@ class DioClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Invalidate cache on mutations
+          // Invalidate cache immediately on mutations
           if (options.method != 'GET') {
             _cache.clear();
             return handler.next(options);
           }
 
-          // Check if cached entry is fresh
+          // Clinical endpoints (visits, queues, stats, orders, bills, prescriptions)
+          // must ALWAYS fetch fresh from live database when online to prevent sync delays
+          final path = options.path;
+          final isLiveClinicalData = path.contains('/visits') ||
+              path.contains('/queue') ||
+              path.contains('/stats') ||
+              path.contains('/orders') ||
+              path.contains('/bills') ||
+              path.contains('/prescriptions') ||
+              path.contains('/patients');
+
+          if (isLiveClinicalData || options.headers['Cache-Control'] == 'no-cache') {
+            // Bypass memory cache and query live server database
+            return handler.next(options);
+          }
+
+          // Check if cached entry is fresh for static resources (e.g. static catalogues)
           final cacheKey = options.uri.toString();
           final cached = _cache[cacheKey];
-          if (cached != null && !cached.isExpired && options.headers['Cache-Control'] != 'no-cache') {
+          if (cached != null && !cached.isExpired) {
             return handler.resolve(
               Response(
                 requestOptions: options,
@@ -87,12 +104,10 @@ class DioClient {
         onResponse: (response, handler) {
           if (response.requestOptions.method == 'GET' && response.statusCode == 200) {
             final path = response.requestOptions.path;
-            // Longer TTL for static catalogues and lists, shorter TTL for fast-moving queues
-            Duration ttl = const Duration(seconds: 45);
-            if (path.contains('/catalogue') || path.contains('/departments') || path.contains('/medicines')) {
+            // Short TTL for clinical data, longer TTL for static catalogues
+            Duration ttl = const Duration(seconds: 10);
+            if (path.contains('/catalogue') || path.contains('/departments')) {
               ttl = const Duration(minutes: 5);
-            } else if (path.contains('/profile') || path.contains('/stats')) {
-              ttl = const Duration(seconds: 30);
             }
 
             final cacheKey = response.requestOptions.uri.toString();
@@ -146,7 +161,7 @@ class DioClient {
           // Attempt automatic token refresh on 401 Unauthorized for non-auth requests
           if (error.response?.statusCode == 401 &&
               !error.requestOptions.path.contains('/auth/')) {
-            final refreshed = await _attemptTokenRefresh();
+            final refreshed = await attemptTokenRefresh();
             if (refreshed) {
               final newToken = await SecureStorageService.getAccessToken();
               final opts = error.requestOptions;
@@ -176,7 +191,7 @@ class DioClient {
     }
   }
 
-  Future<bool> _attemptTokenRefresh() async {
+  Future<bool> attemptTokenRefresh() async {
     try {
       final refreshToken = await SecureStorageService.getRefreshToken();
       if (refreshToken == null) return false;

@@ -9,21 +9,8 @@ import '../models/doctor_model.dart';
 class DoctorRepository {
   final DioClient _dioClient;
 
-  // Local doctor directory
-  final List<DoctorModel> _localDoctors = [
-    DoctorModel(
-      id: 'doc-chen-001',
-      userId: '782fb334-fe10-4859-b409-1533e3baf068',
-      name: 'Dr. Sarah Chen, MD',
-      specialization: 'General Medicine',
-      departmentId: 'General Medicine',
-      departmentName: 'General Medicine',
-      qualification: 'MBBS, MD (Internal Medicine)',
-      roomNumber: 'Room 104, Block A',
-      consultationFee: 500.0,
-      isAvailable: true,
-    ),
-  ];
+  // Local doctor directory (real-time from backend / storage, no sample data)
+  final List<DoctorModel> _localDoctors = [];
 
   DoctorRepository(this._dioClient);
 

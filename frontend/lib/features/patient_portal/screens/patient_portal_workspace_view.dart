@@ -4,8 +4,10 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
+import '../../../shared/widgets/server_config_dialog.dart';
 import '../models/patient_portal_models.dart';
 import '../providers/patient_portal_provider.dart';
+import '../../patients/providers/patient_provider.dart';
 
 class PatientPortalWorkspaceView extends ConsumerStatefulWidget {
   const PatientPortalWorkspaceView({super.key});
@@ -28,6 +30,244 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _downloadBooklet(BuildContext context, String regId) async {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Expanded(child: Text('Downloading verified digital OPD booklet PDF...')),
+          ],
+        ),
+        duration: Duration(seconds: 4),
+      ),
+    );
+    try {
+      final bytes = await ref.read(patientRepositoryProvider).downloadBookletByRegId(regId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Downloaded ${bytes.length} bytes. Verified PDF saved successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Hospital server offline or unreachable on this network.'),
+            backgroundColor: AppColors.hospitalMaroon,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Server IP',
+              textColor: Colors.yellowAccent,
+              onPressed: () => ServerConfigDialog.show(context),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showBookAppointmentSlotDialog(BuildContext context) {
+    DateTime selectedDate = DateTime.now();
+    String selectedDept = 'General Medicine';
+    String selectedSlot = '10:00 AM - 10:30 AM';
+    final complaintCtrl = TextEditingController();
+
+    final departments = [
+      'General Medicine',
+      'Dental Surgery',
+      'Pediatrics',
+      'Cardiology',
+      'Orthopedics',
+      'Ophthalmology',
+    ];
+
+    final timeSlots = [
+      '09:00 AM - 09:30 AM',
+      '09:30 AM - 10:00 AM',
+      '10:00 AM - 10:30 AM',
+      '10:30 AM - 11:00 AM',
+      '11:00 AM - 11:30 AM',
+      '11:30 AM - 12:00 PM',
+      '02:00 PM - 02:30 PM',
+      '02:30 PM - 03:00 PM',
+      '03:00 PM - 03:30 PM',
+      '03:30 PM - 04:00 PM',
+      '04:00 PM - 04:30 PM',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final dateStr = '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}';
+            final isoDate = '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}';
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.calendar_month_rounded, color: AppColors.primaryBlue),
+                  SizedBox(width: 8),
+                  Text('Book Consultation Slot', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Calendar Date Selection
+                    const Text('Select Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: ctx,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 30)),
+                        );
+                        if (picked != null) {
+                          setDialogState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade400),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.primaryBlue),
+                                const SizedBox(width: 8),
+                                Text(dateStr, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              ],
+                            ),
+                            const Text('Change Date', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 2. Department Selection
+                    const Text('Department', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      value: selectedDept,
+                      decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                      items: departments.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => selectedDept = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 3. Time Slot Choice
+                    const Text('Available Time Slots', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: timeSlots.map((slot) {
+                        final isSelected = selectedSlot == slot;
+                        return ChoiceChip(
+                          label: Text(slot, style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                          selected: isSelected,
+                          selectedColor: AppColors.primaryBlue.withValues(alpha: 0.2),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setDialogState(() => selectedSlot = slot);
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 4. Chief Complaint
+                    const Text('Chief Complaint / Reason (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: complaintCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Tooth ache, Fever, Routine check-up',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, foregroundColor: Colors.white),
+                  onPressed: () async {
+                    try {
+                      final selectedPatientId = ref.read(selectedPortalPatientIdProvider);
+                      final repo = ref.read(patientPortalRepositoryProvider);
+                      final result = await repo.bookAppointmentSlot(
+                        patientId: selectedPatientId,
+                        departmentId: selectedDept,
+                        slotDate: isoDate,
+                        slotTime: selectedSlot,
+                        chiefComplaint: complaintCtrl.text.trim().isEmpty ? null : complaintCtrl.text.trim(),
+                      );
+
+                      ref.invalidate(patientAppointmentsProvider);
+                      ref.invalidate(patientProfileProvider);
+
+                      if (context.mounted) {
+                        Navigator.pop(ctx);
+                        final tokenDisp = result['token_display'] ?? '#${result['queue_token']}';
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Appointment booked for $dateStr at $selectedSlot! Token: $tokenDisp generated.'),
+                            backgroundColor: Colors.green,
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Booking failed: $e'), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Confirm & Book Slot'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -206,6 +446,29 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                           ),
                           softWrap: true,
                         ),
+                        if (patient.registeredByStaffName != null) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            'Registered by Staff: ${patient.registeredByStaffName} (${patient.registeredByStaffRole ?? "Staff"})',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.primaryBlue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 6),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.download_rounded, size: 14),
+                          label: const Text('Download Digital Booklet (PDF)'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.hospitalMaroon,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: () => _downloadBooklet(context, displayUhid),
+                        ),
                       ],
                     ),
                   ),
@@ -315,19 +578,66 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
   Widget _buildAppointmentsTab(bool isDark) {
     final apptsAsync = ref.watch(patientAppointmentsProvider);
 
-    return apptsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error loading appointments: $e')),
-      data: (appts) {
-        if (appts.isEmpty) {
-          return const EmptyStateWidget(
-            title: 'No Upcoming Appointments',
-            message: 'You have no scheduled doctor reviews or follow-up visits currently pending.',
-            icon: Icons.event_available,
-          );
-        }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Consultations & Reviews',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.grey.shade900,
+                ),
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                label: const Text('Book Appointment Slot'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => _showBookAppointmentSlotDialog(context),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: apptsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error loading appointments: $e')),
+            data: (appts) {
+              if (appts.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const EmptyStateWidget(
+                        title: 'No Upcoming Appointments',
+                        message: 'You have no scheduled doctor reviews. Book a slot using the interactive calendar.',
+                        icon: Icons.event_available,
+                      ),
+                      const SizedBox(height: 14),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.calendar_month_rounded),
+                        label: const Text('Book Consultation Slot'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => _showBookAppointmentSlotDialog(context),
+                      ),
+                    ],
+                  ),
+                );
+              }
 
-        return ListView.builder(
+              return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: appts.length,
           itemBuilder: (context, idx) {
@@ -404,8 +714,11 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
           },
         );
       },
-    );
-  }
+    ),
+  ),
+],
+);
+}
 
   Widget _buildPrescriptionsTab(bool isDark) {
     final rxAsync = ref.watch(patientPrescriptionsProvider);

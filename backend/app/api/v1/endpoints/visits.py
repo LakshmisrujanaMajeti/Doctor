@@ -25,6 +25,7 @@ def list_visits(
     department_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     patient_id: Optional[str] = Query(None),
+    query: Optional[str] = Query(None, description="Search by Token #, UHID, Patient Name, Phone, or Visit #"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -44,6 +45,7 @@ def list_visits(
         department_id=department_id,
         status=status,
         patient_id=patient_id,
+        query=query,
         skip=skip,
         limit=limit,
     )

@@ -35,6 +35,7 @@ def register(request_in: RegisterRequest, db: Session = Depends(get_db)):
         full_name=request_in.full_name,
         role_name=request_in.role_name or "receptionist",
         phone=request_in.phone,
+        extra_data=request_in.model_dump(),
     )
 
     # Issue access & refresh token for instant authentication
@@ -216,3 +217,16 @@ def get_me(current_user: User = Depends(get_current_user)):
         data=UserRead.model_validate(current_user).model_dump(),
         message="Current user fetched successfully"
     )
+
+
+@router.post("/patient-token-access", summary="Patient Token & UHID Quick Access")
+def auth_patient_token_access(
+    request: Request,
+    db: Session = Depends(get_db),
+    body: dict = Body(...),
+):
+    from app.api.v1.endpoints.patient_portal import patient_quick_access
+    from app.schemas.portal import PatientQuickAccessRequest
+    identifier = body.get("identifier") or body.get("token") or body.get("uhid") or ""
+    req = PatientQuickAccessRequest(identifier=identifier)
+    return patient_quick_access(payload=req, db=db)

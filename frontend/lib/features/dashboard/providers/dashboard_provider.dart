@@ -1,11 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../models/dashboard_stats.dart';
 
+import '../../patients/models/patient_model.dart';
+import '../../visits/models/visit_model.dart';
+import '../../doctors/models/doctor_model.dart';
 import '../../patients/providers/patient_provider.dart';
 import '../../visits/providers/visit_provider.dart';
+import '../../doctors/repositories/doctor_repository.dart';
 
 final dashboardStatsProvider = FutureProvider<DashboardStatsModel>((ref) async {
   final dioClient = ref.watch(dioClientProvider);
@@ -17,35 +22,45 @@ final dashboardStatsProvider = FutureProvider<DashboardStatsModel>((ref) async {
     }
   } catch (_) {}
 
-  // Dynamic real-time calculation from active repositories
-  int totalPatients = 0;
-  int totalVisits = 0;
-  int waiting = 0;
-  int triaged = 0;
-  int completed = 0;
-
+  // Concurrently calculate real-time hospital statistics from active repositories in parallel
   try {
-    final patients = await ref.watch(patientRepositoryProvider).getPatients();
-    totalPatients = patients.length;
-  } catch (_) {}
+    final results = await Future.wait([
+      ref.watch(patientRepositoryProvider).getPatients().catchError((_) => <PatientModel>[]),
+      ref.watch(visitRepositoryProvider).getVisits().catchError((_) => <OPDVisitModel>[]),
+      ref.watch(doctorRepositoryProvider).getDoctors().catchError((_) => <DoctorModel>[]),
+    ]);
 
-  try {
-    final visits = await ref.watch(visitRepositoryProvider).getVisits();
-    totalVisits = visits.length;
-    waiting = visits.where((v) => v.status == 'WAITING' || v.status == 'REGISTERED').length;
-    triaged = visits.where((v) => v.status == 'TRIAGED').length;
-    completed = visits.where((v) => v.status == 'COMPLETED').length;
-  } catch (_) {}
+    final patients = results[0] as List<PatientModel>;
+    final visits = results[1] as List<OPDVisitModel>;
+    final doctors = results[2] as List<DoctorModel>;
 
-  return DashboardStatsModel(
-    totalPatients: totalPatients,
-    totalVisits: totalVisits,
-    activeDoctors: 1,
-    departments: 5,
-    waiting: waiting,
-    triaged: triaged,
-    completed: completed,
-  );
+    final totalPatients = patients.length;
+    final totalVisits = visits.length;
+    final waiting = visits.where((v) => v.status == 'WAITING' || v.status == 'REGISTERED').length;
+    final triaged = visits.where((v) => v.status == 'TRIAGED').length;
+    final completed = visits.where((v) => v.status == 'COMPLETED').length;
+    final activeDoctors = doctors.where((d) => d.isAvailable).length;
+
+    return DashboardStatsModel(
+      totalPatients: totalPatients,
+      totalVisits: totalVisits,
+      activeDoctors: activeDoctors,
+      departments: totalPatients > 0 || totalVisits > 0 ? 5 : 0,
+      waiting: waiting,
+      triaged: triaged,
+      completed: completed,
+    );
+  } catch (_) {
+    return DashboardStatsModel(
+      totalPatients: 0,
+      totalVisits: 0,
+      activeDoctors: 0,
+      departments: 0,
+      waiting: 0,
+      triaged: 0,
+      completed: 0,
+    );
+  }
 });
 
 class ThemeModeNotifier extends Notifier<ThemeMode> {

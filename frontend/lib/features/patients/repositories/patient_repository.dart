@@ -20,6 +20,15 @@ class PatientRepository {
         if (raw != null && raw.isNotEmpty) {
           final list = jsonDecode(raw) as List<dynamic>;
           _localPatients.addAll(list.map((m) => PatientModel.fromJson(m as Map<String, dynamic>)));
+          // Purge any legacy demo or seed patients from old test builds
+          final beforeCount = _localPatients.length;
+          _localPatients.removeWhere((p) =>
+              p.uhid == 'C407662' ||
+              p.id == 'pat-c407662' ||
+              p.fullName.toLowerCase().contains('ravi prasanth'));
+          if (_localPatients.length != beforeCount) {
+            await _saveCache();
+          }
         }
       } catch (_) {}
     }
@@ -39,8 +48,9 @@ class PatientRepository {
         queryParameters: query != null && query.isNotEmpty ? {'query': query} : null,
       );
 
-      if (res.data['status'] == 'success') {
-        final list = res.data['data'] as List<dynamic>;
+      final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
+      if (raw is Map && raw['status'] == 'success') {
+        final list = raw['data'] as List<dynamic>;
         final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
         if (query == null || query.isEmpty) {
           _localPatients.clear();
@@ -53,15 +63,35 @@ class PatientRepository {
 
     await _loadCacheIfNeeded();
 
-    // Fallback search in local items
+    // Fallback search in local items with token matching
     if (query != null && query.isNotEmpty) {
-      final q = query.toLowerCase();
+      final q = query.toLowerCase().trim();
+      final tokenMatch = RegExp(r'^(?:token|tok|queue|opd|t|#|\s)*(\d{1,4})$').firstMatch(q);
+      final queryNum = tokenMatch != null ? int.tryParse(tokenMatch.group(1)!) : (int.tryParse(q));
+
+      final Set<String> matchingVisitPatientIds = {};
+      try {
+        final rawVisits = await SecureStorageService.getVisitsJson();
+        if (rawVisits != null && rawVisits.isNotEmpty) {
+          final visits = jsonDecode(rawVisits) as List<dynamic>;
+          for (final v in visits) {
+            final t = v['queue_token'];
+            final numStr = v['visit_number']?.toString().toLowerCase() ?? '';
+            if ((queryNum != null && t == queryNum) || numStr.contains(q)) {
+              final patId = v['patient_id']?.toString();
+              if (patId != null) matchingVisitPatientIds.add(patId);
+            }
+          }
+        }
+      } catch (_) {}
+
       return _localPatients.where((p) =>
         p.fullName.toLowerCase().contains(q) ||
         p.uhid.toLowerCase().contains(q) ||
         (p.hospitalRegNum != null && p.hospitalRegNum!.toLowerCase().contains(q)) ||
         (p.barcodeValue != null && p.barcodeValue!.toLowerCase().contains(q)) ||
-        p.phone.contains(q)
+        (q.length >= 4 && p.phone.contains(q)) ||
+        matchingVisitPatientIds.contains(p.id)
       ).toList();
     }
     return _localPatients;
@@ -129,6 +159,7 @@ class PatientRepository {
   }
 
   Future<PatientModel> registerPatient(PatientModel patient, {bool allowDuplicate = false}) async {
+    await _loadCacheIfNeeded();
     try {
       final res = await _dioClient.dio.post(
         ApiEndpoints.patients,
@@ -137,14 +168,41 @@ class PatientRepository {
       );
 
       if (res.data['status'] == 'success') {
-        return PatientModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        final registered = PatientModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        _localPatients.removeWhere((p) => p.id == registered.id || p.uhid == registered.uhid);
+        _localPatients.insert(0, registered);
+        await _saveCache();
+        return registered;
       }
     } on DioException catch (e) {
       if (e.response != null && e.response?.data is Map) {
         final msg = e.response!.data['message'] ?? e.response!.data['detail'];
-        if (msg != null) throw Exception(msg.toString());
+        final strMsg = msg?.toString() ?? '';
+        // If it's a duplicate warning, preserve and throw so the UI duplicate dialog opens
+        if (strMsg.contains('Accidental duplicate prevented') || strMsg.contains('duplicate')) {
+          throw Exception(strMsg);
+        }
+
+        // If it's token expired or 401, attempt automatic token refresh and retry
+        if (e.response?.statusCode == 401 || strMsg.toLowerCase().contains('token expired')) {
+          final refreshed = await _dioClient.attemptTokenRefresh();
+          if (refreshed) {
+            try {
+              final retryRes = await _dioClient.dio.post(
+                ApiEndpoints.patients,
+                queryParameters: {'allow_duplicate': allowDuplicate},
+                data: patient.toJson(),
+              );
+              if (retryRes.data['status'] == 'success') {
+                final registered = PatientModel.fromJson(retryRes.data['data'] as Map<String, dynamic>);
+                _localPatients.insert(0, registered);
+                await _saveCache();
+                return registered;
+              }
+            } catch (_) {}
+          }
+        }
       }
-      rethrow;
     } catch (_) {}
 
     // Fallback local registration
@@ -180,6 +238,21 @@ class PatientRepository {
     return newPat;
   }
 
+  Future<PatientModel?> getPatientById(String patientId) async {
+    try {
+      final res = await _dioClient.dio.get(ApiEndpoints.patientById(patientId));
+      final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
+      if (raw is Map && raw['status'] == 'success') {
+        return PatientModel.fromJson(raw['data'] as Map<String, dynamic>);
+      }
+    } catch (_) {}
+    await _loadCacheIfNeeded();
+    return _localPatients.cast<PatientModel?>().firstWhere(
+      (p) => p?.id == patientId || p?.uhid == patientId,
+      orElse: () => null,
+    );
+  }
+
   Future<PatientModel?> getPatientByReg(String regNum) async {
     try {
       final res = await _dioClient.dio.get(ApiEndpoints.patientByReg(regNum));
@@ -204,5 +277,51 @@ class PatientRepository {
       (p) => p?.barcodeValue == barcode,
       orElse: () => null,
     );
+  }
+
+  Future<PatientModel> updatePatient(PatientModel patient) async {
+    try {
+      final res = await _dioClient.dio.put(
+        ApiEndpoints.patientById(patient.id),
+        data: patient.toJson(),
+      );
+      if (res.data['status'] == 'success') {
+        final updated = PatientModel.fromJson(res.data['data'] as Map<String, dynamic>);
+        final idx = _localPatients.indexWhere((p) => p.id == patient.id);
+        if (idx != -1) {
+          _localPatients[idx] = updated;
+          await _saveCache();
+        }
+        return updated;
+      }
+    } catch (_) {}
+
+    await _loadCacheIfNeeded();
+    final idx = _localPatients.indexWhere((p) => p.id == patient.id);
+    if (idx != -1) {
+      _localPatients[idx] = patient;
+    } else {
+      _localPatients.insert(0, patient);
+    }
+    await _saveCache();
+    return patient;
+  }
+
+  Future<void> deletePatient(String patientId) async {
+    try {
+      await _dioClient.dio.delete(ApiEndpoints.patientById(patientId));
+    } catch (_) {}
+
+    await _loadCacheIfNeeded();
+    _localPatients.removeWhere((p) => p.id == patientId);
+    await _saveCache();
+  }
+
+  Future<List<int>> downloadBookletByRegId(String regId) async {
+    final res = await _dioClient.dio.get<List<int>>(
+      ApiEndpoints.patientDownloadByReg(regId),
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return res.data ?? [];
   }
 }

@@ -7,14 +7,14 @@ class DashboardStatsModel {
   final int triaged;
   final int completed;
 
-  DashboardStatsModel({
-    required this.totalPatients,
-    required this.totalVisits,
-    required this.activeDoctors,
-    required this.departments,
-    required this.waiting,
-    required this.triaged,
-    required this.completed,
+  const DashboardStatsModel({
+    this.totalPatients = 0,
+    this.totalVisits = 0,
+    this.activeDoctors = 0,
+    this.departments = 0,
+    this.waiting = 0,
+    this.triaged = 0,
+    this.completed = 0,
   });
 
   factory DashboardStatsModel.fromJson(Map<String, dynamic> json) {

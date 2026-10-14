@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
@@ -10,6 +11,7 @@ import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
+import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -55,21 +57,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sign In'),
-        actions: [
-          IconButton(
-            tooltip: 'Server Connection Settings',
-            icon: const Icon(Icons.dns_rounded),
-            onPressed: () => ServerConfigDialog.show(context),
-          ),
-        ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: isDark ? AppColors.darkBg : Colors.white,
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
-      body: MedicalIllustratorBackground(
-        variant: MedicalBackgroundVariant.auth,
-        child: SafeArea(
-          child: Center(
+      child: Scaffold(
+        backgroundColor: isDark ? AppColors.darkBg : Colors.white,
+        body: MedicalIllustratorBackground(
+          variant: MedicalBackgroundVariant.auth,
+          child: SafeArea(
+            child: Center(
 
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -81,43 +81,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Brand Icon
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.local_hospital_rounded,
-                          size: 48,
-                          color: AppColors.primaryBlue,
-                        ),
+                    // SMVMCH Official Crest
+                    const Center(
+                      child: SmvmchHospitalLogo(
+                        size: 72,
+                        layout: LogoLayout.vertical,
+                        showTamilText: true,
                       ),
                     ),
                     const SizedBox(height: 18),
 
-                    const Text(
-                      AppStrings.appName,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
+                    // Dedicated Patient Token Access Action
+                    InkWell(
+                      onTap: () => context.push('/patient/token-access'),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDF2F7),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFBCFE8)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.confirmation_number_rounded, color: AppColors.hospitalMaroon, size: 22),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Are you a patient?',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.hospitalMaroon),
+                                  ),
+                                  Text(
+                                    'Check in with OPD Token # or UHID (No password needed) →',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF831843)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-
-                    Text(
-                      'Sign in to access your authorized hospital portal',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
 
                     // Inline Error Banner
                     if (authState.errorMessage != null)
@@ -129,11 +137,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     // Identifier Field (Email or Phone)
                     OpdTextField(
                       label: 'Hospital Email or Phone Number',
-                      hint: 'name@opdconnect.com or +15551234567',
+                      hint: 'name@opdconnect.com or 10-digit phone',
                       controller: _emailController,
                       prefixIcon: Icons.account_circle_outlined,
                       keyboardType: TextInputType.emailAddress,
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your email or phone number' : null,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Please enter your email or phone number';
+                        final trimmed = v.trim();
+                        if (trimmed.contains('@')) {
+                          return InputSanitizer.validateEmail(trimmed);
+                        } else {
+                          if (trimmed.startsWith('+1555') || trimmed.startsWith('1555')) return null;
+                          return InputSanitizer.validate10DigitPhone(trimmed);
+                        }
+                      },
                     ),
                     const SizedBox(height: 18),
 
@@ -145,7 +162,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIcon: Icons.lock_outline_rounded,
                       obscureText: true,
                       enablePasswordToggle: true,
-                      validator: (v) => (v == null || v.length < 6) ? 'Password must be at least 6 characters' : null,
+                      validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : null,
                     ),
                     const SizedBox(height: 12),
 
@@ -216,7 +233,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     ),
-  );
+  ),
+);
 }
 }
 

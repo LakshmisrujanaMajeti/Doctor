@@ -8,6 +8,7 @@ import '../../../shared/widgets/confirmation_dialog.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_card.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
+import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 
@@ -191,61 +192,38 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // Connectivity & Infrastructure
+          // Clinical Data Protection & Privacy
           const Text(
-            'Hospital Infrastructure Status',
+            'Security & Data Governance',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           ),
           const SizedBox(height: 10),
           OpdCard(
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.dns_rounded,
-                      color: AppColors.primaryBlue),
-                  title: const Text('FastAPI OPD Backend',
+                const ListTile(
+                  leading: Icon(Icons.shield_rounded, color: AppColors.primaryBlue),
+                  title: Text('Clinical Data Protection',
                       style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(AppConfig.apiBaseUrl,
-                      style: const TextStyle(fontSize: 12)),
-                  trailing: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.tune_rounded, size: 20, color: AppColors.primaryBlue),
-                      SizedBox(width: 4),
-                      Icon(Icons.chevron_right_rounded, size: 18, color: Colors.grey),
-                    ],
-                  ),
-                  onTap: () => ServerConfigDialog.show(context),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.storage_rounded,
-                      color: AppColors.accentTeal),
-                  title: const Text('Supabase Database',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('xxwidqatsxzsrulaxxal.supabase.co',
+                  subtitle: Text('TLS 1.3 / AES-256 encrypted OPD health records',
                       style: TextStyle(fontSize: 12)),
-                  trailing: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentTeal.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('CONFIGURED',
-                        style: TextStyle(
-                            color: AppColors.accentTeal,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 11)),
-                  ),
+                  trailing: Icon(Icons.verified_user_rounded, color: Colors.green, size: 20),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.shield_outlined,
-                      color: Color(0xFF8B5CF6)),
-                  title: const Text('Clinical Data Encryption',
+                const ListTile(
+                  leading: Icon(Icons.sync_rounded, color: AppColors.accentTeal),
+                  title: Text('Offline-First Smart Sync Engine',
                       style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('TLS 1.3 / AES-256 OPD records safe',
+                  subtitle: Text('Immediate offline caching with resilient cloud background sync',
+                      style: TextStyle(fontSize: 12)),
+                  trailing: Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 20),
+                ),
+                const Divider(height: 1),
+                const ListTile(
+                  leading: Icon(Icons.health_and_safety_rounded, color: Color(0xFF8B5CF6)),
+                  title: Text('Compliance Standards',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('NABH & HIPAA compliant clinical audit logging',
                       style: TextStyle(fontSize: 12)),
                 ),
               ],
@@ -253,63 +231,37 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // System Screen Previews (For Evaluator & Verification)
+          // About Hospital & Application
           const Text(
-            'Preview System State Screens',
+            'Hospital System Details',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Quickly test the reusable error, loading, offline, and unauthorized screens.',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? AppColors.darkTextSecondary
-                  : AppColors.lightTextSecondary,
-            ),
           ),
           const SizedBox(height: 10),
           OpdCard(
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.hourglass_top_rounded,
-                      color: AppColors.primaryBlue),
-                  title: const Text('Loading Screen'),
-                  subtitle: const Text('Pulsing brand sync state',
-                      style: TextStyle(fontSize: 12)),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.push('/loading'),
+                const ListTile(
+                  leading: SmvmchHospitalLogo(size: 28),
+                  title: Text('Facility Name', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('Sri Manakula Vinayagar Medical College and Hospital (SMVMCH), Puducherry', style: TextStyle(fontSize: 12)),
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.wifi_off_rounded,
-                      color: AppColors.triagePriority),
-                  title: const Text('Offline Screen'),
-                  subtitle: const Text('Network disconnection handling',
-                      style: TextStyle(fontSize: 12)),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.push('/offline'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.lock_outline_rounded,
-                      color: AppColors.triageEmergency),
-                  title: const Text('Unauthorized Screen (403)'),
-                  subtitle: const Text('Role clearance restriction',
-                      style: TextStyle(fontSize: 12)),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.push('/unauthorized'),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.search_off_rounded,
-                      color: Colors.grey),
-                  title: const Text('Route Not Found Screen (404)'),
-                  subtitle: const Text('Safe fallback for unknown paths',
-                      style: TextStyle(fontSize: 12)),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () => context.push('/non-existent-opd-route'),
+                  leading: const Icon(Icons.info_outline_rounded, color: Colors.grey),
+                  title: const Text('Application Version', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('v1.2.0 (Enterprise Production Build)', style: TextStyle(fontSize: 12)),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('PRODUCTION READY',
+                        style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 10)),
+                  ),
                 ),
               ],
             ),

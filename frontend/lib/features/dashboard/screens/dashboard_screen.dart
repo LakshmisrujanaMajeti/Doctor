@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../../../shared/widgets/stat_metric_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/triage_chip.dart';
@@ -27,21 +28,27 @@ class DashboardScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.primaryTeal.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.local_hospital_rounded, color: AppColors.primaryTeal, size: 20),
-            ),
+            const SmvmchHospitalLogo(size: 30),
             const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('OPD Connect+', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                Text('Hospital Outpatient System', style: TextStyle(fontSize: 11, color: Colors.grey)),
-              ],
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'SMVMCH OPD Connect',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    'Hospital Outpatient System • Puducherry',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -99,12 +106,16 @@ class DashboardScreen extends ConsumerWidget {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                'Welcome, $userName',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
+                              Flexible(
+                                child: Text(
+                                  'Welcome, $userName',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -373,19 +384,23 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        onDestinationSelected: (idx) {
-          if (idx == 1) context.push('/queue');
-          if (idx == 2) context.push('/patients');
-          if (idx == 3) context.push('/settings');
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
-          NavigationDestination(icon: Icon(Icons.queue_rounded), label: 'OPD Queue'),
-          NavigationDestination(icon: Icon(Icons.people_alt_rounded), label: 'Patients'),
-          NavigationDestination(icon: Icon(Icons.settings_rounded), label: 'Settings'),
-        ],
+      bottomNavigationBar: SafeArea(
+        top: false,
+        bottom: true,
+        child: NavigationBar(
+          selectedIndex: 0,
+          onDestinationSelected: (idx) {
+            if (idx == 1) context.push('/queue');
+            if (idx == 2) context.push('/patients');
+            if (idx == 3) context.push('/settings');
+          },
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
+            NavigationDestination(icon: Icon(Icons.queue_rounded), label: 'Queue'),
+            NavigationDestination(icon: Icon(Icons.people_alt_rounded), label: 'Patients'),
+            NavigationDestination(icon: Icon(Icons.settings_rounded), label: 'Settings'),
+          ],
+        ),
       ),
     );
   }

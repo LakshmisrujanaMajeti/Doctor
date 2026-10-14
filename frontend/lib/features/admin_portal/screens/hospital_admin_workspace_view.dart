@@ -1,11 +1,22 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
+import '../../../shared/widgets/smvmch_hospital_logo.dart';
+import '../../../shared/widgets/server_config_dialog.dart';
 import '../models/admin_portal_models.dart';
 import '../providers/admin_portal_provider.dart';
 import '../../patient_portal/models/patient_portal_models.dart';
+import '../../patients/models/patient_model.dart';
+import '../../patients/providers/patient_provider.dart';
+import '../../doctors/repositories/doctor_repository.dart';
 
 class HospitalAdminWorkspaceView extends ConsumerStatefulWidget {
   final int initialTabIndex;
@@ -21,6 +32,7 @@ class _HospitalAdminWorkspaceViewState
     extends ConsumerState<HospitalAdminWorkspaceView>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  Timer? _autoRefreshTimer;
 
   // Search & filter controllers
   final TextEditingController _userSearchCtrl = TextEditingController();
@@ -31,14 +43,21 @@ class _HospitalAdminWorkspaceViewState
   @override
   void initState() {
     super.initState();
-    final idx = (widget.initialTabIndex >= 0 && widget.initialTabIndex < 8)
+    final idx = (widget.initialTabIndex >= 0 && widget.initialTabIndex < 9)
         ? widget.initialTabIndex
         : 0;
-    _tabController = TabController(length: 8, vsync: this, initialIndex: idx);
+    _tabController = TabController(length: 9, vsync: this, initialIndex: idx);
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        ref.invalidate(adminDashboardSummaryProvider);
+        ref.invalidate(patientListProvider);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
     _tabController.dispose();
     _userSearchCtrl.dispose();
     _medicineSearchCtrl.dispose();
@@ -59,6 +78,8 @@ class _HospitalAdminWorkspaceViewState
     ref.invalidate(adminBackupGuidanceProvider);
     ref.invalidate(adminRegistrationsReportProvider);
     ref.invalidate(adminBillingReportProvider);
+    ref.invalidate(patientListProvider);
+    ref.invalidate(doctorListProvider);
   }
 
   @override
@@ -70,35 +91,64 @@ class _HospitalAdminWorkspaceViewState
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.admin_panel_settings_rounded,
-                color: AppColors.primaryBlue,
-                size: 22,
-              ),
-            ),
+            const SmvmchHospitalLogo(size: 32),
             const SizedBox(width: 10),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hospital Administrator Portal',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Operations, Security & Governance Console',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-              ],
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hospital Administrator Portal',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Operations, Security & Governance Console',
+                    style: TextStyle(fontSize: 10, color: Colors.grey),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
+          Tooltip(
+            message: 'Server: ${AppConfig.apiBaseUrl}\nTap to configure Host IP',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => ServerConfigDialog.show(context),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.hospitalGreen.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.hospitalGreen.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bolt_rounded, size: 14, color: AppColors.hospitalGreen),
+                    SizedBox(width: 4),
+                    Text(
+                      'LIVE 5s',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.hospitalGreen,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.dns_outlined, size: 20),
+            tooltip: 'Server IP Configuration',
+            onPressed: () => ServerConfigDialog.show(context),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh All Portals',
@@ -143,6 +193,7 @@ class _HospitalAdminWorkspaceViewState
               tabs: const [
                 Tab(icon: Icon(Icons.dashboard_rounded, size: 18), text: 'Operations & Financials'),
                 Tab(icon: Icon(Icons.manage_accounts_rounded, size: 18), text: 'Staff & Roles'),
+                Tab(icon: Icon(Icons.people_alt_rounded, size: 18), text: 'Patients & Directory'),
                 Tab(icon: Icon(Icons.domain_rounded, size: 18), text: 'Departments & Tariffs'),
                 Tab(icon: Icon(Icons.medication_rounded, size: 18), text: 'Catalogues & Formulary'),
                 Tab(icon: Icon(Icons.analytics_rounded, size: 18), text: 'Operational Reports'),
@@ -160,6 +211,7 @@ class _HospitalAdminWorkspaceViewState
               children: [
                 _buildOperationsFinancialsTab(isDark),
                 _buildStaffManagementTab(isDark),
+                _buildPatientManagementTab(isDark),
                 _buildDepartmentsTariffsTab(isDark),
                 _buildCataloguesFormularyTab(isDark),
                 _buildReportsTab(isDark),
@@ -307,53 +359,48 @@ class _HospitalAdminWorkspaceViewState
                 ),
               ),
               const SizedBox(height: 12),
-              // Queue Breakdown Cards
-              Row(
+              // Queue Breakdown: Responsive 2x2 Grid
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 2.1,
                 children: [
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Waiting in Queue',
-                      value: '${metrics.queueBreakdown['WAITING'] ?? 0}',
-                      icon: Icons.hourglass_top_rounded,
-                      color: Colors.blue,
-                      isDark: isDark,
-                    ),
+                  _buildMetricCard(
+                    title: 'Waiting in Queue',
+                    value: '${metrics.queueBreakdown['WAITING'] ?? metrics.queueBreakdown['waiting'] ?? 0}',
+                    icon: Icons.hourglass_top_rounded,
+                    color: Colors.blue,
+                    isDark: isDark,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'In Consultation',
-                      value: '${metrics.queueBreakdown['IN_CONSULTATION'] ?? 0}',
-                      icon: Icons.medical_services_rounded,
-                      color: Colors.amber.shade800,
-                      isDark: isDark,
-                    ),
+                  _buildMetricCard(
+                    title: 'In Consultation',
+                    value: '${metrics.queueBreakdown['IN_CONSULTATION'] ?? metrics.queueBreakdown['in_consultation'] ?? 0}',
+                    icon: Icons.medical_services_rounded,
+                    color: Colors.amber.shade800,
+                    isDark: isDark,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Consultations Done',
-                      value: '${metrics.queueBreakdown['COMPLETED'] ?? 0}',
-                      icon: Icons.check_circle_rounded,
-                      color: Colors.green,
-                      isDark: isDark,
-                    ),
+                  _buildMetricCard(
+                    title: 'Consultations Done',
+                    value: '${metrics.queueBreakdown['COMPLETED'] ?? metrics.queueBreakdown['completed'] ?? 0}',
+                    icon: Icons.check_circle_rounded,
+                    color: Colors.green,
+                    isDark: isDark,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Triage In Progress',
-                      value: '${metrics.queueBreakdown['TRIAGE'] ?? 0}',
-                      icon: Icons.emergency_rounded,
-                      color: Colors.red,
-                      isDark: isDark,
-                    ),
+                  _buildMetricCard(
+                    title: 'Triage In Progress',
+                    value: '${metrics.queueBreakdown['TRIAGE'] ?? metrics.queueBreakdown['triage'] ?? metrics.queueBreakdown['triaged'] ?? 0}',
+                    icon: Icons.emergency_rounded,
+                    color: Colors.red,
+                    isDark: isDark,
                   ),
                 ],
               ),
               const SizedBox(height: 24),
 
-              // Revenue Overview Section
+              // Revenue Overview Section: Stacked Full-Width Cards
               Text(
                 'Financial Performance',
                 style: TextStyle(
@@ -363,106 +410,109 @@ class _HospitalAdminWorkspaceViewState
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Collections Summary',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                            ),
-                            const Divider(height: 24),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Expanded(child: Text('Today Collections:')),
-                                Text(
-                                  '₹${metrics.revenueToday.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Expanded(child: Text('This Month Collections:')),
-                                Text(
-                                  '₹${metrics.revenueMonth.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Expanded(child: Text('Unsettled Outstanding Bills:')),
-                                Text(
-                                  '₹${metrics.pendingBillsAmount.toStringAsFixed(2)} (${metrics.pendingBillsCount} bills)',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade800),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.account_balance_wallet_rounded, size: 20, color: Colors.green.shade700),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Collections Summary',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Payment Method Breakdown',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                            ),
-                            const Divider(height: 24),
-                            if (metrics.revenueByMethod.isEmpty)
-                              const Text('No transactions recorded today')
-                            else
-                              ...metrics.revenueByMethod.entries.map((e) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          e.key.toUpperCase(),
-                                          style: const TextStyle(fontWeight: FontWeight.w500),
-                                        ),
-                                      ),
-                                      Text(
-                                        '₹${e.value.toStringAsFixed(2)}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                          ],
-                        ),
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Today Collections:', style: TextStyle(fontSize: 14)),
+                          Text(
+                            '₹${metrics.revenueToday.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
+                          ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('This Month Collections:', style: TextStyle(fontSize: 14)),
+                          Text(
+                            '₹${metrics.revenueMonth.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Unsettled Outstanding Bills:', style: TextStyle(fontSize: 14)),
+                          Text(
+                            '₹${metrics.pendingBillsAmount.toStringAsFixed(2)} (${metrics.pendingBillsCount} bills)',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade800),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.pie_chart_rounded, size: 20, color: AppColors.primaryBlue),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Payment Method Breakdown',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      if (metrics.revenueByMethod.isEmpty)
+                        const Text('No transactions recorded today', style: TextStyle(color: Colors.grey))
+                      else
+                        ...metrics.revenueByMethod.entries.map((e) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  e.key.toUpperCase(),
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                                Text(
+                                  '₹${e.value.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
 
-              // Pharmacy & Diagnostic Turnaround
+              // Pharmacy & Diagnostic Efficiency: Stacked Cards
               Text(
                 'Departmental Service Efficiency',
                 style: TextStyle(
@@ -472,38 +522,34 @@ class _HospitalAdminWorkspaceViewState
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.purple,
-                          child: Icon(Icons.biotech, color: Colors.white),
-                        ),
-                        title: const Text('Diagnostic Laboratory'),
-                        subtitle: Text(
-                          '${metrics.completedLabTodayCount} tests released today • ${metrics.pendingLabOrdersCount} in testing pipeline',
-                        ),
-                      ),
-                    ),
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.purple.shade50,
+                    child: const Icon(Icons.biotech, color: Colors.purple),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: Colors.teal,
-                          child: Icon(Icons.medication, color: Colors.white),
-                        ),
-                        title: const Text('Pharmacy Formulary'),
-                        subtitle: Text(
-                          '${metrics.totalMedicinesInFormulary} medicines active • ${metrics.lowStockItemsCount} low stock alerts',
-                        ),
-                      ),
-                    ),
+                  title: const Text('Diagnostic Laboratory', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(
+                    '${metrics.completedLabTodayCount} tests released today • ${metrics.pendingLabOrdersCount} in testing pipeline',
                   ),
-                ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.teal.shade50,
+                    child: const Icon(Icons.medication, color: Colors.teal),
+                  ),
+                  title: const Text('Pharmacy Formulary', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(
+                    '${metrics.totalMedicinesInFormulary} medicines active • ${metrics.lowStockItemsCount} low stock alerts',
+                  ),
+                ),
               ),
             ],
           ),
@@ -520,31 +566,51 @@ class _HospitalAdminWorkspaceViewState
     required bool isDark,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                  ),
+                ),
               ),
-              Icon(icon, color: color, size: 20),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(icon, color: color, size: 16),
+              ),
             ],
           ),
-          const SizedBox(height: 10),
           Text(
             value,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
           ),
         ],
       ),
@@ -560,73 +626,81 @@ class _HospitalAdminWorkspaceViewState
 
     return Column(
       children: [
-        // Controls Header
+        // Controls Header: Responsive Search & Role Chips
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade200)),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: _userSearchCtrl,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    hintText: 'Search staff by name or email...',
-                    isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    suffixIcon: _userSearchCtrl.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _userSearchCtrl.clear();
-                              ref.read(adminUsersSearchProvider.notifier).state = null;
-                            },
-                          )
-                        : null,
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _userSearchCtrl,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        hintText: 'Search staff by name or email...',
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        suffixIcon: _userSearchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _userSearchCtrl.clear();
+                                  ref.read(adminUsersSearchProvider.notifier).state = null;
+                                },
+                              )
+                            : null,
+                      ),
+                      onSubmitted: (val) {
+                        ref.read(adminUsersSearchProvider.notifier).state = val.trim().isEmpty ? null : val.trim();
+                      },
+                    ),
                   ),
-                  onSubmitted: (val) {
-                    ref.read(adminUsersSearchProvider.notifier).state = val.trim().isEmpty ? null : val.trim();
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Role Filter Dropdown
-              DropdownButton<String?>(
-                value: selectedRole,
-                hint: const Text('All Roles'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('All Roles')),
-                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                  DropdownMenuItem(value: 'doctor', child: Text('Doctor')),
-                  DropdownMenuItem(value: 'receptionist', child: Text('Receptionist')),
-                  DropdownMenuItem(value: 'nurse', child: Text('Nurse')),
-                  DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist')),
-                  DropdownMenuItem(value: 'lab_technician', child: Text('Lab Technician')),
-                  DropdownMenuItem(value: 'billing', child: Text('Billing')),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => _showProvisionStaffDialog(context),
+                    icon: const Icon(Icons.person_add_rounded, size: 18),
+                    label: const Text('Provision Staff User'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
                 ],
-                onChanged: (val) {
-                  ref.read(adminUsersFilterRoleProvider.notifier).state = val;
-                },
               ),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: () => _showProvisionStaffDialog(context),
-                icon: const Icon(Icons.person_add_rounded, size: 18),
-                label: const Text('Provision Staff User'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                  foregroundColor: Colors.white,
+              const SizedBox(height: 10),
+              // Role Filter Chips Row
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildRoleFilterChip(null, 'All Roles', selectedRole),
+                    const SizedBox(width: 6),
+                    _buildRoleFilterChip('doctor', 'Doctors', selectedRole),
+                    const SizedBox(width: 6),
+                    _buildRoleFilterChip('receptionist', 'Receptionists', selectedRole),
+                    const SizedBox(width: 6),
+                    _buildRoleFilterChip('pharmacist', 'Pharmacists', selectedRole),
+                    const SizedBox(width: 6),
+                    _buildRoleFilterChip('lab_technician', 'Lab Techs', selectedRole),
+                    const SizedBox(width: 6),
+                    _buildRoleFilterChip('admin', 'Admins', selectedRole),
+                  ],
                 ),
               ),
             ],
           ),
         ),
 
-        // Staff List Table
+        // Staff Member Cards
         Expanded(
           child: usersAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -636,90 +710,1038 @@ class _HospitalAdminWorkspaceViewState
                 return const Center(child: Text('No staff members found matching criteria.'));
               }
 
-              return ListView.separated(
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: users.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final user = users[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: user.isActive ? AppColors.primaryBlue : Colors.grey,
-                      child: Text(
-                        user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : 'U',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    title: Row(
-                      children: [
-                        Text(user.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 8),
-                        Chip(
-                          label: Text(
-                            user.roleName.toUpperCase(),
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  final roleColor = _getRoleColor(user.roleName);
+
+                  return Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Header: Avatar, Name, Role badge, and Active Switch
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: roleColor.withValues(alpha: 0.15),
+                                child: Text(
+                                  user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : 'U',
+                                  style: TextStyle(
+                                    color: roleColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.fullName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: roleColor.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: roleColor.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Text(
+                                            user.roleName.toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: roleColor,
+                                            ),
+                                          ),
+                                        ),
+                                        if (user.lockedUntil != null) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text('LOCKED', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Active Switch
+                              Switch(
+                                value: user.isActive,
+                                activeColor: Colors.green,
+                                onChanged: (val) async {
+                                  final confirm = await showOpdConfirmDialog(
+                                    context: context,
+                                    title: val ? 'Activate Account?' : 'Deactivate Account?',
+                                    message:
+                                        'Are you sure you want to ${val ? "activate" : "deactivate"} ${user.fullName} (${user.email})?',
+                                    confirmText: val ? 'Activate' : 'Deactivate',
+                                  );
+                                  if (confirm == true) {
+                                    try {
+                                      final repo = ref.read(adminPortalRepositoryProvider);
+                                      await repo.updateUserStatus(user.id, isActive: val, unlock: val);
+                                      ref.invalidate(adminUsersProvider);
+                                      ref.invalidate(adminDashboardSummaryProvider);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Account for ${user.fullName} updated successfully.')),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Failed to update status: $e'), backgroundColor: Colors.red),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
                           ),
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        if (user.lockedUntil != null) ...[
-                          const SizedBox(width: 8),
-                          const Chip(
-                            backgroundColor: Colors.red,
-                            label: Text('LOCKED', style: TextStyle(color: Colors.white, fontSize: 10)),
-                            visualDensity: VisualDensity.compact,
+                          const SizedBox(height: 10),
+                          const Divider(height: 1),
+                          const SizedBox(height: 8),
+                          // Contact details
+                          Row(
+                            children: [
+                              const Icon(Icons.email_outlined, size: 14, color: Colors.grey),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  user.email,
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (user.phone != null && user.phone!.isNotEmpty) ...[
+                                const SizedBox(width: 12),
+                                const Icon(Icons.phone_outlined, size: 14, color: Colors.grey),
+                                const SizedBox(width: 6),
+                                Text(
+                                  user.phone!,
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          // Action Buttons Row: Edit, Change Role, Delete
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () => _showEditStaffDialog(context, user),
+                                icon: const Icon(Icons.edit_outlined, size: 15),
+                                label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton.icon(
+                                onPressed: () => _showChangeRoleDialog(context, user),
+                                icon: const Icon(Icons.badge_outlined, size: 15),
+                                label: const Text('Role', style: TextStyle(fontSize: 12)),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                                tooltip: 'Delete Account',
+                                onPressed: () => _showDeleteStaffDialog(context, user),
+                              ),
+                            ],
                           ),
                         ],
-                      ],
-                    ),
-                    subtitle: Text('${user.email} • ${user.phone ?? "No phone"}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Role Edit Button
-                        IconButton(
-                          icon: const Icon(Icons.badge_rounded, color: Colors.blue),
-                          tooltip: 'Change Role',
-                          onPressed: () => _showChangeRoleDialog(context, user),
-                        ),
-                        // Status Toggle Switch
-                        Switch(
-                          value: user.isActive,
-                          activeColor: Colors.green,
-                          onChanged: (val) async {
-                            final confirm = await showOpdConfirmDialog(
-                              context: context,
-                              title: val ? 'Activate Account?' : 'Deactivate Account?',
-                              message:
-                                  'Are you sure you want to ${val ? "activate" : "deactivate"} ${user.fullName} (${user.email})? Security audit logs will record this action.',
-                              confirmText: val ? 'Activate' : 'Deactivate',
-                            );
-                            if (confirm == true) {
-                              try {
-                                final repo = ref.read(adminPortalRepositoryProvider);
-                                await repo.updateUserStatus(user.id, isActive: val, unlock: val);
-                                ref.invalidate(adminUsersProvider);
-                                ref.invalidate(adminDashboardSummaryProvider);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Account for ${user.fullName} updated successfully.')),
-                                  );
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Failed to update status: $e'), backgroundColor: Colors.red),
-                                  );
-                                }
-                              }
-                            }
-                          },
-                        ),
-                      ],
+                      ),
                     ),
                   );
                 },
               );
             },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleFilterChip(String? roleKey, String label, String? selectedRole) {
+    final isSelected = selectedRole == roleKey;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) {
+        ref.read(adminUsersFilterRoleProvider.notifier).state = roleKey;
+      },
+      selectedColor: AppColors.primaryBlue.withValues(alpha: 0.15),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? AppColors.primaryBlue : Colors.grey.shade700,
+      ),
+      visualDensity: VisualDensity.compact,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    );
+  }
+
+  Color _getRoleColor(String role) {
+    switch (role.toLowerCase()) {
+      case 'doctor':
+        return Colors.teal;
+      case 'receptionist':
+        return Colors.orange.shade800;
+      case 'pharmacist':
+        return Colors.green.shade700;
+      case 'lab_technician':
+        return Colors.purple.shade700;
+      case 'nurse':
+        return Colors.blue.shade700;
+      case 'admin':
+        return Colors.indigo.shade700;
+      case 'billing':
+        return Colors.brown;
+      default:
+        return AppColors.primaryBlue;
+    }
+  }
+
+  // ==========================================
+  // TAB 3: PATIENT DIRECTORY & DEMOGRAPHICS
+  // ==========================================
+  Widget _buildPatientManagementTab(bool isDark) {
+    final patientsAsync = ref.watch(patientListProvider);
+
+    return Column(
+      children: [
+        // Search Header
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade200)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    hintText: 'Search patients by UHID, Name, or Phone...',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onChanged: (val) {
+                    ref.read(patientSearchQueryProvider.notifier).setQuery(val.trim());
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await context.push('/patients/new');
+                  if (mounted) {
+                    ref.read(patientSearchQueryProvider.notifier).setQuery('');
+                    ref.invalidate(patientListProvider);
+                    ref.invalidate(adminDashboardSummaryProvider);
+                    ref.invalidate(adminRegistrationsReportProvider);
+                  }
+                },
+                icon: const Icon(Icons.person_add_rounded, size: 18),
+                label: const Text('New Patient'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryTeal,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Patient List
+        Expanded(
+          child: patientsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => Center(child: Text('Error loading patients: $err')),
+            data: (patients) {
+              if (patients.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.people_outline, size: 48, color: Colors.grey),
+                      const SizedBox(height: 12),
+                      const Text('No registered patients found.', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await context.push('/patients/new');
+                          if (mounted) {
+                            ref.read(patientSearchQueryProvider.notifier).setQuery('');
+                            ref.invalidate(patientListProvider);
+                            ref.invalidate(adminDashboardSummaryProvider);
+                            ref.invalidate(adminRegistrationsReportProvider);
+                          }
+                        },
+                        child: const Text('Register First Patient'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: patients.length,
+                itemBuilder: (context, index) {
+                  final patient = patients[index];
+                  return Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundColor: AppColors.primaryTeal.withValues(alpha: 0.15),
+                                child: Text(
+                                  patient.fullName.isNotEmpty ? patient.fullName[0].toUpperCase() : 'P',
+                                  style: const TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      patient.fullName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primaryTeal.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            patient.uhid,
+                                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primaryTeal),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${patient.gender} • ${patient.ageYears ?? "--"} yrs',
+                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.confirmation_number_rounded, color: AppColors.primaryTeal),
+                                tooltip: 'Book Visit',
+                                onPressed: () => context.push('/visits/new', extra: patient),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Divider(height: 1),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.phone_outlined, size: 14, color: Colors.grey),
+                              const SizedBox(width: 6),
+                              Text(patient.phone, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              if (patient.address != null && patient.address!.isNotEmpty) ...[
+                                const SizedBox(width: 12),
+                                const Icon(Icons.location_on_outlined, size: 14, color: Colors.grey),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    patient.address!,
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (patient.registeredByStaffName != null && patient.registeredByStaffName!.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.badge_outlined, size: 12, color: AppColors.primaryBlue),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Registered by: ${patient.registeredByStaffName} (${patient.registeredByStaffRole ?? "Staff"})',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            alignment: WrapAlignment.end,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () => _showPatientDetailsModal(context, patient),
+                                icon: const Icon(Icons.visibility_outlined, size: 14),
+                                label: const Text('All Details', style: TextStyle(fontSize: 11)),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () => context.push('/patients/${patient.id}/booklet'),
+                                icon: const Icon(Icons.menu_book_rounded, size: 14, color: AppColors.primaryBlue),
+                                label: const Text('Booklet', style: TextStyle(fontSize: 11, color: AppColors.primaryBlue)),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: () => _downloadPatientBooklet(context, patient),
+                                icon: const Icon(Icons.download_rounded, size: 14),
+                                label: const Text('PDF', style: TextStyle(fontSize: 11)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.hospitalMaroon,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () => _showEditPatientInAdmin(context, patient),
+                                icon: const Icon(Icons.edit_outlined, size: 14),
+                                label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  visualDensity: VisualDensity.compact,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 18),
+                                tooltip: 'Delete Patient Record',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => _deletePatientInAdmin(context, patient),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showEditStaffDialog(BuildContext context, AdminUserModel user) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: user.fullName);
+    final emailCtrl = TextEditingController(text: user.email);
+    final phoneCtrl = TextEditingController(text: user.phone ?? '');
+    final qualCtrl = TextEditingController(text: 'MBBS, MD');
+    final roomCtrl = TextEditingController(text: 'Room 101');
+    final feeCtrl = TextEditingController(text: '500');
+    final deptCtrl = TextEditingController(text: 'General Medicine');
+    String selectedRole = user.roleName.toLowerCase();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final isDoc = selectedRole == 'doctor';
+            return AlertDialog(
+              title: Text('Edit Staff: ${user.fullName}'),
+              content: SizedBox(
+                width: 450,
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: nameCtrl,
+                          decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: emailCtrl,
+                          decoration: const InputDecoration(labelText: 'Hospital Email *', isDense: true),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (v) => InputSanitizer.validateEmail(v, fieldName: 'Hospital Email'),
+                        ),
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: phoneCtrl,
+                          decoration: const InputDecoration(labelText: 'Phone Number (10 digits)', isDense: true),
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                          validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Phone Number'),
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          value: selectedRole,
+                          decoration: const InputDecoration(labelText: 'Staff Role Group', isDense: true),
+                          items: const [
+                            DropdownMenuItem(value: 'doctor', child: Text('Doctor (Clinical Access)')),
+                            DropdownMenuItem(value: 'receptionist', child: Text('Receptionist (Intake & Tokens)')),
+                            DropdownMenuItem(value: 'nurse', child: Text('Nurse (Vitals & Triage)')),
+                            DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist (Formulary & Dispensing)')),
+                            DropdownMenuItem(value: 'lab_technician', child: Text('Lab Technician (Diagnostic Testing)')),
+                            DropdownMenuItem(value: 'billing', child: Text('Billing Counter (Invoices & Cashier)')),
+                            DropdownMenuItem(value: 'admin', child: Text('Hospital Administrator (Governance)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setDialogState(() => selectedRole = val);
+                          },
+                        ),
+                        if (isDoc) ...[
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: deptCtrl,
+                            decoration: const InputDecoration(labelText: 'Department / Specialization', isDense: true),
+                          ),
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: roomCtrl,
+                            decoration: const InputDecoration(labelText: 'OPD Room Number', isDense: true),
+                          ),
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: qualCtrl,
+                            decoration: const InputDecoration(labelText: 'Medical Qualification', isDense: true),
+                          ),
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: feeCtrl,
+                            decoration: const InputDecoration(labelText: 'Consultation Fee (₹)', isDense: true),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (formKey.currentState?.validate() ?? false) {
+                      try {
+                        final repo = ref.read(adminPortalRepositoryProvider);
+                        await repo.updateUserDetails(
+                          user.id,
+                          fullName: nameCtrl.text.trim(),
+                          email: emailCtrl.text.trim(),
+                          phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                          roleName: selectedRole,
+                          departmentName: isDoc ? deptCtrl.text.trim() : null,
+                          roomNumber: isDoc ? roomCtrl.text.trim() : null,
+                          qualification: isDoc ? qualCtrl.text.trim() : null,
+                          consultationFee: isDoc ? feeCtrl.text.trim() : null,
+                        );
+                        ref.invalidate(adminUsersProvider);
+                        ref.invalidate(adminDashboardSummaryProvider);
+                        ref.invalidate(doctorListProvider);
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Staff details for ${nameCtrl.text.trim()} updated successfully!')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to update staff: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    }
+                  },
+                  child: const Text('Save Changes'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteStaffDialog(BuildContext context, AdminUserModel user) async {
+    final confirm = await showOpdConfirmDialog(
+      context: context,
+      title: 'Delete Staff Account?',
+      message: 'Are you sure you want to permanently delete the account for "${user.fullName}" (${user.email})? They will immediately lose access.',
+      confirmText: 'Delete Account',
+      isDestructive: true,
+    );
+    if (confirm == true) {
+      try {
+        final repo = ref.read(adminPortalRepositoryProvider);
+        await repo.deleteUserAccount(user.id);
+        ref.invalidate(adminUsersProvider);
+        ref.invalidate(adminDashboardSummaryProvider);
+        ref.invalidate(doctorListProvider);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Account for "${user.fullName}" deleted successfully.')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete staff: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  void _showEditPatientInAdmin(BuildContext context, PatientModel patient) {
+    final nameCtrl = TextEditingController(text: patient.fullName);
+    final phoneCtrl = TextEditingController(text: patient.phone);
+    final ageCtrl = TextEditingController(text: patient.ageYears != null ? '${patient.ageYears}' : '');
+    final addressCtrl = TextEditingController(text: patient.address ?? '');
+    final relationNameCtrl = TextEditingController(text: patient.parentSpouseName ?? '');
+    String selectedGender = patient.gender.toUpperCase();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Edit Patient: ${patient.fullName}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(labelText: 'Phone Number (10 Digits) *', isDense: true),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: ageCtrl,
+                        decoration: const InputDecoration(labelText: 'Age (Years)', isDense: true),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: ['MALE', 'FEMALE', 'OTHER'].contains(selectedGender) ? selectedGender : 'OTHER',
+                        decoration: const InputDecoration(labelText: 'Gender', isDense: true),
+                        items: const [
+                          DropdownMenuItem(value: 'MALE', child: Text('Male')),
+                          DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
+                          DropdownMenuItem(value: 'OTHER', child: Text('Other')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => selectedGender = val);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: relationNameCtrl,
+                  decoration: const InputDecoration(labelText: 'Father / Spouse Name', isDense: true),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: addressCtrl,
+                  decoration: const InputDecoration(labelText: 'Address', isDense: true),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (nameCtrl.text.trim().isEmpty || phoneCtrl.text.trim().isEmpty) return;
+                final updated = patient.copyWith(
+                  fullName: nameCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim(),
+                  ageYears: int.tryParse(ageCtrl.text.trim()),
+                  gender: selectedGender,
+                  parentSpouseName: relationNameCtrl.text.trim().isEmpty ? null : relationNameCtrl.text.trim(),
+                  address: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
+                );
+                try {
+                  await ref.read(patientRepositoryProvider).updatePatient(updated);
+                  ref.invalidate(patientListProvider);
+                  ref.invalidate(adminDashboardSummaryProvider);
+                  if (context.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Patient "${updated.fullName}" updated successfully!')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to update patient: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _deletePatientInAdmin(BuildContext context, PatientModel patient) async {
+    final confirm = await showOpdConfirmDialog(
+      context: context,
+      title: 'Delete Patient Record?',
+      message: 'Are you sure you want to permanently delete patient "${patient.fullName}" (UHID: ${patient.uhid})? This will permanently remove all associated records.',
+      confirmText: 'Delete Record',
+      isDestructive: true,
+    );
+    if (confirm == true) {
+      try {
+        await ref.read(patientRepositoryProvider).deletePatient(patient.id);
+        ref.invalidate(patientListProvider);
+        ref.invalidate(adminDashboardSummaryProvider);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Patient "${patient.fullName}" deleted successfully.')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete patient: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _downloadPatientBooklet(BuildContext context, PatientModel patient) async {
+    final regId = patient.hospitalRegNum ?? patient.uhid;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
+            SizedBox(width: 12),
+            Expanded(child: Text('Generating & downloading 7-page verified OPD booklet...')),
+          ],
+        ),
+        duration: Duration(seconds: 4),
+      ),
+    );
+    try {
+      final bytes = await ref.read(patientRepositoryProvider).downloadBookletByRegId(regId);
+      if (bytes.isNotEmpty && context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Downloaded ${bytes.length} bytes. Verified SMVMCH booklet saved!'),
+            backgroundColor: Colors.green,
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () => context.push('/patients/${patient.id}/booklet'),
+            ),
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Hospital server offline/unreachable on this network.',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Opening verified in-app 7-page Digital Booklet for ${patient.fullName}...',
+                  style: TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.hospitalMaroon,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Server IP',
+              textColor: Colors.yellowAccent,
+              onPressed: () => ServerConfigDialog.show(context),
+            ),
+          ),
+        );
+        context.push('/patients/${patient.id}/booklet');
+      }
+    }
+  }
+
+  void _showPatientDetailsModal(BuildContext context, PatientModel patient) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: AppColors.primaryTeal.withValues(alpha: 0.15),
+              child: Text(
+                patient.fullName.isNotEmpty ? patient.fullName[0].toUpperCase() : 'P',
+                style: const TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(patient.fullName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(
+                    'UHID: ${patient.uhid}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.primaryTeal, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Demographics Card
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildDetailRow('Age & Gender', '${patient.ageYears ?? "N/A"} Yrs • ${patient.gender}'),
+                      const Divider(height: 12),
+                      _buildDetailRow('Phone Number', patient.phone),
+                      const Divider(height: 12),
+                      _buildDetailRow('Father / Spouse', patient.parentSpouseName ?? 'N/A'),
+                      const Divider(height: 12),
+                      _buildDetailRow('Address', patient.address ?? 'Not recorded'),
+                      if (patient.barcodeValue != null) ...[
+                        const Divider(height: 12),
+                        _buildDetailRow('Barcode / Code128', patient.barcodeValue!),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Staff Attribution & Registration Audit
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.verified_user_rounded, size: 16, color: AppColors.primaryBlue),
+                          SizedBox(width: 6),
+                          Text(
+                            'Registration Audit & Staff Attribution',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryBlue),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildDetailRow(
+                        'Registered By Staff',
+                        patient.registeredByStaffName != null
+                            ? '${patient.registeredByStaffName} (${patient.registeredByStaffRole ?? "Receptionist"})'
+                            : 'Hospital Admissions Desk',
+                      ),
+                      if (patient.registeredByStaffId != null) ...[
+                        const Divider(height: 12),
+                        _buildDetailRow('Staff ID', patient.registeredByStaffId!),
+                      ],
+                      if (patient.createdAt != null) ...[
+                        const Divider(height: 12),
+                        _buildDetailRow(
+                          'Registration Timestamp',
+                          '${patient.createdAt!.day.toString().padLeft(2, '0')}/${patient.createdAt!.month.toString().padLeft(2, '0')}/${patient.createdAt!.year} ${patient.createdAt!.hour.toString().padLeft(2, '0')}:${patient.createdAt!.minute.toString().padLeft(2, '0')}',
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Action Buttons inside Modal
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          context.push('/patients/${patient.id}/booklet');
+                        },
+                        icon: const Icon(Icons.menu_book_rounded, size: 16),
+                        label: const Text('Digital Booklet'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.hospitalMaroon,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _downloadPatientBooklet(context, patient);
+                        },
+                        icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
+                        label: const Text('Download PDF'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 140,
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -757,19 +1779,26 @@ class _HospitalAdminWorkspaceViewState
                       TextFormField(
                         controller: emailCtrl,
                         decoration: const InputDecoration(labelText: 'Hospital Email *', isDense: true),
-                        validator: (v) => v == null || !v.contains('@') ? 'Valid email required' : null,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) => InputSanitizer.validateEmail(v, fieldName: 'Hospital Email'),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: passwordCtrl,
-                        decoration: const InputDecoration(labelText: 'Initial Password *', isDense: true),
+                        decoration: const InputDecoration(labelText: 'Initial Password * (Strong)', isDense: true),
                         obscureText: true,
-                        validator: (v) => v == null || v.length < 8 ? 'Min 8 characters' : null,
+                        validator: (v) => InputSanitizer.validateStrongPassword(v),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: phoneCtrl,
-                        decoration: const InputDecoration(labelText: 'Phone Number (Optional)', isDense: true),
+                        decoration: const InputDecoration(labelText: 'Phone Number (10 digits, Optional)', isDense: true),
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Phone Number'),
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
@@ -808,6 +1837,7 @@ class _HospitalAdminWorkspaceViewState
                         );
                         ref.invalidate(adminUsersProvider);
                         ref.invalidate(adminDashboardSummaryProvider);
+                        ref.invalidate(doctorListProvider);
                         if (context.mounted) {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -927,6 +1957,17 @@ class _HospitalAdminWorkspaceViewState
                   color: isDark ? Colors.white : Colors.grey.shade900,
                 ),
               ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Add Department'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () => _showAddDepartmentDialog(context),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1016,6 +2057,116 @@ class _HospitalAdminWorkspaceViewState
           ),
         ],
       ),
+    );
+  }
+
+  void _showAddDepartmentDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.domain_add_rounded, color: AppColors.primaryBlue),
+              SizedBox(width: 8),
+              Text('Create Department', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Department Name *',
+                    hintText: 'e.g. Cardiology, Orthopedics',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: codeCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Department Code *',
+                    hintText: 'e.g. CARD, ORTHO',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (Optional)',
+                    hintText: 'Brief clinical specialty details...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                final code = codeCtrl.text.trim();
+                if (name.isEmpty || code.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Department name and code are required.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                try {
+                  final repo = ref.read(adminPortalRepositoryProvider);
+                  await repo.createDepartment(
+                    name: name,
+                    code: code,
+                    description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                  );
+                  ref.invalidate(adminDepartmentsProvider);
+                  if (context.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Department "$name" created successfully.'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to create department: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -2004,6 +3155,57 @@ class _HospitalAdminWorkspaceViewState
                             label: const Text('Trigger Instant Snapshot'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Syncing all hospital records to Supabase Cloud...')),
+                              );
+                              try {
+                                final res = await ref.read(dioClientProvider).dio.post('/admin/sync-supabase');
+                                if (context.mounted) {
+                                  final data = res.data['data'] as Map<String, dynamic>?;
+                                  final pCount = data?['patients_synced'] ?? 0;
+                                  final vCount = data?['visits_synced'] ?? 0;
+                                  final bCount = data?['bills_synced'] ?? 0;
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Row(
+                                        children: [
+                                          Icon(Icons.cloud_done_rounded, color: Colors.blue),
+                                          SizedBox(width: 8),
+                                          Text('Supabase Cloud Sync'),
+                                        ],
+                                      ),
+                                      content: Text(
+                                        'Hospital database successfully synced to Supabase Cloud!\n\n'
+                                        '• Patients Synced: $pCount\n'
+                                        '• OPD Visits Synced: $vCount\n'
+                                        '• Bills Synced: $bCount\n\n'
+                                        'Project: xxwidqatsxzsrulaxxal.supabase.co',
+                                      ),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+                                      ],
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Supabase sync notice: $e'), backgroundColor: Colors.orange),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.cloud_upload_rounded, size: 18),
+                            label: const Text('Sync to Supabase Cloud'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryBlue,
                               foregroundColor: Colors.white,
                             ),
                           ),

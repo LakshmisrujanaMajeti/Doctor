@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../shared/widgets/opd_button.dart';
+import '../../../shared/widgets/smvmch_hospital_logo.dart';
 
 class LoadingScreen extends StatefulWidget {
   final String title;
@@ -90,18 +91,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                               ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: const BoxDecoration(
-                              color: AppColors.primaryBlue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.local_hospital_rounded,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
+                          const SmvmchHospitalLogo(size: 44),
                         ],
                       ),
                     ),
@@ -154,14 +144,18 @@ class _LoadingScreenState extends State<LoadingScreen>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        AppStrings.tagline,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? AppColors.darkTextSecondary
-                              : AppColors.lightTextSecondary,
+                      Flexible(
+                        child: Text(
+                          AppStrings.tagline,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary,
+                          ),
                         ),
                       ),
                     ],

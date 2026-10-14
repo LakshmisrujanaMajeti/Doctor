@@ -431,7 +431,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('OPD CONNECT+ HEALTHCARE CENTRE'), findsOneWidget);
+    expect(find.text('Sri Manakula Vinayagar Medical College & Hospital'), findsOneWidget);
     expect(find.text('INV-2026-0001'), findsOneWidget);
     expect(find.text('General OPD Consultation'), findsOneWidget);
     expect(find.text('Minor Wound Dressing'), findsOneWidget);

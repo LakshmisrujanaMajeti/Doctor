@@ -89,16 +89,23 @@ def seed_database():
 
         # 1c. System Configs
         default_configs = [
-            ("hospital_name", "City Care Memorial Hospital", "HOSPITAL", "Official hospital name printed on OPD booklets and receipts"),
-            ("hospital_code", "CCMH-OPD", "HOSPITAL", "Hospital code prefix for registrations"),
-            ("opd_operating_hours", "08:00 AM - 08:00 PM (Mon-Sat), 09:00 AM - 01:00 PM (Sun)", "HOSPITAL", "Daily OPD operating hours"),
-            ("hospital_gstin", "29AAAAA0000A1Z5", "BILLING", "Hospital GST identification number"),
+            ("hospital_name", "Sri Manakula Vinayagar Medical College and Hospital", "HOSPITAL", "Official hospital name printed on OPD booklets and receipts"),
+            ("hospital_tamil_name", "ஸ்ரீ மணக்குள விநாயகர் மருத்துவக் கல்லூரி மற்றும் மருத்துவமனை", "HOSPITAL", "Official Tamil hospital name"),
+            ("hospital_code", "SMVMCH", "HOSPITAL", "Hospital code prefix for registrations"),
+            ("hospital_address", "Kalitheerthalkuppam, Madagadipet, Puducherry - 605 107", "HOSPITAL", "Campus address"),
+            ("hospital_phone", "0413 - 2643000", "HOSPITAL", "Official hospital telephone"),
+            ("hospital_email", "principal@smvmch.ac.in", "HOSPITAL", "Official administrative email"),
+            ("hospital_website", "www.smvmch.ac.in", "HOSPITAL", "Official hospital website"),
+            ("hospital_gstin", "34AAATM9599A1ZE", "BILLING", "Hospital GST identification number"),
+            ("hospital_tin", "34880001919", "BILLING", "Hospital TIN registration number"),
+            ("pharmacy_dl_nos", "RLF20PY2024000071 / RLF21PY2024000075 / RLF20F2024PY000001", "PHARMACY", "Pharmacy drug licenses"),
+            ("opd_operating_hours", "24 Hours Casualty & Emergency • OPD: 08:00 AM - 08:00 PM", "HOSPITAL", "Daily OPD operating hours"),
             ("consultation_default_fee", "500.00", "BILLING", "Default general OPD consultation fee"),
-            ("tax_rate_medicines", "5.0", "BILLING", "Standard tax percentage for essential medicines"),
+            ("tax_rate_medicines", "5.0", "BILLING", "Standard tax percentage for essential medicines (CGST 2.5% + SGST 2.5%)"),
             ("tax_rate_services", "0.0", "BILLING", "Standard tax percentage for clinical healthcare services (exempt)"),
             ("backup_schedule", "Daily at 02:00 AM UTC", "BACKUP", "Automated backup schedule"),
             ("backup_retention_days", "30", "BACKUP", "Snapshot retention period in days"),
-            ("emergency_helpline", "+91 8000 112 911", "HOSPITAL", "24/7 Hospital emergency helpline"),
+            ("emergency_helpline", "0413 - 2643000", "HOSPITAL", "24/7 Hospital emergency helpline"),
         ]
         for c_key, c_val, c_cat, c_desc in default_configs:
             cfg = db.query(SystemConfig).filter(SystemConfig.config_key == c_key).first()
@@ -110,6 +117,7 @@ def seed_database():
         # 2. Departments
         departments_data = [
             ("General Medicine", "MED", "Internal medicine, acute infections, lifestyle disorders"),
+            ("Dental / Maxillofacial Surgery", "DENT", "Oral, dental, and maxillofacial surgery OPD"),
             ("Pediatrics", "PED", "Comprehensive infant, child, and adolescent healthcare"),
             ("Orthopedics", "ORTH", "Bone, joint, spine, and trauma consultations"),
             ("Cardiology", "CARD", "Heart conditions, hypertension, preventive cardiology"),
@@ -241,6 +249,60 @@ def seed_database():
             pharm_user.is_active = True
             db.flush()
 
+        # Nurse User
+        nurse_user = db.query(User).filter((User.email == "nurse@smvmch.ac.in") | (User.email == "nurse@opdconnect.com") | (User.phone == "+1555000006")).first()
+        if not nurse_user:
+            nurse_user = User(
+                email="nurse@smvmch.ac.in",
+                full_name="Sister Priya (Triage Nurse)",
+                phone="+1555000006",
+                hashed_password=get_password_hash("Nurse@123"),
+                role_id=roles["nurse"].id,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(nurse_user)
+            db.flush()
+
+        # Billing Cashier User
+        billing_user = db.query(User).filter((User.email == "billing@smvmch.ac.in") | (User.email == "billing@opdconnect.com") | (User.phone == "+1555000007")).first()
+        if not billing_user:
+            billing_user = User(
+                email="billing@smvmch.ac.in",
+                full_name="Rajesh Kumar (Billing Desk)",
+                phone="+1555000007",
+                hashed_password=get_password_hash("Billing@123"),
+                role_id=roles["billing" if "billing" in roles else "receptionist"].id,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(billing_user)
+            db.flush()
+
+        # SMVMCH Official Institutional Credentials
+        institutional_staff = [
+            ("admin@smvmch.ac.in", "Admin Administrator", "+1555000011", "Admin@123", "admin"),
+            ("doctor@smvmch.ac.in", "Dr. Sarah Chen, MD", "+1555000012", "Doctor@123", "doctor"),
+            ("receptionist@smvmch.ac.in", "Alice Adams (Reception Desk)", "+1555000013", "Reception@123", "receptionist"),
+            ("reception@smvmch.ac.in", "Alice Adams (Reception Desk)", "+1555000014", "Reception@123", "receptionist"),
+            ("lab@smvmch.ac.in", "Marcus Vance (Lab Tech)", "+1555000015", "Lab@123", "lab_tech"),
+            ("pharmacy@smvmch.ac.in", "Elena Rostova (Pharmacist)", "+1555000016", "Pharmacy@123", "pharmacist"),
+        ]
+        for inst_email, inst_name, inst_phone, inst_pass, inst_role in institutional_staff:
+            u_check = db.query(User).filter(User.email == inst_email).first()
+            if not u_check:
+                u_check = User(
+                    email=inst_email,
+                    full_name=inst_name,
+                    phone=inst_phone,
+                    hashed_password=get_password_hash(inst_pass),
+                    role_id=roles[inst_role].id,
+                    is_active=True,
+                    is_verified=True,
+                )
+                db.add(u_check)
+                db.flush()
+
         # 4. Standard Essential Medicine Catalogue (Clean Master Formulary)
         medicines_data = [
             {
@@ -367,8 +429,35 @@ def seed_database():
                 )
                 db.add(movement)
 
+        # 5. Doctor Dr. Arunraj (SMVMCH Dental & Oral Surgery Specialist from document)
+        doc_arun_user = db.query(User).filter(User.email == "dr.arunraj@opdconnect.com").first()
+        if not doc_arun_user:
+            doc_arun_user = User(
+                email="dr.arunraj@opdconnect.com",
+                full_name="Dr. M. Arunraj, MDS",
+                phone="+1555000020",
+                hashed_password=get_password_hash("Doctor@123456"),
+                role_id=roles["doctor"].id,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(doc_arun_user)
+            db.flush()
+
+        doctor_arun = db.query(Doctor).filter(Doctor.user_id == doc_arun_user.id).first()
+        if not doctor_arun:
+            doctor_arun = Doctor(
+                user_id=doc_arun_user.id,
+                department_id=departments["DENT"].id,
+                qualification="BDS, MDS (Oral & Maxillofacial Surgery)",
+                specialization="Dental & Oral Surgery",
+                registration_number="TNDC-2016-44120",
+                room_number="Room 208, Dental OPD",
+                consultation_fee="500.00",
+                is_available=True,
+            )
         db.commit()
-        print("Database cleanly initialized with core roles, configs, master catalogues, and admin credentials. Zero demo patient records.")
+        print("Database initialized with SMVMCH master configuration, staff accounts, departments, and formulary catalogue.")
 
     except Exception as e:
         db.rollback()

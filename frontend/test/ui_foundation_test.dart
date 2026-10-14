@@ -19,6 +19,7 @@ import 'package:opd_connect/shared/widgets/error_banner_widget.dart';
 import 'package:opd_connect/shared/widgets/opd_button.dart';
 import 'package:opd_connect/shared/widgets/opd_card.dart';
 import 'package:opd_connect/shared/widgets/opd_text_field.dart';
+import 'package:opd_connect/shared/widgets/smvmch_hospital_logo.dart';
 
 void main() {
   group('OPD Connect+ Reusable Components Tests', () {
@@ -153,7 +154,7 @@ void main() {
 
       expect(find.text(AppStrings.appName), findsOneWidget);
       expect(find.text(AppStrings.tagline), findsOneWidget);
-      expect(find.byIcon(Icons.local_hospital_rounded), findsOneWidget);
+      expect(find.byType(SmvmchHospitalLogo), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 2000));
     });
@@ -251,7 +252,7 @@ void main() {
 
       expect(find.text('Profile & Hospital Settings'), findsOneWidget);
       expect(find.text('Dark Mode'), findsOneWidget);
-      expect(find.text('Hospital Infrastructure Status'), findsOneWidget);
+      expect(find.text('Security & Data Governance'), findsOneWidget);
       expect(find.text('Sign Out of OPD Connect+'), findsOneWidget);
     });
   });

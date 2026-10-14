@@ -200,6 +200,30 @@ def create_doctor(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    existing_doctor = db.query(Doctor).filter(Doctor.user_id == doc_in.user_id).first()
+    if existing_doctor:
+        if doc_in.department_id:
+            existing_doctor.department_id = doc_in.department_id
+        if doc_in.qualification:
+            existing_doctor.qualification = doc_in.qualification
+        if doc_in.specialization:
+            existing_doctor.specialization = doc_in.specialization
+        if doc_in.registration_number:
+            existing_doctor.registration_number = doc_in.registration_number
+        if doc_in.room_number:
+            existing_doctor.room_number = doc_in.room_number
+        if doc_in.consultation_fee is not None:
+            existing_doctor.consultation_fee = doc_in.consultation_fee
+        if doc_in.is_available is not None:
+            existing_doctor.is_available = doc_in.is_available
+        db.commit()
+        db.refresh(existing_doctor)
+        return success_response(
+            data=DoctorRead.model_validate(existing_doctor).model_dump(),
+            message="Doctor profile updated successfully",
+            status_code=200
+        )
+
     doctor = Doctor(
         user_id=doc_in.user_id,
         department_id=doc_in.department_id,

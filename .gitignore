@@ -20,9 +20,10 @@ backend/venv/
 backend/env/
 backend/ENV/
 backend/.env
-backend/*.db
-backend/*.sqlite
-backend/*.sqlite3
+*.db
+*.sqlite
+*.sqlite3
+.postman/
 backend/storage/*
 !backend/storage/.gitkeep
 backend/__pycache__/

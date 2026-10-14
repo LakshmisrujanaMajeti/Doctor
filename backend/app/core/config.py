@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # JWT Security
     SECRET_KEY: str = "super_secret_opd_connect_jwt_key_default_change_in_production"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours (prevents token expired errors during clinical shifts)
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Authentication & Security Controls

@@ -24,6 +24,7 @@ import '../features/visits/screens/opd_queue_screen.dart';
 import '../features/visits/screens/record_vitals_screen.dart';
 import '../features/visits/screens/visit_detail_screen.dart';
 import '../features/laboratory/screens/laboratory_report_screen.dart';
+import '../features/laboratory/screens/laboratory_workspace_view.dart';
 import '../features/pharmacy/screens/pharmacy_workspace_view.dart';
 import '../features/billing/screens/billing_workspace_view.dart';
 import '../features/billing/screens/printable_invoice_screen.dart';
@@ -32,10 +33,13 @@ import '../features/documents/screens/document_capture_screen.dart';
 import '../features/documents/screens/document_ocr_verification_screen.dart';
 import '../features/patient_portal/screens/patient_portal_workspace_view.dart';
 import '../features/admin_portal/screens/hospital_admin_workspace_view.dart';
+import '../features/auth/screens/patient_token_access_screen.dart';
+import '../features/patients/screens/digital_opd_booklet_screen.dart';
 import '../routing/route_names.dart';
 import '../shared/screens/empty_screen.dart';
 import '../shared/screens/loading_screen.dart';
 import '../shared/screens/not_found_screen.dart';
+import '../shared/widgets/smvmch_hospital_logo.dart';
 import '../shared/screens/offline_screen.dart';
 import '../shared/screens/unauthorized_screen.dart';
 
@@ -65,17 +69,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isAuth = authState.isAuthenticated;
       final path = state.matchedLocation;
 
-      // 1. Prevent authenticated users from returning to login / welcome / splash / profile-setup
+      // 1. NEVER redirect /splash! Splash screen must always display for 5s with app icon
+      if (path == '/splash') {
+        return null;
+      }
+
+      // 2. Allow user on /login to stay on /login to sign in or switch accounts
+      if (path == '/login') {
+        return null;
+      }
+
+      // 3. Prevent authenticated users from returning to welcome / onboarding / profile-setup
       if (isAuth &&
-          (path == '/login' ||
-              path == '/welcome' ||
-              path == '/splash' ||
+          (path == '/welcome' ||
               path == '/onboarding' ||
               path == '/profile-setup')) {
         return '/dashboard';
       }
 
-      // 2. Allow public / system utility routes without authentication
+      // 4. Allow public / system utility routes without authentication
       const publicRoutes = [
         '/splash',
         '/onboarding',
@@ -83,6 +95,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         '/login',
         '/forgot-password',
         '/profile-setup',
+        '/patient/token-access',
+        '/queue',
         '/loading',
         '/offline',
         '/unauthorized',
@@ -90,9 +104,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         '/404',
       ];
 
-      final isPublic = publicRoutes.contains(path);
+      final isPublic = publicRoutes.contains(path) ||
+          (path.startsWith('/patients/') && path.endsWith('/booklet'));
       if (!isAuth && !isPublic) {
-        return '/welcome';
+        return '/login';
       }
 
       return null;
@@ -162,7 +177,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'new',
             builder: (context, state) => const PatientRegistrationScreen(),
           ),
+          GoRoute(
+            name: RouteNames.digitalOpdBooklet,
+            path: ':id/booklet',
+            builder: (context, state) {
+              final patientId = state.pathParameters['id'] ?? '';
+              return DigitalOpdBookletScreen(patientId: patientId);
+            },
+          ),
         ],
+      ),
+      GoRoute(
+        name: RouteNames.patientTokenAccess,
+        path: '/patient/token-access',
+        builder: (context, state) => const PatientTokenAccessScreen(),
       ),
 
       // OPD Token Queue
@@ -226,10 +254,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        name: RouteNames.laboratory,
+        path: '/laboratory',
+        builder: (context, state) => Scaffold(
+          appBar: AppBar(
+            leading: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: SmvmchHospitalLogo(size: 28),
+            ),
+            title: const Text('Diagnostic Laboratory Desk'),
+          ),
+          body: const SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: LaboratoryWorkspaceView(),
+          ),
+        ),
+      ),
+      GoRoute(
         name: RouteNames.pharmacy,
         path: '/pharmacy',
         builder: (context, state) => Scaffold(
-          appBar: AppBar(title: const Text('Pharmacy Inventory & Dispensing')),
+          appBar: AppBar(
+            leading: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: SmvmchHospitalLogo(size: 28),
+            ),
+            title: const Text('Pharmacy Inventory & Dispensing'),
+          ),
           body: const SingleChildScrollView(
             padding: EdgeInsets.all(16),
             child: PharmacyWorkspaceView(),
@@ -240,7 +291,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: RouteNames.billing,
         path: '/billing',
         builder: (context, state) => Scaffold(
-          appBar: AppBar(title: const Text('OPD Billing & Payments Counter')),
+          appBar: AppBar(
+            leading: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: SmvmchHospitalLogo(size: 28),
+            ),
+            title: const Text('OPD Billing & Payments Counter'),
+          ),
           body: const SingleChildScrollView(
             padding: EdgeInsets.all(16),
             child: BillingWorkspaceView(),

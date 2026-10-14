@@ -54,3 +54,14 @@ def test_patient_registration_and_search(client):
     results = search_res.json()["data"]
     assert len(results) >= 1
     assert any(p["id"] == patient_id for p in results)
+
+    # 5. Download Booklet by Registration ID (UHID)
+    dl_res = client.get(f"/api/v1/patients/download-by-reg/{uhid}", headers=headers)
+    assert dl_res.status_code == 200
+    assert dl_res.headers["content-type"] == "application/pdf"
+    assert dl_res.content[:4] == b"%PDF"
+
+    # 6. Verify staff attribution fields are recorded on patient record
+    assert data.get("registered_by_staff_name") == "Test Receptionist"
+    assert data.get("registered_by_staff_role") == "receptionist"
+

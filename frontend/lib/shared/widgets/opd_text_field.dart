@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class OpdTextField extends StatefulWidget {
   final String label;
@@ -9,6 +10,7 @@ class OpdTextField extends StatefulWidget {
   final bool obscureText;
   final bool enablePasswordToggle;
   final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
   final int maxLines;
   final void Function(String)? onChanged;
@@ -25,6 +27,7 @@ class OpdTextField extends StatefulWidget {
     this.obscureText = false,
     this.enablePasswordToggle = false,
     this.keyboardType,
+    this.inputFormatters,
     this.validator,
     this.maxLines = 1,
     this.onChanged,
@@ -83,6 +86,13 @@ class _OpdTextFieldState extends State<OpdTextField> {
           controller: widget.controller,
           obscureText: _obscured,
           keyboardType: widget.keyboardType,
+          inputFormatters: widget.inputFormatters ??
+              (widget.keyboardType == TextInputType.phone
+                  ? [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ]
+                  : null),
           validator: widget.validator,
           maxLines: widget.maxLines,
           onChanged: widget.onChanged,

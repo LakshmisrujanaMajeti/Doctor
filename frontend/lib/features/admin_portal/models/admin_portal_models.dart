@@ -71,6 +71,50 @@ class AdminDashboardMetricsModel {
       lockedAccountsCount: (json['locked_accounts_count'] as num?)?.toInt() ?? 0,
     );
   }
+
+  AdminDashboardMetricsModel copyWith({
+    int? totalPatientsRegistered,
+    int? visitsTodayCount,
+    Map<String, int>? queueBreakdown,
+    int? activeClinicsCount,
+    int? activeDoctorsCount,
+    double? revenueToday,
+    double? revenueMonth,
+    int? pendingBillsCount,
+    double? pendingBillsAmount,
+    Map<String, double>? revenueByMethod,
+    int? lowStockItemsCount,
+    int? expiringSoonItemsCount,
+    int? totalMedicinesInFormulary,
+    int? pendingLabOrdersCount,
+    int? completedLabTodayCount,
+    int? totalStaffAccounts,
+    Map<String, int>? staffByRole,
+    int? inactiveAccountsCount,
+    int? lockedAccountsCount,
+  }) {
+    return AdminDashboardMetricsModel(
+      totalPatientsRegistered: totalPatientsRegistered ?? this.totalPatientsRegistered,
+      visitsTodayCount: visitsTodayCount ?? this.visitsTodayCount,
+      queueBreakdown: queueBreakdown ?? this.queueBreakdown,
+      activeClinicsCount: activeClinicsCount ?? this.activeClinicsCount,
+      activeDoctorsCount: activeDoctorsCount ?? this.activeDoctorsCount,
+      revenueToday: revenueToday ?? this.revenueToday,
+      revenueMonth: revenueMonth ?? this.revenueMonth,
+      pendingBillsCount: pendingBillsCount ?? this.pendingBillsCount,
+      pendingBillsAmount: pendingBillsAmount ?? this.pendingBillsAmount,
+      revenueByMethod: revenueByMethod ?? this.revenueByMethod,
+      lowStockItemsCount: lowStockItemsCount ?? this.lowStockItemsCount,
+      expiringSoonItemsCount: expiringSoonItemsCount ?? this.expiringSoonItemsCount,
+      totalMedicinesInFormulary: totalMedicinesInFormulary ?? this.totalMedicinesInFormulary,
+      pendingLabOrdersCount: pendingLabOrdersCount ?? this.pendingLabOrdersCount,
+      completedLabTodayCount: completedLabTodayCount ?? this.completedLabTodayCount,
+      totalStaffAccounts: totalStaffAccounts ?? this.totalStaffAccounts,
+      staffByRole: staffByRole ?? this.staffByRole,
+      inactiveAccountsCount: inactiveAccountsCount ?? this.inactiveAccountsCount,
+      lockedAccountsCount: lockedAccountsCount ?? this.lockedAccountsCount,
+    );
+  }
 }
 
 @immutable

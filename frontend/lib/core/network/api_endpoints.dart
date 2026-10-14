@@ -21,6 +21,8 @@ class ApiEndpoints {
   static String patientByUhid(String uhid) => '/patients/uhid/$uhid';
   static String patientByReg(String reg) => '/patients/reg/$reg';
   static String patientByBarcode(String barcode) => '/patients/barcode/$barcode';
+  static String patientDownloadBooklet(String patientId) => '/patients/$patientId/download-booklet';
+  static String patientDownloadByReg(String regId) => '/patients/download-by-reg/$regId';
 
   // Departments & Doctors
   static const String departments = '/departments';
@@ -111,6 +113,7 @@ class ApiEndpoints {
   static const String adminDashboardSummary = '/admin/dashboard-summary';
   static const String auditLogs = '/admin/audit-logs';
   static const String adminUsers = '/admin/users';
+  static String adminUserById(String id) => '/admin/users/$id';
   static String adminUserStatus(String id) => '/admin/users/$id/status';
   static String adminUserRole(String id) => '/admin/users/$id/role';
   static const String adminRoles = '/admin/roles';

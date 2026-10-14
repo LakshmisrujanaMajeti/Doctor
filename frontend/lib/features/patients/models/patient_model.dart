@@ -2,6 +2,7 @@ class PatientModel {
   final String id;
   final String uhid;
   final String? hospitalRegNum;
+  final String? abhaNumber; // Ayushman Bharat Health Account (e.g. 78-6882-8324-4837)
   final String fullName;
   final String? parentSpouseName;
   final String? parentSpouseRelation; // "S/o", "D/o", "W/o", "H/o", "Care of"
@@ -23,12 +24,16 @@ class PatientModel {
   final String? emergencyContactPhone;
   final String? emergencyContactRelation;
   final String? guardianId;
+  final String? registeredByStaffId;
+  final String? registeredByStaffName;
+  final String? registeredByStaffRole;
   final DateTime? createdAt;
 
   PatientModel({
     required this.id,
     required this.uhid,
     this.hospitalRegNum,
+    this.abhaNumber,
     required this.fullName,
     this.parentSpouseName,
     this.parentSpouseRelation,
@@ -50,14 +55,82 @@ class PatientModel {
     this.emergencyContactPhone,
     this.emergencyContactRelation,
     this.guardianId,
+    this.registeredByStaffId,
+    this.registeredByStaffName,
+    this.registeredByStaffRole,
     this.createdAt,
   });
+
+  PatientModel copyWith({
+    String? id,
+    String? uhid,
+    String? hospitalRegNum,
+    String? abhaNumber,
+    String? fullName,
+    String? parentSpouseName,
+    String? parentSpouseRelation,
+    String? dateOfBirth,
+    int? ageYears,
+    int? ageMonths,
+    String? gender,
+    String? phone,
+    String? email,
+    String? address,
+    String? city,
+    String? state,
+    String? postalCode,
+    String? bloodGroup,
+    DateTime? registrationDate,
+    String? barcodeValue,
+    String? qrCodeData,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? emergencyContactRelation,
+    String? guardianId,
+    String? registeredByStaffId,
+    String? registeredByStaffName,
+    String? registeredByStaffRole,
+    DateTime? createdAt,
+  }) {
+    return PatientModel(
+      id: id ?? this.id,
+      uhid: uhid ?? this.uhid,
+      hospitalRegNum: hospitalRegNum ?? this.hospitalRegNum,
+      fullName: fullName ?? this.fullName,
+      parentSpouseName: parentSpouseName ?? this.parentSpouseName,
+      parentSpouseRelation: parentSpouseRelation ?? this.parentSpouseRelation,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      ageYears: ageYears ?? this.ageYears,
+      ageMonths: ageMonths ?? this.ageMonths,
+      gender: gender ?? this.gender,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      address: address ?? this.address,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      postalCode: postalCode ?? this.postalCode,
+      bloodGroup: bloodGroup ?? this.bloodGroup,
+      abhaNumber: abhaNumber ?? this.abhaNumber,
+      registrationDate: registrationDate ?? this.registrationDate,
+      barcodeValue: barcodeValue ?? this.barcodeValue,
+      qrCodeData: qrCodeData ?? this.qrCodeData,
+      emergencyContactName: emergencyContactName ?? this.emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone ?? this.emergencyContactPhone,
+      emergencyContactRelation: emergencyContactRelation ?? this.emergencyContactRelation,
+      guardianId: guardianId ?? this.guardianId,
+      registeredByStaffId: registeredByStaffId ?? this.registeredByStaffId,
+      registeredByStaffName: registeredByStaffName ?? this.registeredByStaffName,
+      registeredByStaffRole: registeredByStaffRole ?? this.registeredByStaffRole,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 
   factory PatientModel.fromJson(Map<String, dynamic> json) {
     return PatientModel(
       id: json['id'] as String? ?? '',
       uhid: json['uhid'] as String? ?? '',
       hospitalRegNum: json['hospital_reg_num'] as String?,
+      abhaNumber: json['abha_number'] as String?,
       fullName: json['full_name'] as String? ?? '',
       parentSpouseName: json['parent_spouse_name'] as String?,
       parentSpouseRelation: json['parent_spouse_relation'] as String?,
@@ -81,6 +154,9 @@ class PatientModel {
       emergencyContactPhone: json['emergency_contact_phone'] as String?,
       emergencyContactRelation: json['emergency_contact_relation'] as String?,
       guardianId: json['guardian_id'] as String?,
+      registeredByStaffId: json['registered_by_staff_id'] as String?,
+      registeredByStaffName: json['registered_by_staff_name'] as String?,
+      registeredByStaffRole: json['registered_by_staff_role'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String)
           : null,
@@ -91,6 +167,7 @@ class PatientModel {
     'id': id,
     'uhid': uhid,
     if (hospitalRegNum != null) 'hospital_reg_num': hospitalRegNum,
+    if (abhaNumber != null) 'abha_number': abhaNumber,
     'full_name': fullName,
     if (parentSpouseName != null) 'parent_spouse_name': parentSpouseName,
     if (parentSpouseRelation != null) 'parent_spouse_relation': parentSpouseRelation,
@@ -111,6 +188,9 @@ class PatientModel {
     if (emergencyContactPhone != null) 'emergency_contact_phone': emergencyContactPhone,
     if (emergencyContactRelation != null) 'emergency_contact_relation': emergencyContactRelation,
     if (guardianId != null) 'guardian_id': guardianId,
+    if (registeredByStaffId != null) 'registered_by_staff_id': registeredByStaffId,
+    if (registeredByStaffName != null) 'registered_by_staff_name': registeredByStaffName,
+    if (registeredByStaffRole != null) 'registered_by_staff_role': registeredByStaffRole,
   };
 }
 

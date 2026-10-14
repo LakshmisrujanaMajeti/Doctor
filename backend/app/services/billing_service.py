@@ -294,6 +294,14 @@ class BillingService:
 
         db.commit()
         db.refresh(bill)
+
+        # Real-time Cloud Sync to Supabase
+        try:
+            from app.services.supabase_sync_service import SupabaseSyncService
+            SupabaseSyncService.sync_bill(bill)
+        except Exception as se:
+            logger.debug(f"Supabase bill sync notice: {se}")
+
         return bill
 
     @staticmethod

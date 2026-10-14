@@ -1,9 +1,12 @@
 from datetime import datetime
+import re
 from typing import List, Optional
 from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 from app.core.exceptions import NotFoundException, ConflictException
 from app.models.patient import Patient
+from app.models.user import User
+from app.models.visit import OPDVisit
 from app.schemas.patient import (
     PatientCreate,
     PatientUpdate,
@@ -143,6 +146,14 @@ class PatientService:
         barcode = patient_in.barcode_value or f"BAR-{uhid}"
         qr_code = patient_in.qr_code_data or f"OPDCONNECT+{uhid}+{reg_num}"
 
+        staff_name = None
+        staff_role = None
+        if current_user_id:
+            staff_user = db.query(User).filter(User.id == current_user_id).first()
+            if staff_user:
+                staff_name = staff_user.full_name
+                staff_role = staff_user.role.name if staff_user.role else None
+
         patient = Patient(
             uhid=uhid,
             hospital_reg_num=reg_num,
@@ -160,6 +171,7 @@ class PatientService:
             state=patient_in.state,
             postal_code=patient_in.postal_code,
             blood_group=patient_in.blood_group,
+            abha_number=patient_in.abha_number.strip() if patient_in.abha_number else None,
             registration_date=datetime.utcnow(),
             barcode_value=barcode,
             qr_code_data=qr_code,
@@ -167,6 +179,9 @@ class PatientService:
             emergency_contact_phone=patient_in.emergency_contact_phone,
             emergency_contact_relation=patient_in.emergency_contact_relation,
             guardian_id=patient_in.guardian_id,
+            registered_by_staff_id=current_user_id,
+            registered_by_staff_name=staff_name,
+            registered_by_staff_role=staff_role,
         )
         db.add(patient)
         db.commit()
@@ -183,6 +198,14 @@ class PatientService:
             )
         )
         db.commit()
+
+        # Real-time Cloud Sync to Supabase
+        try:
+            from app.services.supabase_sync_service import SupabaseSyncService
+            SupabaseSyncService.sync_patient(patient)
+        except Exception as se:
+            logger.debug(f"Supabase sync notice: {se}")
+
         return patient
 
     @staticmethod
@@ -222,16 +245,47 @@ class PatientService:
     ) -> List[Patient]:
         stmt = db.query(Patient)
         if query:
-            pattern = f"%{query.strip()}%"
-            stmt = stmt.filter(
-                or_(
-                    Patient.full_name.ilike(pattern),
-                    Patient.uhid.ilike(pattern),
-                    Patient.hospital_reg_num.ilike(pattern),
-                    Patient.phone.ilike(pattern),
-                    Patient.barcode_value.ilike(pattern),
-                )
-            )
+            clean = query.strip()
+            pattern = f"%{clean}%"
+            conditions = [
+                Patient.full_name.ilike(pattern),
+                Patient.uhid.ilike(pattern),
+                Patient.hospital_reg_num.ilike(pattern),
+                Patient.barcode_value.ilike(pattern),
+                Patient.abha_number.ilike(pattern),
+            ]
+
+            # Only match phone substring if query is at least 4 digits (avoids matching all phones when typing token "1")
+            if len(clean) >= 4:
+                conditions.append(Patient.phone.ilike(pattern))
+
+            # Check if query represents a token number (e.g. "1", "#1", "token 1", "tok 2", "T-3")
+            token_num = None
+            m_token = re.match(r'^(?:token|tok|queue|opd|t|#|\s)*[:#-]?\s*(\d{1,4})$', clean, re.IGNORECASE)
+            if m_token:
+                token_num = int(m_token.group(1))
+            elif clean.isdigit() and len(clean) <= 4:
+                token_num = int(clean)
+
+            if token_num is not None:
+                visit_patient_ids = [
+                    r[0] for r in db.query(OPDVisit.patient_id)
+                    .filter(OPDVisit.queue_token == token_num)
+                    .distinct().all()
+                ]
+                if visit_patient_ids:
+                    conditions.append(Patient.id.in_(visit_patient_ids))
+
+            # Also check if query matches visit number (e.g. "VIS-20261014-0001" or "0001")
+            visit_by_num_ids = [
+                r[0] for r in db.query(OPDVisit.patient_id)
+                .filter(OPDVisit.visit_number.ilike(pattern))
+                .distinct().all()
+            ]
+            if visit_by_num_ids:
+                conditions.append(Patient.id.in_(visit_by_num_ids))
+
+            stmt = stmt.filter(or_(*conditions))
         return stmt.order_by(Patient.registration_date.desc()).offset(skip).limit(limit).all()
 
     @staticmethod
@@ -260,3 +314,33 @@ class PatientService:
         )
         db.commit()
         return patient
+
+    @staticmethod
+    def delete_patient(
+        db: Session,
+        patient_id: str,
+        current_user_id: Optional[str] = None,
+    ) -> bool:
+        patient = PatientService.get_patient_by_id(db, patient_id)
+        from app.models.billing import Bill
+        from app.models.clinical import ClinicalRecord
+        from app.models.visit import OPDVisit
+
+        db.query(ClinicalRecord).filter(ClinicalRecord.patient_id == patient_id).delete(synchronize_session=False)
+        db.query(Bill).filter(Bill.patient_id == patient_id).delete(synchronize_session=False)
+        db.query(OPDVisit).filter(OPDVisit.patient_id == patient_id).delete(synchronize_session=False)
+
+        db.delete(patient)
+        db.commit()
+
+        if current_user_id:
+            db.add(
+                AuditLog(
+                    user_id=current_user_id,
+                    action="DELETE_PATIENT",
+                    entity_type="Patient",
+                    entity_id=patient_id,
+                )
+            )
+            db.commit()
+        return True

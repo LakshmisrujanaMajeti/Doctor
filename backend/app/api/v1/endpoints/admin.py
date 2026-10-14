@@ -31,6 +31,7 @@ from app.schemas.auth import AdminCreateUserRequest, AdminUpdateUserStatusReques
 from app.schemas.portal import (
     AdminDashboardMetrics,
     UserRoleUpdateRequest,
+    AdminUserUpdateRequest,
     SystemConfigItem,
     SystemConfigBatchUpdateRequest,
     BackupGuidanceResponse,
@@ -162,6 +163,12 @@ def get_operational_dashboard_summary(
             "in_consultation": in_consultation,
             "completed": completed_visits,
             "cancelled": cancelled_visits,
+            "WAITING": registered_visits,
+            "TRIAGED": triaged_visits,
+            "TRIAGE": triaged_visits,
+            "IN_CONSULTATION": in_consultation,
+            "COMPLETED": completed_visits,
+            "CANCELLED": cancelled_visits,
         },
         active_clinics_count=active_clinics,
         active_doctors_count=active_doctors,
@@ -208,6 +215,10 @@ def get_dashboard_stats(
                 "waiting": registered_visits,
                 "triaged": triaged_visits,
                 "completed": completed_visits,
+                "WAITING": registered_visits,
+                "TRIAGED": triaged_visits,
+                "TRIAGE": triaged_visits,
+                "COMPLETED": completed_visits,
             }
         },
         message="Hospital OPD statistics retrieved"
@@ -347,6 +358,132 @@ def update_user_role(
     return success_response(
         data=UserRead.model_validate(user).model_dump(),
         message=f"User role changed from '{old_role_name}' to '{new_role.name}'"
+    )
+
+
+@router.put("/users/{user_id}", summary="Full Edit of Staff User Account")
+def update_user_details(
+    user_id: str,
+    req: AdminUserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"])),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise NotFoundException(f"User '{user_id}' not found")
+
+    if req.full_name is not None and req.full_name.strip():
+        user.full_name = req.full_name.strip()
+    if req.email is not None and req.email.strip():
+        existing = db.query(User).filter(User.email == req.email.strip(), User.id != user_id).first()
+        if existing:
+            raise BadRequestException("Email is already registered to another account")
+        user.email = req.email.strip()
+    if req.phone is not None:
+        user.phone = req.phone.strip() if req.phone.strip() else None
+    if req.is_active is not None:
+        if user_id == current_user.id and req.is_active is False:
+            raise BadRequestException("Administrators cannot deactivate their own active account")
+        user.is_active = req.is_active
+
+    if req.role_name is not None and req.role_name.strip():
+        new_role = db.query(Role).filter(Role.name == req.role_name.strip().lower()).first()
+        if new_role:
+            user.role_id = new_role.id
+
+    role_name = (user.role.name if user.role else "").lower()
+    if role_name == "doctor":
+        doc = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+        dept_id = None
+        if req.department_name:
+            dept = db.query(Department).filter(
+                or_(
+                    Department.name.ilike(f"%{req.department_name}%"),
+                    Department.code.ilike(f"%{req.department_name}%")
+                )
+            ).first()
+            if dept:
+                dept_id = dept.id
+        if not dept_id and not doc:
+            first_dept = db.query(Department).first()
+            dept_id = first_dept.id if first_dept else None
+
+        if not doc and dept_id:
+            doc = Doctor(
+                user_id=user.id,
+                department_id=dept_id,
+                qualification=req.qualification or "MBBS, MD",
+                specialization=req.department_name or "General Medicine",
+                registration_number=f"MCI-{datetime.utcnow().year}-{user.id[:6].upper()}",
+                room_number=req.room_number or "Room 101",
+                consultation_fee=req.consultation_fee or "500.00",
+                is_available=user.is_active,
+            )
+            db.add(doc)
+        elif doc:
+            if dept_id:
+                doc.department_id = dept_id
+            if req.qualification:
+                doc.qualification = req.qualification
+            if req.department_name:
+                doc.specialization = req.department_name
+            if req.room_number:
+                doc.room_number = req.room_number
+            if req.consultation_fee:
+                doc.consultation_fee = req.consultation_fee
+            doc.is_available = user.is_active
+
+    db.commit()
+    db.refresh(user)
+
+    AuditService.log_event(
+        db=db,
+        action="USER_UPDATED",
+        entity_type="User",
+        actor_user_id=current_user.id,
+        entity_id=user.id,
+        details={"email": user.email, "role": user.role.name if user.role else None, "name": user.full_name},
+    )
+    return success_response(
+        data=UserRead.model_validate(user).model_dump(),
+        message="Staff user account updated successfully"
+    )
+
+
+@router.delete("/users/{user_id}", summary="Delete Staff User Account")
+def delete_user_account(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"])),
+):
+    if user_id == current_user.id:
+        raise BadRequestException("Administrators cannot delete their own active account")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise NotFoundException(f"User '{user_id}' not found")
+
+    user_email = user.email
+    user_name = user.full_name
+
+    doc = db.query(Doctor).filter(Doctor.user_id == user.id).first()
+    if doc:
+        db.delete(doc)
+
+    db.delete(user)
+    db.commit()
+
+    AuditService.log_event(
+        db=db,
+        action="USER_DELETED",
+        entity_type="User",
+        actor_user_id=current_user.id,
+        entity_id=user_id,
+        details={"deleted_email": user_email, "deleted_name": user_name},
+    )
+    return success_response(
+        data={"deleted": True, "id": user_id, "email": user_email},
+        message=f"Account for '{user_name}' deleted successfully"
     )
 
 
@@ -1018,4 +1155,26 @@ def trigger_manual_backup(
             "created_at": datetime.utcnow().isoformat() + "Z",
         },
         message="Database backup snapshot exported successfully"
+    )
+
+
+@router.post("/sync-supabase", summary="Trigger Full Real-Time Sync to Supabase Cloud")
+def trigger_supabase_sync(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"])),
+):
+    from app.services.supabase_sync_service import SupabaseSyncService
+    sync_results = SupabaseSyncService.sync_all_database_records(db)
+
+    AuditService.log_event(
+        db=db,
+        action="SUPABASE_CLOUD_SYNC_TRIGGERED",
+        entity_type="CloudSync",
+        actor_user_id=current_user.id,
+        details=sync_results,
+    )
+
+    return success_response(
+        data=sync_results,
+        message="Hospital records synchronized to Supabase Cloud database successfully"
     )

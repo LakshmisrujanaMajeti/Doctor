@@ -44,9 +44,13 @@ class OpdButton extends StatelessWidget {
                 Icon(icon, size: 19),
                 const SizedBox(width: 8),
               ],
-              Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
               ),
             ],
           );

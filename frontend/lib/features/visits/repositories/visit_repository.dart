@@ -20,6 +20,15 @@ class VisitRepository {
         if (raw != null && raw.isNotEmpty) {
           final list = jsonDecode(raw) as List<dynamic>;
           _localVisits.addAll(list.map((m) => OPDVisitModel.fromJson(m as Map<String, dynamic>)));
+          // Purge any legacy demo or seed visits from old test builds
+          final beforeCount = _localVisits.length;
+          _localVisits.removeWhere((v) =>
+              v.id.contains('c407662') ||
+              (v.patient?.fullName.toLowerCase().contains('ravi prasanth') ?? false) ||
+              (v.patient?.uhid == 'C407662'));
+          if (_localVisits.length != beforeCount) {
+            await _saveCache();
+          }
         }
       } catch (_) {}
     }
@@ -32,20 +41,21 @@ class VisitRepository {
     } catch (_) {}
   }
 
-  Future<List<OPDVisitModel>> getVisits({String? status, String? departmentId}) async {
+  Future<List<OPDVisitModel>> getVisits({String? status, String? departmentId, String? query}) async {
     try {
       final res = await _dioClient.dio.get(
         ApiEndpoints.visits,
         queryParameters: {
           if (status != null && status.isNotEmpty) 'status': status,
           if (departmentId != null && departmentId.isNotEmpty) 'department_id': departmentId,
+          if (query != null && query.isNotEmpty) 'query': query,
         },
       );
 
       if (res.data['status'] == 'success') {
         final list = res.data['data'] as List<dynamic>;
         final fetched = list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
-        if ((status == null || status.isEmpty) && (departmentId == null || departmentId.isEmpty)) {
+        if ((status == null || status.isEmpty) && (departmentId == null || departmentId.isEmpty) && (query == null || query.isEmpty)) {
           _localVisits.clear();
           _localVisits.addAll(fetched);
           await _saveCache();
@@ -56,11 +66,39 @@ class VisitRepository {
 
     await _loadCacheIfNeeded();
 
-    // Fallback
+    var results = List<OPDVisitModel>.from(_localVisits);
+
     if (status != null && status.isNotEmpty) {
-      return _localVisits.where((v) => v.status == status).toList();
+      results = results.where((v) => v.status == status).toList();
     }
-    return List.from(_localVisits);
+    if (departmentId != null && departmentId.isNotEmpty) {
+      results = results.where((v) => v.departmentId == departmentId).toList();
+    }
+    if (query != null && query.trim().isNotEmpty) {
+      final q = query.trim().toLowerCase();
+      final cleanDigits = q.replaceAll(RegExp(r'[^0-9]'), '');
+      final queryNum = cleanDigits.isNotEmpty ? int.tryParse(cleanDigits) : null;
+
+      results = results.where((v) {
+        final token = v.queueToken;
+        final tokenStr = token.toString();
+        final tokenPrefixed = '#$tokenStr';
+        final uhid = (v.patient?.uhid ?? '').toLowerCase();
+        final name = (v.patient?.fullName ?? '').toLowerCase();
+        final phone = (v.patient?.phone ?? '').toLowerCase();
+        final visitNum = v.visitNumber.toLowerCase();
+        final docName = (v.doctorName ?? '').toLowerCase();
+
+        if (tokenStr == q || tokenPrefixed == q) return true;
+        if (queryNum != null && queryNum == token) return true;
+        if (uhid.contains(q) || name.contains(q) || phone.contains(q) || visitNum.contains(q) || docName.contains(q)) {
+          return true;
+        }
+        return false;
+      }).toList();
+    }
+
+    return results;
   }
 
   Future<OPDVisitModel> createVisit({

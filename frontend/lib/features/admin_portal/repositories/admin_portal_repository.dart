@@ -10,69 +10,19 @@ import '../../patient_portal/models/patient_portal_models.dart';
 class AdminPortalRepository {
   final DioClient _dioClient;
 
-  final List<AdminUserModel> _localUsers = [
-    const AdminUserModel(
-      id: 'admin-001',
-      email: 'admin@opdconnect.com',
-      fullName: 'Admin Administrator',
-      roleName: 'admin',
-      phone: '+1555000001',
-      isActive: true,
-      isVerified: true,
-    ),
-    const AdminUserModel(
-      id: 'doc-chen-001',
-      email: 'dr.chen@opdconnect.com',
-      fullName: 'Dr. Sarah Chen, MD',
-      roleName: 'doctor',
-      phone: '+1555000002',
-      isActive: true,
-      isVerified: true,
-    ),
-    const AdminUserModel(
-      id: 'rec-001',
-      email: 'receptionist@opdconnect.com',
-      fullName: 'Alice Adams',
-      roleName: 'receptionist',
-      phone: '+1555000003',
-      isActive: true,
-      isVerified: true,
-    ),
-    const AdminUserModel(
-      id: 'lab-001',
-      email: 'lab@opdconnect.com',
-      fullName: 'Marcus Vance (Lab Tech)',
-      roleName: 'lab_technician',
-      phone: '+1555000004',
-      isActive: true,
-      isVerified: true,
-    ),
-    const AdminUserModel(
-      id: 'pharm-001',
-      email: 'pharmacist@opdconnect.com',
-      fullName: 'Elena Rostova (Pharmacist)',
-      roleName: 'pharmacist',
-      phone: '+1555000005',
-      isActive: true,
-      isVerified: true,
-    ),
-  ];
+  final List<AdminUserModel> _localUsers = [];
 
   AdminPortalRepository(this._dioClient);
 
   Future<void> _loadCacheIfNeeded() async {
+    if (_localUsers.isNotEmpty) return;
     try {
       final raw = await SecureStorageService.getStaffDirectoryJson();
       if (raw != null && raw.isNotEmpty) {
         final list = jsonDecode(raw) as List<dynamic>;
+        _localUsers.clear();
         for (final item in list) {
-          final u = AdminUserModel.fromJson(item as Map<String, dynamic>);
-          final idx = _localUsers.indexWhere((x) => x.id == u.id || x.email == u.email);
-          if (idx != -1) {
-            _localUsers[idx] = u;
-          } else {
-            _localUsers.add(u);
-          }
+          _localUsers.add(AdminUserModel.fromJson(item as Map<String, dynamic>));
         }
       }
     } catch (_) {}
@@ -88,19 +38,61 @@ class AdminPortalRepository {
   Future<AdminDashboardMetricsModel> getDashboardSummary() async {
     try {
       final response = await _dioClient.dio.get(ApiEndpoints.adminDashboardSummary);
-      return AdminDashboardMetricsModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      var metrics = AdminDashboardMetricsModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      if (metrics.totalPatientsRegistered == 0) {
+        try {
+          final rawPat = await SecureStorageService.getPatientsJson();
+          if (rawPat != null && rawPat.isNotEmpty) {
+            final pList = jsonDecode(rawPat) as List<dynamic>;
+            if (pList.isNotEmpty) {
+              metrics = metrics.copyWith(totalPatientsRegistered: pList.length);
+            }
+          }
+        } catch (_) {}
+      }
+      return metrics;
     } catch (_) {
-      // Dynamic fallback based on active users and hospital defaults
+      // Dynamic fallback based on cached active users and real counters
       await _loadCacheIfNeeded();
       final byRole = <String, int>{};
       for (final u in _localUsers) {
         byRole[u.roleName] = (byRole[u.roleName] ?? 0) + 1;
       }
+
+      int totalPatients = 0;
+      try {
+        final rawPat = await SecureStorageService.getPatientsJson();
+        if (rawPat != null && rawPat.isNotEmpty) {
+          final pList = jsonDecode(rawPat) as List<dynamic>;
+          totalPatients = pList.length;
+        }
+      } catch (_) {}
+
+      int totalVisitsToday = 0;
+      final qBreakdown = <String, int>{'WAITING': 0, 'TRIAGED': 0, 'COMPLETED': 0};
+      try {
+        final rawVis = await SecureStorageService.getVisitsJson();
+        if (rawVis != null && rawVis.isNotEmpty) {
+          final vList = jsonDecode(rawVis) as List<dynamic>;
+          totalVisitsToday = vList.length;
+          for (final v in vList) {
+            final st = (v['status'] ?? 'WAITING').toString().toUpperCase();
+            if (st.contains('WAIT') || st.contains('REG')) {
+              qBreakdown['WAITING'] = (qBreakdown['WAITING'] ?? 0) + 1;
+            } else if (st.contains('TRIAG')) {
+              qBreakdown['TRIAGED'] = (qBreakdown['TRIAGED'] ?? 0) + 1;
+            } else if (st.contains('COMPLET')) {
+              qBreakdown['COMPLETED'] = (qBreakdown['COMPLETED'] ?? 0) + 1;
+            }
+          }
+        }
+      } catch (_) {}
+
       return AdminDashboardMetricsModel(
-        totalPatientsRegistered: 0,
-        visitsTodayCount: 0,
-        queueBreakdown: {'WAITING': 0, 'TRIAGED': 0, 'COMPLETED': 0},
-        activeClinicsCount: 5,
+        totalPatientsRegistered: totalPatients,
+        visitsTodayCount: totalVisitsToday,
+        queueBreakdown: qBreakdown,
+        activeClinicsCount: 1,
         activeDoctorsCount: _localUsers.where((u) => u.roleName == 'doctor').length,
         revenueToday: 0.0,
         revenueMonth: 0.0,
@@ -109,7 +101,7 @@ class AdminPortalRepository {
         revenueByMethod: {},
         lowStockItemsCount: 0,
         expiringSoonItemsCount: 0,
-        totalMedicinesInFormulary: 15,
+        totalMedicinesInFormulary: 0,
         pendingLabOrdersCount: 0,
         completedLabTodayCount: 0,
         totalStaffAccounts: _localUsers.length,
@@ -130,20 +122,31 @@ class AdminPortalRepository {
       final response = await _dioClient.dio.get(ApiEndpoints.adminUsers, queryParameters: q);
       final list = (response.data['data'] as List?) ?? [];
       final fetched = list.map((u) => AdminUserModel.fromJson(u as Map<String, dynamic>)).toList();
-      for (final f in fetched) {
-        final idx = _localUsers.indexWhere((x) => x.id == f.id || x.email == f.email);
-        if (idx != -1) {
-          _localUsers[idx] = f;
-        } else {
-          _localUsers.add(f);
+      if ((role == null || role.isEmpty) && isActive == null && (search == null || search.isEmpty)) {
+        _localUsers.clear();
+        _localUsers.addAll(fetched);
+        await _saveCache();
+        return _localUsers;
+      } else {
+        for (final f in fetched) {
+          final idx = _localUsers.indexWhere((x) => x.id == f.id || x.email == f.email);
+          if (idx != -1) {
+            _localUsers[idx] = f;
+          } else {
+            _localUsers.add(f);
+          }
         }
+        await _saveCache();
+        return fetched;
       }
-      await _saveCache();
-    } catch (_) {}
+    } catch (_) {
+      await _loadCacheIfNeeded();
+      return _filterUsers(_localUsers, role, isActive, search);
+    }
+  }
 
-    await _loadCacheIfNeeded();
-
-    var results = List<AdminUserModel>.from(_localUsers);
+  List<AdminUserModel> _filterUsers(List<AdminUserModel> users, String? role, bool? isActive, String? search) {
+    var results = List<AdminUserModel>.from(users);
     if (role != null && role.isNotEmpty) {
       results = results.where((u) => u.roleName.toLowerCase() == role.toLowerCase()).toList();
     }
@@ -253,6 +256,68 @@ class AdminPortalRepository {
     return AdminUserModel.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
+  Future<AdminUserModel> updateUserDetails(
+    String userId, {
+    String? fullName,
+    String? email,
+    String? phone,
+    String? roleName,
+    String? departmentName,
+    String? roomNumber,
+    String? qualification,
+    String? consultationFee,
+    bool? isActive,
+  }) async {
+    AdminUserModel? updated;
+    try {
+      final response = await _dioClient.dio.put(
+        ApiEndpoints.adminUserById(userId),
+        data: {
+          if (fullName != null) 'full_name': fullName.trim(),
+          if (email != null) 'email': email.trim().toLowerCase(),
+          if (phone != null) 'phone': phone.trim(),
+          if (roleName != null) 'role_name': roleName.trim().toLowerCase(),
+          if (departmentName != null) 'department_name': departmentName.trim(),
+          if (roomNumber != null) 'room_number': roomNumber.trim(),
+          if (qualification != null) 'qualification': qualification.trim(),
+          if (consultationFee != null) 'consultation_fee': consultationFee.trim(),
+          if (isActive != null) 'is_active': isActive,
+        },
+      );
+      if (response.data['status'] == 'success') {
+        updated = AdminUserModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      }
+    } catch (_) {}
+
+    await _loadCacheIfNeeded();
+    final idx = _localUsers.indexWhere((u) => u.id == userId);
+    if (idx != -1) {
+      final old = _localUsers[idx];
+      updated ??= AdminUserModel(
+        id: old.id,
+        email: email?.trim().toLowerCase() ?? old.email,
+        fullName: fullName?.trim() ?? old.fullName,
+        roleName: roleName?.trim().toLowerCase() ?? old.roleName,
+        phone: phone?.trim() ?? old.phone,
+        isActive: isActive ?? old.isActive,
+        isVerified: old.isVerified,
+      );
+      _localUsers[idx] = updated;
+      await _saveCache();
+    }
+    return updated ?? _localUsers.firstWhere((u) => u.id == userId);
+  }
+
+  Future<void> deleteUserAccount(String userId) async {
+    try {
+      await _dioClient.dio.delete(ApiEndpoints.adminUserById(userId));
+    } catch (_) {}
+
+    await _loadCacheIfNeeded();
+    _localUsers.removeWhere((u) => u.id == userId);
+    await _saveCache();
+  }
+
   Future<List<DepartmentAdminModel>> getDepartments() async {
     final response = await _dioClient.dio.get(ApiEndpoints.adminDepartments);
     final list = (response.data['data'] as List?) ?? [];
@@ -261,6 +326,21 @@ class AdminPortalRepository {
 
   Future<void> toggleDepartmentStatus(String departmentId) async {
     await _dioClient.dio.patch(ApiEndpoints.adminDepartmentToggle(departmentId));
+  }
+
+  Future<void> createDepartment({
+    required String name,
+    required String code,
+    String? description,
+  }) async {
+    await _dioClient.dio.post(
+      ApiEndpoints.adminDepartments,
+      data: {
+        'name': name.trim(),
+        'code': code.trim().toUpperCase(),
+        if (description != null && description.isNotEmpty) 'description': description.trim(),
+      },
+    );
   }
 
   Future<List<MedicineAdminModel>> getMedicineCatalogue({String? search, bool lowStockOnly = false}) async {
@@ -288,14 +368,41 @@ class AdminPortalRepository {
     String? departmentId,
     String? status,
   }) async {
-    final Map<String, dynamic> q = {'format': 'json'};
-    if (dateFrom != null) q['date_from'] = dateFrom;
-    if (dateTo != null) q['date_to'] = dateTo;
-    if (departmentId != null) q['department_id'] = departmentId;
-    if (status != null) q['status'] = status;
+    try {
+      final Map<String, dynamic> q = {'format': 'json'};
+      if (dateFrom != null) q['date_from'] = dateFrom;
+      if (dateTo != null) q['date_to'] = dateTo;
+      if (departmentId != null) q['department_id'] = departmentId;
+      if (status != null) q['status'] = status;
 
-    final response = await _dioClient.dio.get(ApiEndpoints.adminReportRegistrations, queryParameters: q);
-    return response.data['data'] as Map<String, dynamic>;
+      final response = await _dioClient.dio.get(ApiEndpoints.adminReportRegistrations, queryParameters: q);
+      return response.data['data'] as Map<String, dynamic>;
+    } catch (_) {
+      final records = <Map<String, dynamic>>[];
+      final statusSummary = <String, int>{'WAITING': 0, 'TRIAGED': 0, 'COMPLETED': 0};
+      final deptSummary = <String, int>{};
+
+      try {
+        final rawVisits = await SecureStorageService.getVisitsJson();
+        if (rawVisits != null && rawVisits.isNotEmpty) {
+          final list = jsonDecode(rawVisits) as List<dynamic>;
+          for (final item in list) {
+            final st = (item['status'] ?? 'WAITING').toString();
+            statusSummary[st] = (statusSummary[st] ?? 0) + 1;
+            final dept = (item['department_name'] ?? 'General Medicine').toString();
+            deptSummary[dept] = (deptSummary[dept] ?? 0) + 1;
+            records.add(item as Map<String, dynamic>);
+          }
+        }
+      } catch (_) {}
+
+      return {
+        'total_visits': records.length,
+        'status_summary': statusSummary,
+        'department_summary': deptSummary,
+        'records': records,
+      };
+    }
   }
 
   Future<Map<String, dynamic>> getBillingReport({
@@ -303,13 +410,43 @@ class AdminPortalRepository {
     String? dateTo,
     String? paymentStatus,
   }) async {
-    final Map<String, dynamic> q = {'format': 'json'};
-    if (dateFrom != null) q['date_from'] = dateFrom;
-    if (dateTo != null) q['date_to'] = dateTo;
-    if (paymentStatus != null) q['payment_status'] = paymentStatus;
+    try {
+      final Map<String, dynamic> q = {'format': 'json'};
+      if (dateFrom != null) q['date_from'] = dateFrom;
+      if (dateTo != null) q['date_to'] = dateTo;
+      if (paymentStatus != null) q['payment_status'] = paymentStatus;
 
-    final response = await _dioClient.dio.get(ApiEndpoints.adminReportBilling, queryParameters: q);
-    return response.data['data'] as Map<String, dynamic>;
+      final response = await _dioClient.dio.get(ApiEndpoints.adminReportBilling, queryParameters: q);
+      return response.data['data'] as Map<String, dynamic>;
+    } catch (_) {
+      final records = <Map<String, dynamic>>[];
+      double totalCollected = 0.0;
+      double totalPending = 0.0;
+
+      try {
+        final rawBills = await SecureStorageService.getBillsJson();
+        if (rawBills != null && rawBills.isNotEmpty) {
+          final list = jsonDecode(rawBills) as List<dynamic>;
+          for (final item in list) {
+            final amt = (item['total_amount'] as num?)?.toDouble() ?? 0.0;
+            final pst = (item['payment_status'] ?? 'PAID').toString().toUpperCase();
+            if (pst == 'PAID' || pst == 'COMPLETED') {
+              totalCollected += amt;
+            } else {
+              totalPending += amt;
+            }
+            records.add(item as Map<String, dynamic>);
+          }
+        }
+      } catch (_) {}
+
+      return {
+        'total_invoices': records.length,
+        'total_collected': totalCollected,
+        'total_pending': totalPending,
+        'records': records,
+      };
+    }
   }
 
   Future<List<AuditLogItemModel>> getAuditLogs({

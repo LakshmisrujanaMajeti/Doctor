@@ -64,31 +64,38 @@ class _DoctorDashboardViewState extends ConsumerState<DoctorDashboardView> with 
   }
 
   Widget _buildDashboardContent(BuildContext context, DoctorDashboardModel data, bool isDark) {
+    final hasScrollableAncestor = Scrollable.maybeOf(context) != null;
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. KPI Metrics Grid (6 Critical Doctor Metrics)
+        _buildMetricsGrid(context, data.stats, isDark),
+        const SizedBox(height: 24),
+
+        // 2. Active Clinical Queue Hub (Waiting, In Consultation, Completed)
+        _buildClinicalQueueCard(context, data, isDark),
+        const SizedBox(height: 24),
+
+        // 3. Pending Laboratory Investigations
+        _buildPendingInvestigationsCard(context, data.pendingInvestigations, isDark),
+        const SizedBox(height: 24),
+
+        // 4. Follow-up Appointments
+        _buildFollowUpsCard(context, data.followUpAppointments, isDark),
+        const SizedBox(height: 24),
+
+        // 5. Recent Authorized Patient Records
+        _buildRecentAuthorizedPatientsCard(context, data.recentAuthorizedPatients, isDark),
+      ],
+    );
+
+    if (hasScrollableAncestor) {
+      return content;
+    }
+
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. KPI Metrics Grid (6 Critical Doctor Metrics)
-          _buildMetricsGrid(context, data.stats, isDark),
-          const SizedBox(height: 24),
-
-          // 2. Active Clinical Queue Hub (Waiting, In Consultation, Completed)
-          _buildClinicalQueueCard(context, data, isDark),
-          const SizedBox(height: 24),
-
-          // 3. Pending Laboratory Investigations
-          _buildPendingInvestigationsCard(context, data.pendingInvestigations, isDark),
-          const SizedBox(height: 24),
-
-          // 4. Follow-up Appointments
-          _buildFollowUpsCard(context, data.followUpAppointments, isDark),
-          const SizedBox(height: 24),
-
-          // 5. Recent Authorized Patient Records
-          _buildRecentAuthorizedPatientsCard(context, data.recentAuthorizedPatients, isDark),
-        ],
-      ),
+      child: content,
     );
   }
 
@@ -576,8 +583,19 @@ class _MetricCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(subtitle, style: TextStyle(color: Colors.grey[600], fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5, height: 1.2),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(color: Colors.grey[600], fontSize: 10),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),

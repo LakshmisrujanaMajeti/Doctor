@@ -96,6 +96,7 @@ class AuthNotifier extends Notifier<AuthState> {
     required String password,
     required String roleName,
     String? phone,
+    Map<String, dynamic>? roleMetadata,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
@@ -105,6 +106,7 @@ class AuthNotifier extends Notifier<AuthState> {
         password: password,
         roleName: roleName,
         phone: phone,
+        roleMetadata: roleMetadata,
       );
       state = state.copyWith(
         isAuthenticated: true,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_strings.dart';
+import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../models/billing_models.dart';
 import '../providers/billing_provider.dart';
 
@@ -78,44 +80,51 @@ class PrintableInvoiceScreen extends ConsumerWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(
-                              Icons.local_hospital_rounded,
-                              color: AppColors.primaryBlue,
-                              size: 36,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
+                          const SmvmchHospitalLogo(size: 54),
+                          const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'OPD CONNECT+ HEALTHCARE CENTRE',
+                                  AppStrings.hospitalTamilName,
                                   style: TextStyle(
-                                    fontSize: 19,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.hospitalMaroon,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                const Text(
+                                  'Sri Manakula Vinayagar Medical College & Hospital',
+                                  style: TextStyle(
+                                    fontSize: 17,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: -0.3,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Multi-Speciality Outpatient Clinic • ISO 9001:2015 Certified',
+                                  'Kalitheerthalkuppam, Madagadipet, Puducherry - 605 107 • Ph: 0413-2643000',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                                   ),
                                 ),
                                 Text(
-                                  '12 Medical Enclave, Health City • Tel: +91 40 2345 6789 • GSTIN: 36AABCO1234F1Z5',
+                                  'DL.No.: RLF20PY2024000071 / RLF21PY2024000075 / RLF20F2024PY000001 (Dated 13.03.2024)',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                  ),
+                                ),
+                                const Text(
+                                  'GSTIN: 34AAATM9599A1ZE • TIN: 34880001919 • PHARMACY UNIT-I (24 HOURS)',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.hospitalMaroon,
                                   ),
                                 ),
                               ],
