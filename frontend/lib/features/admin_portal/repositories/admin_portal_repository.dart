@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/supabase_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../models/admin_portal_models.dart';
@@ -114,13 +115,32 @@ class AdminPortalRepository {
 
     // 1. If we have cached users, return immediately (0ms) and background sync
     if (_localUsers.isNotEmpty) {
-      if (DioClient.isHostReachable) {
-        _syncUsersFromServer(role, isActive, search);
-      }
+      _syncUsersFromCloud(role, isActive, search);
       return _filterUsers(_localUsers, role, isActive, search);
     }
 
-    // 2. Cold first run with empty local cache
+    // 2. Cold first run: fetch from Supabase Cloud
+    try {
+      final supaUsers = await SupabaseService.fetchUsers();
+      if (supaUsers.isNotEmpty) {
+        _localUsers.clear();
+        for (final su in supaUsers) {
+          _localUsers.add(AdminUserModel(
+            id: su.id,
+            email: su.email,
+            fullName: su.fullName,
+            roleName: su.roleName,
+            phone: su.phone,
+            isActive: su.isActive,
+            isVerified: su.isVerified,
+          ));
+        }
+        await _saveCache();
+        return _filterUsers(_localUsers, role, isActive, search);
+      }
+    } catch (_) {}
+
+    // 3. Fallback to Dio backend
     try {
       final Map<String, dynamic> q = {};
       if (role != null && role.isNotEmpty) q['role'] = role;
@@ -152,27 +172,55 @@ class AdminPortalRepository {
     }
   }
 
-  void _syncUsersFromServer(String? role, bool? isActive, String? search) {
+  void _syncUsersFromCloud(String? role, bool? isActive, String? search) {
     Future.microtask(() async {
       try {
-        final Map<String, dynamic> q = {};
-        if (role != null && role.isNotEmpty) q['role'] = role;
-        if (isActive != null) q['is_active'] = isActive;
-        if (search != null && search.isNotEmpty) q['search'] = search;
-
-        final response = await _dioClient.dio.get(ApiEndpoints.adminUsers, queryParameters: q);
-        final list = (response.data['data'] as List?) ?? [];
-        final fetched = list.map((u) => AdminUserModel.fromJson(u as Map<String, dynamic>)).toList();
-        for (final f in fetched) {
-          final idx = _localUsers.indexWhere((x) => x.id == f.id || x.email == f.email);
-          if (idx != -1) {
-            _localUsers[idx] = f;
-          } else {
-            _localUsers.add(f);
+        final supaUsers = await SupabaseService.fetchUsers();
+        if (supaUsers.isNotEmpty) {
+          final existingIds = _localUsers.map((u) => u.id).toSet();
+          final existingEmails = _localUsers.map((u) => u.email.toLowerCase()).toSet();
+          bool hasNew = false;
+          for (final su in supaUsers) {
+            if (!existingIds.contains(su.id) && !existingEmails.contains(su.email.toLowerCase())) {
+              _localUsers.add(AdminUserModel(
+                id: su.id,
+                email: su.email,
+                fullName: su.fullName,
+                roleName: su.roleName,
+                phone: su.phone,
+                isActive: su.isActive,
+                isVerified: su.isVerified,
+              ));
+              hasNew = true;
+            }
+          }
+          if (hasNew) {
+            await _saveCache();
           }
         }
-        await _saveCache();
       } catch (_) {}
+
+      if (DioClient.isHostReachable) {
+        try {
+          final Map<String, dynamic> q = {};
+          if (role != null && role.isNotEmpty) q['role'] = role;
+          if (isActive != null) q['is_active'] = isActive;
+          if (search != null && search.isNotEmpty) q['search'] = search;
+
+          final response = await _dioClient.dio.get(ApiEndpoints.adminUsers, queryParameters: q);
+          final list = (response.data['data'] as List?) ?? [];
+          final fetched = list.map((u) => AdminUserModel.fromJson(u as Map<String, dynamic>)).toList();
+          for (final f in fetched) {
+            final idx = _localUsers.indexWhere((x) => x.id == f.id || x.email == f.email);
+            if (idx != -1) {
+              _localUsers[idx] = f;
+            } else {
+              _localUsers.add(f);
+            }
+          }
+          await _saveCache();
+        } catch (_) {}
+      }
     });
   }
 
@@ -255,6 +303,17 @@ class AdminPortalRepository {
       _localUsers.insert(0, createdUser);
     }
     await _saveCache();
+
+    // Persist directly to Supabase PostgreSQL table 'users'
+    SupabaseService.upsertUser({
+      'id': createdUser.id,
+      'email': cleanEmail,
+      'full_name': cleanName,
+      'phone': phone?.trim(),
+      'is_active': true,
+      'is_verified': true,
+      'failed_login_attempts': 0,
+    }).catchError((_) => false);
 
     // Register into AuthRepository so the new staff member can log in instantly
     await AuthRepository.registerDynamicStaff(

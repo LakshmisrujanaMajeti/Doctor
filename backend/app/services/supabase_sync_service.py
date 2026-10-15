@@ -105,7 +105,7 @@ class SupabaseSyncService:
             "qr_code_data": patient.qr_code_data,
             "registered_by_staff_id": getattr(patient, "registered_by_staff_id", None),
             "registered_by_staff_name": getattr(patient, "registered_by_staff_name", None),
-            "registered_by_staff_role": getattr(patient, "registered_by_staff_role", None),
+            "registration_date": getattr(patient, "registration_date", None) or getattr(patient, "created_at", None),
             "created_at": patient.created_at,
             "updated_at": patient.updated_at,
         }
@@ -147,21 +147,46 @@ class SupabaseSyncService:
         return cls.sync_record("bills", payload)
 
     @classmethod
+    def sync_user(cls, user) -> bool:
+        """Sync a user staff account to Supabase."""
+        payload = {
+            "id": str(user.id),
+            "email": user.email,
+            "phone": user.phone,
+            "full_name": user.full_name,
+            "hashed_password": user.hashed_password,
+            "is_active": user.is_active,
+            "is_verified": user.is_verified,
+            "failed_login_attempts": getattr(user, "failed_login_attempts", 0) or 0,
+            "role_id": getattr(user, "role_id", None),
+            "created_at": user.created_at,
+            "updated_at": user.updated_at,
+        }
+        return cls.sync_record("users", payload)
+
+    @classmethod
     def sync_all_database_records(cls, db: Session) -> Dict[str, Any]:
         """Bulk synchronizes all local records to Supabase Cloud."""
         from app.models.patient import Patient
         from app.models.visit import OPDVisit
         from app.models.billing import Bill
+        from app.models.user import User
 
         results = {
             "patients_synced": 0,
             "visits_synced": 0,
             "bills_synced": 0,
+            "users_synced": 0,
             "configured": cls.is_configured(),
         }
 
         if not cls.is_configured():
             return results
+
+        users = db.query(User).all()
+        for u in users:
+            if cls.sync_user(u):
+                results["users_synced"] += 1
 
         patients = db.query(Patient).all()
         for p in patients:

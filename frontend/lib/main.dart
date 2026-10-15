@@ -29,11 +29,14 @@ Future<void> main() async {
 
   // Initialize Supabase client asynchronously in background (non-blocking for instant app boot)
   try {
-    if (AppConfig.supabaseUrl.isNotEmpty && AppConfig.supabaseAnonKey.isNotEmpty) {
+    final supaKey = AppConfig.supabaseServiceRoleKey.isNotEmpty
+        ? AppConfig.supabaseServiceRoleKey
+        : AppConfig.supabaseAnonKey;
+    if (AppConfig.supabaseUrl.isNotEmpty && supaKey.isNotEmpty) {
       Supabase.initialize(
         url: AppConfig.supabaseUrl,
         // ignore: deprecated_member_use
-        anonKey: AppConfig.supabaseAnonKey,
+        anonKey: supaKey,
       ).catchError((e) {
         debugPrint('Supabase initialisation note: $e');
         return Supabase.instance;

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/supabase_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../models/visit_model.dart';
 import '../models/vitals_model.dart';
@@ -53,19 +54,28 @@ class VisitRepository {
   }
 
   /// Instant Stale-While-Revalidate: returns cached visits in 0-1ms,
-  /// then asynchronously updates from backend when online without blocking the UI.
+  /// then asynchronously updates from Supabase Cloud and backend without blocking the UI.
   Future<List<OPDVisitModel>> getVisits({String? status, String? departmentId, String? query}) async {
     await _loadCacheIfNeeded();
 
     // 1. If we have cached visits, return immediately (0ms) and background sync
     if (_localVisits.isNotEmpty) {
-      if (DioClient.isHostReachable) {
-        _syncVisitsFromServer(status, departmentId, query);
-      }
+      _syncVisitsFromCloud(status, departmentId, query);
       return _filterVisits(_localVisits, status, departmentId, query);
     }
 
-    // 2. Cold first run with empty local storage: fetch from server
+    // 2. Cold first run with empty local storage: fetch from Supabase Cloud (works everywhere)
+    try {
+      final supaList = await SupabaseService.fetchVisits();
+      if (supaList.isNotEmpty) {
+        _localVisits.clear();
+        _localVisits.addAll(supaList);
+        await _saveCache();
+        return _filterVisits(supaList, status, departmentId, query);
+      }
+    } catch (_) {}
+
+    // 3. Fallback to Dio backend if reachable
     try {
       final res = await _dioClient.dio.get(
         ApiEndpoints.visits,
@@ -91,28 +101,53 @@ class VisitRepository {
     return _filterVisits(_localVisits, status, departmentId, query);
   }
 
-  void _syncVisitsFromServer(String? status, String? departmentId, String? query) {
+  void _syncVisitsFromCloud(String? status, String? departmentId, String? query) {
     Future.microtask(() async {
       try {
-        final res = await _dioClient.dio.get(
-          ApiEndpoints.visits,
-          queryParameters: {
-            if (status != null && status.isNotEmpty) 'status': status,
-            if (departmentId != null && departmentId.isNotEmpty) 'department_id': departmentId,
-            if (query != null && query.isNotEmpty) 'query': query,
-          },
-        );
-
-        if (res.data['status'] == 'success') {
-          final list = res.data['data'] as List<dynamic>;
-          final fetched = list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
-          if ((status == null || status.isEmpty) && (departmentId == null || departmentId.isEmpty) && (query == null || query.isEmpty)) {
-            _localVisits.clear();
-            _localVisits.addAll(fetched);
+        final supaList = await SupabaseService.fetchVisits();
+        if (supaList.isNotEmpty) {
+          final existingIds = _localVisits.map((v) => v.id).toSet();
+          bool hasNew = false;
+          for (final sv in supaList) {
+            if (!existingIds.contains(sv.id)) {
+              _localVisits.add(sv);
+              hasNew = true;
+            }
+          }
+          if (hasNew) {
             await _saveCache();
           }
         }
       } catch (_) {}
+
+      if (DioClient.isHostReachable) {
+        try {
+          final res = await _dioClient.dio.get(
+            ApiEndpoints.visits,
+            queryParameters: {
+              if (status != null && status.isNotEmpty) 'status': status,
+              if (departmentId != null && departmentId.isNotEmpty) 'department_id': departmentId,
+              if (query != null && query.isNotEmpty) 'query': query,
+            },
+          );
+
+          if (res.data['status'] == 'success') {
+            final list = res.data['data'] as List<dynamic>;
+            final fetched = list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
+            final existingIds = _localVisits.map((v) => v.id).toSet();
+            bool hasNew = false;
+            for (final v in fetched) {
+              if (!existingIds.contains(v.id)) {
+                _localVisits.add(v);
+                hasNew = true;
+              }
+            }
+            if (hasNew) {
+              await _saveCache();
+            }
+          }
+        } catch (_) {}
+      }
     });
   }
 
@@ -185,6 +220,7 @@ class VisitRepository {
         );
         _localVisits.insert(0, merged);
         await _saveCache();
+        SupabaseService.upsertVisit(merged).catchError((_) => false);
         return merged;
       }
     } catch (_) {}
@@ -211,6 +247,8 @@ class VisitRepository {
     );
     _localVisits.insert(0, newVisit);
     await _saveCache();
+    // Persist directly to Supabase PostgreSQL so all physical devices see this visit
+    SupabaseService.upsertVisit(newVisit).catchError((_) => false);
     return newVisit;
   }
 

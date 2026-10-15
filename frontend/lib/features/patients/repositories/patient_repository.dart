@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/supabase_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../models/patient_model.dart';
 import '../../visits/repositories/visit_repository.dart';
@@ -53,19 +54,28 @@ class PatientRepository {
   }
 
   /// Instant Stale-While-Revalidate: returns cached patients in 0-1ms,
-  /// then asynchronously updates from backend when online without blocking the UI.
+  /// then asynchronously updates from Supabase Cloud and backend without blocking the UI.
   Future<List<PatientModel>> getPatients({String? query}) async {
     await _loadCacheIfNeeded();
 
     // 1. If we have cached patients, return immediately (0ms) and background sync
     if (_localPatients.isNotEmpty) {
-      if (DioClient.isHostReachable) {
-        _syncPatientsFromServer(query);
-      }
+      _syncPatientsFromCloud(query);
       return _filterPatients(_localPatients, query);
     }
 
-    // 2. Cold first run with empty local storage: fetch from server
+    // 2. Cold first run with empty local storage: fetch from Supabase Cloud (works everywhere)
+    try {
+      final supaList = await SupabaseService.fetchPatients();
+      if (supaList.isNotEmpty) {
+        _localPatients.clear();
+        _localPatients.addAll(supaList);
+        await _saveCache();
+        return _filterPatients(supaList, query);
+      }
+    } catch (_) {}
+
+    // 3. Fallback to Dio backend if reachable
     try {
       final res = await _dioClient.dio.get(
         ApiEndpoints.patients,
@@ -88,25 +98,53 @@ class PatientRepository {
     return _filterPatients(_localPatients, query);
   }
 
-  void _syncPatientsFromServer(String? query) {
+  void _syncPatientsFromCloud(String? query) {
     Future.microtask(() async {
       try {
-        final res = await _dioClient.dio.get(
-          ApiEndpoints.patients,
-          queryParameters: query != null && query.isNotEmpty ? {'query': query} : null,
-        );
-
-        final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
-        if (raw is Map && raw['status'] == 'success') {
-          final list = raw['data'] as List<dynamic>;
-          final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
-          if (query == null || query.isEmpty) {
-            _localPatients.clear();
-            _localPatients.addAll(fetched);
+        final supaList = await SupabaseService.fetchPatients();
+        if (supaList.isNotEmpty) {
+          final existingIds = _localPatients.map((p) => p.id).toSet();
+          final existingUhids = _localPatients.map((p) => p.uhid).toSet();
+          bool hasNew = false;
+          for (final sp in supaList) {
+            if (!existingIds.contains(sp.id) && !existingUhids.contains(sp.uhid)) {
+              _localPatients.add(sp);
+              hasNew = true;
+            }
+          }
+          if (hasNew) {
             await _saveCache();
           }
         }
       } catch (_) {}
+
+      if (DioClient.isHostReachable) {
+        try {
+          final res = await _dioClient.dio.get(
+            ApiEndpoints.patients,
+            queryParameters: query != null && query.isNotEmpty ? {'query': query} : null,
+          );
+
+          final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
+          if (raw is Map && raw['status'] == 'success') {
+            final list = raw['data'] as List<dynamic>;
+            final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
+            if (query == null || query.isEmpty) {
+              final existingIds = _localPatients.map((p) => p.id).toSet();
+              bool hasNew = false;
+              for (final p in fetched) {
+                if (!existingIds.contains(p.id)) {
+                  _localPatients.add(p);
+                  hasNew = true;
+                }
+              }
+              if (hasNew) {
+                await _saveCache();
+              }
+            }
+          }
+        } catch (_) {}
+      }
     });
   }
 
@@ -213,6 +251,7 @@ class PatientRepository {
         _localPatients.removeWhere((p) => p.id == registered.id || p.uhid == registered.uhid);
         _localPatients.insert(0, registered);
         await _saveCache();
+        SupabaseService.upsertPatient(registered).catchError((_) => false);
         return registered;
       }
     } on DioException catch (e) {
@@ -238,6 +277,7 @@ class PatientRepository {
                 final registered = PatientModel.fromJson(retryRes.data['data'] as Map<String, dynamic>);
                 _localPatients.insert(0, registered);
                 await _saveCache();
+                SupabaseService.upsertPatient(registered).catchError((_) => false);
                 return registered;
               }
             } catch (_) {}
@@ -250,8 +290,8 @@ class PatientRepository {
     final generatedUhid = 'UHID-2026-${(_localPatients.length + 1).toString().padLeft(5, '0')}';
     final generatedReg = 'REG-2026-${(_localPatients.length + 1).toString().padLeft(5, '0')}';
     final newPat = PatientModel(
-      id: 'pat-${DateTime.now().millisecondsSinceEpoch}',
-      uhid: generatedUhid,
+      id: patient.id.isNotEmpty ? patient.id : 'pat-${DateTime.now().millisecondsSinceEpoch}',
+      uhid: patient.uhid.isNotEmpty ? patient.uhid : generatedUhid,
       hospitalRegNum: patient.hospitalRegNum ?? generatedReg,
       fullName: patient.fullName,
       parentSpouseName: patient.parentSpouseName,
@@ -272,10 +312,13 @@ class PatientRepository {
       emergencyContactName: patient.emergencyContactName,
       emergencyContactPhone: patient.emergencyContactPhone,
       emergencyContactRelation: patient.emergencyContactRelation,
+      registrationDate: DateTime.now(),
       createdAt: DateTime.now(),
     );
     _localPatients.insert(0, newPat);
     await _saveCache();
+    // Persist directly to Supabase PostgreSQL so all physical devices see this immediately
+    SupabaseService.upsertPatient(newPat).catchError((_) => false);
     return newPat;
   }
 
