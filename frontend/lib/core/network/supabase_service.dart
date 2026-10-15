@@ -47,6 +47,26 @@ class SupabaseService {
     }
   }
 
+  // ==========================================
+  // DOCTORS
+  // ==========================================
+
+  static Future<List<Map<String, dynamic>>> fetchDoctors() async {
+    final cli = client;
+    if (cli == null) return [];
+    try {
+      final res = await cli
+          .from('doctors')
+          .select('*, user:users(*), department:departments(*)');
+
+      final list = res as List<dynamic>;
+      return list.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+    } catch (e) {
+      debugPrint('Supabase fetchDoctors note: $e');
+      return [];
+    }
+  }
+
   static Future<bool> upsertPatient(PatientModel patient) async {
     final cli = client;
     if (cli == null) return false;
@@ -164,6 +184,133 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Supabase upsertUser error: $e');
       return false;
+    }
+  }
+
+  // ==========================================
+  // CLINICAL RECORDS (Medical Entry Forms)
+  // ==========================================
+
+  static Future<Map<String, dynamic>?> fetchClinicalRecord(String visitId) async {
+    final cli = client;
+    if (cli == null) return null;
+    try {
+      final res = await cli
+          .from('clinical_records')
+          .select()
+          .eq('visit_id', visitId)
+          .maybeSingle();
+
+      if (res != null) {
+        return Map<String, dynamic>.from(res);
+      }
+    } catch (e) {
+      debugPrint('Supabase fetchClinicalRecord note: $e');
+    }
+    return null;
+  }
+
+  static Future<bool> upsertClinicalRecord(Map<String, dynamic> recordMap) async {
+    final cli = client;
+    if (cli == null) return false;
+    try {
+      final nowIso = DateTime.now().toIso8601String();
+      final data = Map<String, dynamic>.from(recordMap);
+      data['created_at'] = data['created_at'] ?? nowIso;
+      data['updated_at'] = nowIso;
+      data['status'] = data['status'] ?? 'COMPLETED';
+      data['version'] = data['version'] ?? 1;
+
+      await cli.from('clinical_records').upsert(data);
+      return true;
+    } catch (e) {
+      debugPrint('Supabase upsertClinicalRecord error: $e');
+      return false;
+    }
+  }
+
+  // ==========================================
+  // VITAL SIGNS
+  // ==========================================
+
+  static Future<Map<String, dynamic>?> fetchVitalSigns(String visitId) async {
+    final cli = client;
+    if (cli == null) return null;
+    try {
+      final res = await cli
+          .from('vital_signs')
+          .select()
+          .eq('visit_id', visitId)
+          .maybeSingle();
+
+      if (res != null) {
+        return Map<String, dynamic>.from(res);
+      }
+    } catch (e) {
+      debugPrint('Supabase fetchVitalSigns note: $e');
+    }
+    return null;
+  }
+
+  static Future<bool> upsertVitalSigns(Map<String, dynamic> vitalsMap) async {
+    final cli = client;
+    if (cli == null) return false;
+    try {
+      final nowIso = DateTime.now().toIso8601String();
+      final data = Map<String, dynamic>.from(vitalsMap);
+      data['recorded_at'] = data['recorded_at'] ?? nowIso;
+      data['created_at'] = data['created_at'] ?? nowIso;
+      data['updated_at'] = nowIso;
+
+      await cli.from('vital_signs').upsert(data);
+      return true;
+    } catch (e) {
+      debugPrint('Supabase upsertVitalSigns error: $e');
+      return false;
+    }
+  }
+
+  // ==========================================
+  // PRESCRIPTIONS
+  // ==========================================
+
+  static Future<Map<String, dynamic>?> fetchPrescription(String visitId) async {
+    final cli = client;
+    if (cli == null) return null;
+    try {
+      final res = await cli
+          .from('prescriptions')
+          .select('*, prescription_items(*)')
+          .eq('visit_id', visitId)
+          .maybeSingle();
+
+      if (res != null) {
+        return Map<String, dynamic>.from(res);
+      }
+    } catch (e) {
+      debugPrint('Supabase fetchPrescription note: $e');
+    }
+    return null;
+  }
+
+  // ==========================================
+  // LAB ORDERS
+  // ==========================================
+
+  static Future<List<Map<String, dynamic>>> fetchLabOrders(String visitId) async {
+    final cli = client;
+    if (cli == null) return [];
+    try {
+      final res = await cli
+          .from('lab_orders')
+          .select('*, lab_results(*)')
+          .eq('visit_id', visitId);
+
+      final list = res as List<dynamic>;
+      return list.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+    } catch (e) {
+      debugPrint('Supabase fetchLabOrders note: $e');
+      return [];
     }
   }
 }

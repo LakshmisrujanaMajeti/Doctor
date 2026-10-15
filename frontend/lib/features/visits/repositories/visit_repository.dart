@@ -253,6 +253,27 @@ class VisitRepository {
   }
 
   Future<VitalSignsModel> recordVitals(VitalSignsModel vitals) async {
+    // 1. Immediately persist to Supabase Cloud PostgreSQL
+    SupabaseService.upsertVitalSigns({
+      'id': vitals.id.isNotEmpty ? vitals.id : 'vit_${vitals.visitId}',
+      'visit_id': vitals.visitId,
+      'systolic_bp': vitals.systolicBp,
+      'diastolic_bp': vitals.diastolicBp,
+      'pulse_rate': vitals.pulseRate,
+      'temperature_f': vitals.temperatureF,
+      'spo2_percent': vitals.spo2Percent,
+      'respiratory_rate': vitals.respiratoryRate,
+      'height_cm': vitals.heightCm,
+      'weight_kg': vitals.weightKg,
+      'bmi': vitals.bmi,
+      'notes': vitals.notes,
+    }).catchError((_) => false);
+
+    final cli = SupabaseService.client;
+    if (cli != null) {
+      cli.from('opd_visits').update({'status': 'TRIAGED'}).eq('id', vitals.visitId).catchError((_) => null);
+    }
+
     try {
       final res = await _dioClient.dio.post(
         ApiEndpoints.visitVitals(vitals.visitId),

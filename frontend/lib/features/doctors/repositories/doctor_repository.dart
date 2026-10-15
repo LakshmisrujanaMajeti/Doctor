@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/secure_storage_service.dart';
+import '../../../core/network/supabase_service.dart';
 import '../models/doctor_model.dart';
 
 class DoctorRepository {
@@ -58,19 +59,39 @@ class DoctorRepository {
   }
 
   /// Instant Stale-While-Revalidate: returns cached doctors in 0-1ms,
-  /// then asynchronously updates from backend when online.
+  /// then asynchronously updates from Supabase Cloud & backend when online.
   Future<List<DoctorModel>> getDoctors({String? departmentId}) async {
     await _loadCacheIfNeeded();
 
     // 1. If we have cached doctors, return immediately (0ms) and background sync
     if (_localDoctors.isNotEmpty) {
+      _syncDoctorsFromSupabase(departmentId);
       if (DioClient.isHostReachable) {
         _syncDoctorsFromServer(departmentId);
       }
       return _filterDoctors(_localDoctors, departmentId);
     }
 
-    // 2. Cold first run with empty local cache: fetch from server
+    // 2. Direct Supabase Cloud Fetch (Fastest & direct connection on physical devices)
+    try {
+      final supaDoctors = await SupabaseService.fetchDoctors();
+      if (supaDoctors.isNotEmpty) {
+        final fetched = supaDoctors.map((m) => DoctorModel.fromJson(m)).toList();
+        for (final f in fetched) {
+          final idx = _localDoctors.indexWhere((d) => d.id == f.id || d.userId == f.userId);
+          if (idx != -1) {
+            _localDoctors[idx] = f;
+          } else {
+            _localDoctors.add(f);
+          }
+        }
+        return _filterDoctors(_localDoctors, departmentId);
+      }
+    } catch (e) {
+      debugPrint('Supabase direct doctor fetch note: $e');
+    }
+
+    // 3. Cold first run with empty local cache: fetch from server
     try {
       final res = await _dioClient.dio.get(
         ApiEndpoints.doctors,
@@ -95,6 +116,25 @@ class DoctorRepository {
     } catch (_) {}
 
     return _filterDoctors(_localDoctors, departmentId);
+  }
+
+  void _syncDoctorsFromSupabase(String? departmentId) {
+    Future.microtask(() async {
+      try {
+        final supaDoctors = await SupabaseService.fetchDoctors();
+        if (supaDoctors.isNotEmpty) {
+          final fetched = supaDoctors.map((m) => DoctorModel.fromJson(m)).toList();
+          for (final f in fetched) {
+            final idx = _localDoctors.indexWhere((d) => d.id == f.id || d.userId == f.userId);
+            if (idx != -1) {
+              _localDoctors[idx] = f;
+            } else {
+              _localDoctors.add(f);
+            }
+          }
+        }
+      } catch (_) {}
+    });
   }
 
   void _syncDoctorsFromServer(String? departmentId) {

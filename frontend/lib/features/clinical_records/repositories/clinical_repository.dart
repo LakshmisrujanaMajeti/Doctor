@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/supabase_service.dart';
 import '../models/clinical_record_model.dart';
 
 class ClinicalRepository {
@@ -12,10 +13,28 @@ class ClinicalRepository {
   ClinicalRepository(this._dioClient);
 
   Future<ClinicalRecordModel?> getRecordByVisit(String visitId) async {
+    if (_localRecords.containsKey(visitId)) {
+      return _localRecords[visitId];
+    }
+
+    if (DioClient.isHostReachable) {
+      try {
+        final res = await _dioClient.dio.get(ApiEndpoints.clinicalRecordByVisit(visitId));
+        if (res.data['status'] == 'success') {
+          final record = ClinicalRecordModel.fromJson(res.data['data'] as Map<String, dynamic>);
+          _localRecords[visitId] = record;
+          return record;
+        }
+      } catch (_) {}
+    }
+
+    // Fetch directly from Supabase Cloud PostgreSQL
     try {
-      final res = await _dioClient.dio.get(ApiEndpoints.clinicalRecordByVisit(visitId));
-      if (res.data['status'] == 'success') {
-        return ClinicalRecordModel.fromJson(res.data['data'] as Map<String, dynamic>);
+      final supaRecord = await SupabaseService.fetchClinicalRecord(visitId);
+      if (supaRecord != null) {
+        final record = ClinicalRecordModel.fromJson(supaRecord);
+        _localRecords[visitId] = record;
+        return record;
       }
     } catch (_) {}
 
@@ -23,26 +42,50 @@ class ClinicalRepository {
   }
 
   Future<ClinicalRecordModel> saveRecord(ClinicalRecordModel record) async {
-    try {
-      final res = await _dioClient.dio.post(
-        ApiEndpoints.clinicalRecords,
-        data: record.toJson(),
-      );
-      if (res.data['status'] == 'success') {
-        final saved = ClinicalRecordModel.fromJson(res.data['data'] as Map<String, dynamic>);
-        _localRecords[record.visitId] = saved;
-        return saved;
-      }
-    } on DioException catch (e) {
-      if (e.response != null && e.response?.data is Map) {
-        final msg = e.response!.data['message'] ?? e.response!.data['detail'];
-        if (msg != null) throw Exception(msg.toString());
-      }
-      rethrow;
-    } catch (_) {}
-
-    // Fallback local save
+    // 1. Immediately cache locally
     _localRecords[record.visitId] = record;
+
+    // 2. Persist to Supabase Cloud PostgreSQL
+    SupabaseService.upsertClinicalRecord({
+      'id': record.id.isNotEmpty ? record.id : 'cr_${record.visitId}',
+      'visit_id': record.visitId,
+      'patient_id': record.patientId,
+      'doctor_id': record.doctorId,
+      'presenting_complaint': record.presentingComplaint,
+      'history_of_present_illness': record.historyOfPresentIllness,
+      'allergies': record.allergies,
+      'past_medical_history': record.pastMedicalHistory,
+      'general_examination': record.generalExamination,
+      'provisional_diagnosis': record.provisionalDiagnosis,
+      'final_diagnosis': record.finalDiagnosis,
+      'icd10_code': record.icd10Code,
+      'care_plan': record.carePlan,
+      'follow_up_date': record.followUpDate,
+      'status': record.status,
+      'version': record.version,
+    }).catchError((_) => false);
+
+    // 3. Post to Dio backend if reachable
+    if (DioClient.isHostReachable) {
+      try {
+        final res = await _dioClient.dio.post(
+          ApiEndpoints.clinicalRecords,
+          data: record.toJson(),
+        );
+        if (res.data['status'] == 'success') {
+          final saved = ClinicalRecordModel.fromJson(res.data['data'] as Map<String, dynamic>);
+          _localRecords[record.visitId] = saved;
+          return saved;
+        }
+      } on DioException catch (e) {
+        if (e.response != null && e.response?.data is Map) {
+          final msg = e.response!.data['message'] ?? e.response!.data['detail'];
+          if (msg != null) throw Exception(msg.toString());
+        }
+        rethrow;
+      } catch (_) {}
+    }
+
     return record;
   }
 

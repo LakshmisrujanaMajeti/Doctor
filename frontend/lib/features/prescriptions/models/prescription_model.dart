@@ -126,9 +126,9 @@ class PrescriptionModel {
   bool get isCancelled => status.toUpperCase() == 'CANCELLED';
 
   factory PrescriptionModel.fromJson(Map<String, dynamic> json) {
-    var rawItems = json['items'] as List<dynamic>? ?? [];
+    var rawItems = json['items'] as List<dynamic>? ?? json['prescription_items'] as List<dynamic>? ?? [];
     List<PrescriptionItemModel> itemsList = rawItems
-        .map((i) => PrescriptionItemModel.fromJson(i as Map<String, dynamic>))
+        .map((i) => PrescriptionItemModel.fromJson(Map<String, dynamic>.from(i as Map)))
         .toList();
 
     var rawAmendments = json['amendments'] as List<dynamic>? ?? [];
