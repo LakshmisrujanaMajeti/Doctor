@@ -1,0 +1,24 @@
+{
+  "name": "opd-connect-desktop",
+  "version": "1.0.0",
+  "description": "SMVMCH OPD Connect - Hospital Clinical Desktop Workstation",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package:mac": "electron-packager . \"OPD Connect\" --platform=darwin --out=dist --overwrite",
+    "package:all": "electron-packager . \"OPD Connect\" --all --out=dist --overwrite"
+  },
+  "keywords": [
+    "hospital",
+    "opd",
+    "medical",
+    "desktop",
+    "electron"
+  ],
+  "author": "SMVMCH",
+  "license": "ISC",
+  "devDependencies": {
+    "@electron/packager": "^18.3.6",
+    "electron": "^33.2.0"
+  }
+}

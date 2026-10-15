@@ -54,3 +54,9 @@ frontend/app.*.symbols
 frontend/app.*.map.json
 apk_builds/
 *.apk
+
+# Desktop Workstation Builds
+desktop_builds/
+desktop/node_modules/
+desktop/dist/
+desktop/web/
