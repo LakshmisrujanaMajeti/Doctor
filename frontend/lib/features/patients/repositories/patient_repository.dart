@@ -4,12 +4,22 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../models/patient_model.dart';
+import '../../visits/repositories/visit_repository.dart';
 
 class PatientRepository {
   final DioClient _dioClient;
 
-  // Local offline cache
-  final List<PatientModel> _localPatients = [];
+  // Local offline cache - shared static in-memory cache for instant 0ms access
+  static final List<PatientModel> _localPatients = [];
+  static bool _isLoaded = false;
+
+  static List<PatientModel> get cachedPatients => List.unmodifiable(_localPatients);
+
+  static void initializeCache(List<PatientModel> patients) {
+    _localPatients.clear();
+    _localPatients.addAll(patients);
+    _isLoaded = true;
+  }
 
   PatientRepository(this._dioClient);
 
@@ -32,6 +42,7 @@ class PatientRepository {
         }
       } catch (_) {}
     }
+    _isLoaded = true;
   }
 
   Future<void> _saveCache() async {
@@ -41,7 +52,20 @@ class PatientRepository {
     } catch (_) {}
   }
 
+  /// Instant Stale-While-Revalidate: returns cached patients in 0-1ms,
+  /// then asynchronously updates from backend when online without blocking the UI.
   Future<List<PatientModel>> getPatients({String? query}) async {
+    await _loadCacheIfNeeded();
+
+    // 1. If we have cached patients, return immediately (0ms) and background sync
+    if (_localPatients.isNotEmpty) {
+      if (DioClient.isHostReachable) {
+        _syncPatientsFromServer(query);
+      }
+      return _filterPatients(_localPatients, query);
+    }
+
+    // 2. Cold first run with empty local storage: fetch from server
     try {
       final res = await _dioClient.dio.get(
         ApiEndpoints.patients,
@@ -57,44 +81,61 @@ class PatientRepository {
           _localPatients.addAll(fetched);
           await _saveCache();
         }
-        return fetched;
+        return _filterPatients(fetched, query);
       }
     } catch (_) {}
 
-    await _loadCacheIfNeeded();
+    return _filterPatients(_localPatients, query);
+  }
 
-    // Fallback search in local items with token matching
-    if (query != null && query.isNotEmpty) {
-      final q = query.toLowerCase().trim();
-      final tokenMatch = RegExp(r'^(?:token|tok|queue|opd|t|#|\s)*(\d{1,4})$').firstMatch(q);
-      final queryNum = tokenMatch != null ? int.tryParse(tokenMatch.group(1)!) : (int.tryParse(q));
-
-      final Set<String> matchingVisitPatientIds = {};
+  void _syncPatientsFromServer(String? query) {
+    Future.microtask(() async {
       try {
-        final rawVisits = await SecureStorageService.getVisitsJson();
-        if (rawVisits != null && rawVisits.isNotEmpty) {
-          final visits = jsonDecode(rawVisits) as List<dynamic>;
-          for (final v in visits) {
-            final t = v['queue_token'];
-            final numStr = v['visit_number']?.toString().toLowerCase() ?? '';
-            if ((queryNum != null && t == queryNum) || numStr.contains(q)) {
-              final patId = v['patient_id']?.toString();
-              if (patId != null) matchingVisitPatientIds.add(patId);
-            }
+        final res = await _dioClient.dio.get(
+          ApiEndpoints.patients,
+          queryParameters: query != null && query.isNotEmpty ? {'query': query} : null,
+        );
+
+        final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
+        if (raw is Map && raw['status'] == 'success') {
+          final list = raw['data'] as List<dynamic>;
+          final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
+          if (query == null || query.isEmpty) {
+            _localPatients.clear();
+            _localPatients.addAll(fetched);
+            await _saveCache();
           }
         }
       } catch (_) {}
+    });
+  }
 
-      return _localPatients.where((p) =>
-        p.fullName.toLowerCase().contains(q) ||
-        p.uhid.toLowerCase().contains(q) ||
-        (p.hospitalRegNum != null && p.hospitalRegNum!.toLowerCase().contains(q)) ||
-        (p.barcodeValue != null && p.barcodeValue!.toLowerCase().contains(q)) ||
-        (q.length >= 4 && p.phone.contains(q)) ||
-        matchingVisitPatientIds.contains(p.id)
-      ).toList();
+  List<PatientModel> _filterPatients(List<PatientModel> source, String? query) {
+    if (query == null || query.trim().isEmpty) {
+      return List.unmodifiable(source);
     }
-    return _localPatients;
+
+    final q = query.toLowerCase().trim();
+    final tokenMatch = RegExp(r'^(?:token|tok|queue|opd|t|#|\s)*(\d{1,4})$').firstMatch(q);
+    final queryNum = tokenMatch != null ? int.tryParse(tokenMatch.group(1)!) : (int.tryParse(q));
+
+    final Set<String> matchingVisitPatientIds = {};
+    for (final v in VisitRepository.cachedVisits) {
+      final t = v.queueToken;
+      final numStr = v.visitNumber.toLowerCase();
+      if ((queryNum != null && t == queryNum) || numStr.contains(q)) {
+        matchingVisitPatientIds.add(v.patientId);
+      }
+    }
+
+    return source.where((p) =>
+      p.fullName.toLowerCase().contains(q) ||
+      p.uhid.toLowerCase().contains(q) ||
+      (p.hospitalRegNum != null && p.hospitalRegNum!.toLowerCase().contains(q)) ||
+      (p.barcodeValue != null && p.barcodeValue!.toLowerCase().contains(q)) ||
+      (q.length >= 4 && p.phone.contains(q)) ||
+      matchingVisitPatientIds.contains(p.id)
+    ).toList();
   }
 
   Future<DuplicateCheckResult> checkDuplicates({

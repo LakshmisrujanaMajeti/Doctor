@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../routing/route_names.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
 import '../../../shared/widgets/smvmch_hospital_logo.dart';
@@ -258,8 +259,13 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             ref.invalidate(labDashboardStatsProvider);
           },
           child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 96),
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            padding: EdgeInsets.only(
+              left: Responsive.horizontalPadding(context),
+              right: Responsive.horizontalPadding(context),
+              top: 16,
+              bottom: 96,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -534,6 +540,47 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
     );
   }
 
+  Widget _buildResponsiveMetricRow(BuildContext context, List<Widget> cards) {
+    final isTablet = MediaQuery.sizeOf(context).width >= 650;
+    final isSmall = MediaQuery.sizeOf(context).width < 360;
+    final gap = isSmall ? 8.0 : 12.0;
+
+    if (isTablet && cards.length == 4) {
+      return Row(
+        children: [
+          Expanded(child: cards[0]),
+          SizedBox(width: gap),
+          Expanded(child: cards[1]),
+          SizedBox(width: gap),
+          Expanded(child: cards[2]),
+          SizedBox(width: gap),
+          Expanded(child: cards[3]),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: cards[0]),
+            SizedBox(width: gap),
+            Expanded(child: cards[1]),
+          ],
+        ),
+        SizedBox(height: gap),
+        if (cards.length > 2)
+          Row(
+            children: [
+              Expanded(child: cards[2]),
+              SizedBox(width: gap),
+              Expanded(child: cards.length > 3 ? cards[3] : const SizedBox()),
+            ],
+          ),
+      ],
+    );
+  }
+
   // Role-Aware KPI Metrics
   Widget _buildRoleMetricsGrid({
     required BuildContext context,
@@ -543,464 +590,296 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
   }) {
     switch (role) {
       case 'doctor':
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Waiting for Me',
-                    value: stats.waiting.toString(),
-                    icon: Icons.hourglass_top_rounded,
-                    color: AppColors.triagePriority,
-                    subtitle: 'In Line',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'In Consultation',
-                    value: stats.triaged.toString(),
-                    icon: Icons.medical_services_rounded,
-                    color: AppColors.primaryBlue,
-                    subtitle: 'Current Room',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Consulted Today',
-                    value: stats.completed.toString(),
-                    icon: Icons.task_alt_rounded,
-                    color: AppColors.statusCompleted,
-                    subtitle: 'Concluded',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Total OPD Today',
-                    value: stats.totalVisits.toString(),
-                    icon: Icons.people_alt_rounded,
-                    color: AppColors.accentTeal,
-                    subtitle: 'General Clinic',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _buildResponsiveMetricRow(context, [
+          StatMetricCard(
+            title: 'Waiting for Me',
+            value: stats.waiting.toString(),
+            icon: Icons.hourglass_top_rounded,
+            color: AppColors.triagePriority,
+            subtitle: 'In Line',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'In Consultation',
+            value: stats.triaged.toString(),
+            icon: Icons.medical_services_rounded,
+            color: AppColors.primaryBlue,
+            subtitle: 'Current Room',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Consulted Today',
+            value: stats.completed.toString(),
+            icon: Icons.task_alt_rounded,
+            color: AppColors.statusCompleted,
+            subtitle: 'Concluded',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Total OPD Today',
+            value: stats.totalVisits.toString(),
+            icon: Icons.people_alt_rounded,
+            color: AppColors.accentTeal,
+            subtitle: 'General Clinic',
+            onTap: () => context.push('/queue'),
+          ),
+        ]);
 
       case 'nurse':
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Awaiting Triage',
-                    value: stats.waiting.toString(),
-                    icon: Icons.monitor_heart_rounded,
-                    color: AppColors.triageEmergency,
-                    subtitle: 'Pending Vitals',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Triaged & Ready',
-                    value: stats.triaged.toString(),
-                    icon: Icons.check_circle_outline_rounded,
-                    color: AppColors.accentTeal,
-                    subtitle: 'To Doctor',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Total Visits',
-                    value: stats.totalVisits.toString(),
-                    icon: Icons.assignment_turned_in_rounded,
-                    color: AppColors.primaryBlue,
-                    subtitle: "Today's Intake",
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Doctors Active',
-                    value: stats.activeDoctors.toString(),
-                    icon: Icons.medical_services_rounded,
-                    color: const Color(0xFF8B5CF6),
-                    subtitle: 'In Clinic Rooms',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _buildResponsiveMetricRow(context, [
+          StatMetricCard(
+            title: 'Awaiting Triage',
+            value: stats.waiting.toString(),
+            icon: Icons.monitor_heart_rounded,
+            color: AppColors.triageEmergency,
+            subtitle: 'Pending Vitals',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Triaged & Ready',
+            value: stats.triaged.toString(),
+            icon: Icons.check_circle_outline_rounded,
+            color: AppColors.accentTeal,
+            subtitle: 'To Doctor',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Total Visits',
+            value: stats.totalVisits.toString(),
+            icon: Icons.assignment_turned_in_rounded,
+            color: AppColors.primaryBlue,
+            subtitle: "Today's Intake",
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Doctors Active',
+            value: stats.activeDoctors.toString(),
+            icon: Icons.medical_services_rounded,
+            color: const Color(0xFF8B5CF6),
+            subtitle: 'In Clinic Rooms',
+            onTap: () => context.push('/queue'),
+          ),
+        ]);
 
       case 'patient':
         final allVisits = visitsAsync.asData?.value ?? [];
         final myVisit = allVisits.isNotEmpty ? allVisits.first : null;
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Your Token',
-                    value: myVisit != null ? '#${myVisit.queueToken}' : 'No Token',
-                    icon: Icons.confirmation_number_rounded,
-                    color: AppColors.primaryBlue,
-                    subtitle: myVisit?.departmentName ?? 'OPD Intake',
-                    onTap: () => context.push('/patient/portal'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Queue Status',
-                    value: myVisit?.status ?? 'READY',
-                    icon: Icons.timer_outlined,
-                    color: AppColors.accentTeal,
-                    subtitle: myVisit != null ? 'Slip: ${myVisit.visitNumber}' : 'Visit Slip Not Issued',
-                    onTap: () => context.push('/patient/portal'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Assigned Physician',
-                    value: myVisit?.doctorName ?? 'Consultation Desk',
-                    icon: Icons.meeting_room_rounded,
-                    color: const Color(0xFF8B5CF6),
-                    subtitle: myVisit?.departmentName ?? 'Outpatient Clinic',
-                    onTap: () => context.push('/patient/portal'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Health Services',
-                    value: 'Patient Portal',
-                    icon: Icons.health_and_safety_rounded,
-                    color: AppColors.statusCompleted,
-                    subtitle: 'Rx, Labs & Invoices',
-                    onTap: () => context.push('/patient/portal'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _buildResponsiveMetricRow(context, [
+          StatMetricCard(
+            title: 'Your Token',
+            value: myVisit != null ? '#${myVisit.queueToken}' : 'No Token',
+            icon: Icons.confirmation_number_rounded,
+            color: AppColors.primaryBlue,
+            subtitle: myVisit?.departmentName ?? 'OPD Intake',
+            onTap: () => context.push('/patient/portal'),
+          ),
+          StatMetricCard(
+            title: 'Queue Status',
+            value: myVisit?.status ?? 'READY',
+            icon: Icons.timer_outlined,
+            color: AppColors.accentTeal,
+            subtitle: myVisit != null ? 'Slip: ${myVisit.visitNumber}' : 'Visit Slip Not Issued',
+            onTap: () => context.push('/patient/portal'),
+          ),
+          StatMetricCard(
+            title: 'Assigned Physician',
+            value: myVisit?.doctorName ?? 'Consultation Desk',
+            icon: Icons.meeting_room_rounded,
+            color: const Color(0xFF8B5CF6),
+            subtitle: myVisit?.departmentName ?? 'Outpatient Clinic',
+            onTap: () => context.push('/patient/portal'),
+          ),
+          StatMetricCard(
+            title: 'Health Services',
+            value: 'Patient Portal',
+            icon: Icons.health_and_safety_rounded,
+            color: AppColors.statusCompleted,
+            subtitle: 'Rx, Labs & Invoices',
+            onTap: () => context.push('/patient/portal'),
+          ),
+        ]);
 
       case 'admin':
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Hospital OPD Total',
-                    value: stats.totalPatients.toString(),
-                    icon: Icons.groups_rounded,
-                    color: AppColors.primaryBlue,
-                    subtitle: 'Active UHIDs',
-                    onTap: () => context.push('/patients'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: "Today's Footfall",
-                    value: stats.totalVisits.toString(),
-                    icon: Icons.assessment_rounded,
-                    color: AppColors.accentTeal,
-                    subtitle: 'Visits Registered',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Active Clinics',
-                    value: '${stats.departments} Depts',
-                    icon: Icons.domain_rounded,
-                    color: const Color(0xFF8B5CF6),
-                    subtitle: 'Operational',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Doctor Roster',
-                    value: '${stats.activeDoctors} On Duty',
-                    icon: Icons.badge_outlined,
-                    color: AppColors.statusCompleted,
-                    subtitle: 'Consulting',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _buildResponsiveMetricRow(context, [
+          StatMetricCard(
+            title: 'Hospital OPD Total',
+            value: stats.totalPatients.toString(),
+            icon: Icons.groups_rounded,
+            color: AppColors.primaryBlue,
+            subtitle: 'Active UHIDs',
+            onTap: () => context.push('/patients'),
+          ),
+          StatMetricCard(
+            title: "Today's Footfall",
+            value: stats.totalVisits.toString(),
+            icon: Icons.assessment_rounded,
+            color: AppColors.accentTeal,
+            subtitle: 'Visits Registered',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Active Clinics',
+            value: '${stats.departments} Depts',
+            icon: Icons.domain_rounded,
+            color: const Color(0xFF8B5CF6),
+            subtitle: 'Operational',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Doctor Roster',
+            value: '${stats.activeDoctors} On Duty',
+            icon: Icons.badge_outlined,
+            color: AppColors.statusCompleted,
+            subtitle: 'Consulting',
+            onTap: () => context.push('/queue'),
+          ),
+        ]);
 
       case 'laboratory':
       case 'lab_tech':
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Pending Tests',
-                    value: '${stats.triaged} Tests',
-                    icon: Icons.biotech_rounded,
-                    color: AppColors.primaryBlue,
-                    subtitle: 'Awaiting Run',
-                    onTap: () => context.push('/laboratory'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Abnormal Results',
-                    value: '0 Flagged',
-                    icon: Icons.warning_amber_rounded,
-                    color: AppColors.triageEmergency,
-                    subtitle: 'Critical Alerts',
-                    onTap: () => context.push('/laboratory'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Completed Tests',
-                    value: '${stats.completed} Verified',
-                    icon: Icons.task_alt_rounded,
-                    color: AppColors.statusCompleted,
-                    subtitle: 'Verified & Sent',
-                    onTap: () => context.push('/laboratory'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Lab Turnaround',
-                    value: 'Active TAT',
-                    icon: Icons.timer_outlined,
-                    color: AppColors.accentTeal,
-                    subtitle: 'Average Turnaround',
-                    onTap: () => context.push('/laboratory'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _buildResponsiveMetricRow(context, [
+          StatMetricCard(
+            title: 'Pending Tests',
+            value: '${stats.triaged} Tests',
+            icon: Icons.biotech_rounded,
+            color: AppColors.primaryBlue,
+            subtitle: 'Awaiting Run',
+            onTap: () => context.push('/laboratory'),
+          ),
+          StatMetricCard(
+            title: 'Abnormal Results',
+            value: '0 Flagged',
+            icon: Icons.warning_amber_rounded,
+            color: AppColors.triageEmergency,
+            subtitle: 'Critical Alerts',
+            onTap: () => context.push('/laboratory'),
+          ),
+          StatMetricCard(
+            title: 'Completed Tests',
+            value: '${stats.completed} Verified',
+            icon: Icons.task_alt_rounded,
+            color: AppColors.statusCompleted,
+            subtitle: 'Verified & Sent',
+            onTap: () => context.push('/laboratory'),
+          ),
+          StatMetricCard(
+            title: 'Lab Turnaround',
+            value: 'Active TAT',
+            icon: Icons.timer_outlined,
+            color: AppColors.accentTeal,
+            subtitle: 'Average Turnaround',
+            onTap: () => context.push('/laboratory'),
+          ),
+        ]);
 
       case 'billing':
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Active Invoices',
-                    value: '${stats.waiting + stats.triaged}',
-                    icon: Icons.receipt_long_rounded,
-                    color: AppColors.primaryBlue,
-                    subtitle: 'Pending Collection',
-                    onTap: () => context.push('/billing'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Settled Today',
-                    value: stats.completed.toString(),
-                    icon: Icons.check_circle_rounded,
-                    color: AppColors.statusCompleted,
-                    subtitle: 'Paid Invoices',
-                    onTap: () => context.push('/billing'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Patient Slips',
-                    value: stats.totalVisits.toString(),
-                    icon: Icons.assignment_turned_in_rounded,
-                    color: AppColors.accentTeal,
-                    subtitle: 'Counter Registrations',
-                    onTap: () => context.push('/billing'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Revenue Audit',
-                    value: 'Optimal',
-                    icon: Icons.account_balance_wallet_rounded,
-                    color: const Color(0xFF8B5CF6),
-                    subtitle: 'Daily Reconciliation',
-                    onTap: () => context.push('/billing'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _buildResponsiveMetricRow(context, [
+          StatMetricCard(
+            title: 'Active Invoices',
+            value: '${stats.waiting + stats.triaged}',
+            icon: Icons.receipt_long_rounded,
+            color: AppColors.primaryBlue,
+            subtitle: 'Pending Collection',
+            onTap: () => context.push('/billing'),
+          ),
+          StatMetricCard(
+            title: 'Settled Today',
+            value: stats.completed.toString(),
+            icon: Icons.check_circle_rounded,
+            color: AppColors.statusCompleted,
+            subtitle: 'Paid Invoices',
+            onTap: () => context.push('/billing'),
+          ),
+          StatMetricCard(
+            title: 'Patient Slips',
+            value: stats.totalVisits.toString(),
+            icon: Icons.assignment_turned_in_rounded,
+            color: AppColors.accentTeal,
+            subtitle: 'Counter Registrations',
+            onTap: () => context.push('/billing'),
+          ),
+          StatMetricCard(
+            title: 'Revenue Audit',
+            value: 'Optimal',
+            icon: Icons.account_balance_wallet_rounded,
+            color: const Color(0xFF8B5CF6),
+            subtitle: 'Daily Reconciliation',
+            onTap: () => context.push('/billing'),
+          ),
+        ]);
 
       case 'pharmacist':
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Rx Dispensing Queue',
-                    value: '${stats.waiting + stats.triaged} Active',
-                    icon: Icons.medication_rounded,
-                    color: AppColors.primaryBlue,
-                    subtitle: 'To Dispense',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Medicines Dispensed',
-                    value: '${stats.completed} Today',
-                    icon: Icons.check_circle_outline_rounded,
-                    color: AppColors.statusCompleted,
-                    subtitle: 'Fulfilled Visits',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Pending Payments',
-                    value: 'Counter Queue',
-                    icon: Icons.receipt_long_rounded,
-                    color: AppColors.triagePriority,
-                    subtitle: 'Billing Ready',
-                    onTap: () => context.push('/billing'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Formulary Status',
-                    value: 'Stock Optimal',
-                    icon: Icons.inventory_2_outlined,
-                    color: AppColors.statusCompleted,
-                    subtitle: 'Core Medications',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _buildResponsiveMetricRow(context, [
+          StatMetricCard(
+            title: 'Rx Dispensing Queue',
+            value: '${stats.waiting + stats.triaged} Active',
+            icon: Icons.medication_rounded,
+            color: AppColors.primaryBlue,
+            subtitle: 'To Dispense',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Medicines Dispensed',
+            value: '${stats.completed} Today',
+            icon: Icons.check_circle_outline_rounded,
+            color: AppColors.statusCompleted,
+            subtitle: 'Fulfilled Visits',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Pending Payments',
+            value: 'Counter Queue',
+            icon: Icons.receipt_long_rounded,
+            color: AppColors.triagePriority,
+            subtitle: 'Billing Ready',
+            onTap: () => context.push('/billing'),
+          ),
+          StatMetricCard(
+            title: 'Formulary Status',
+            value: 'Stock Optimal',
+            icon: Icons.inventory_2_outlined,
+            color: AppColors.statusCompleted,
+            subtitle: 'Core Medications',
+            onTap: () => context.push('/queue'),
+          ),
+        ]);
 
       case 'receptionist':
       default:
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Total Patients',
-                    value: stats.totalPatients.toString(),
-                    icon: Icons.people_alt_rounded,
-                    color: AppColors.primaryBlue,
-                    subtitle: 'Registered UHIDs',
-                    onTap: () => context.push('/patients'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: "Today's Tokens",
-                    value: stats.totalVisits.toString(),
-                    icon: Icons.confirmation_number_rounded,
-                    color: AppColors.accentTeal,
-                    subtitle: 'Issued Slips',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Waiting in Hall',
-                    value: stats.waiting.toString(),
-                    icon: Icons.airline_seat_recline_normal_rounded,
-                    color: AppColors.triagePriority,
-                    subtitle: 'Queue Active',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatMetricCard(
-                    title: 'Completed',
-                    value: stats.completed.toString(),
-                    icon: Icons.check_circle_rounded,
-                    color: AppColors.statusCompleted,
-                    subtitle: 'Visits Concluded',
-                    onTap: () => context.push('/queue'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
+        return _buildResponsiveMetricRow(context, [
+          StatMetricCard(
+            title: 'Total Patients',
+            value: stats.totalPatients.toString(),
+            icon: Icons.people_alt_rounded,
+            color: AppColors.primaryBlue,
+            subtitle: 'Registered UHIDs',
+            onTap: () => context.push('/patients'),
+          ),
+          StatMetricCard(
+            title: "Today's Tokens",
+            value: stats.totalVisits.toString(),
+            icon: Icons.confirmation_number_rounded,
+            color: AppColors.accentTeal,
+            subtitle: 'Issued Slips',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Waiting in Hall',
+            value: stats.waiting.toString(),
+            icon: Icons.airline_seat_recline_normal_rounded,
+            color: AppColors.triagePriority,
+            subtitle: 'Queue Active',
+            onTap: () => context.push('/queue'),
+          ),
+          StatMetricCard(
+            title: 'Completed',
+            value: stats.completed.toString(),
+            icon: Icons.check_circle_rounded,
+            color: AppColors.statusCompleted,
+            subtitle: 'Visits Concluded',
+            onTap: () => context.push('/queue'),
+          ),
+        ]);
     }
   }
 

@@ -9,6 +9,8 @@ import 'core/utils/responsive.dart';
 import 'features/dashboard/providers/dashboard_provider.dart';
 import 'routing/app_router.dart';
 
+import 'core/storage/repository_cache_warmer.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -21,6 +23,9 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Server URL restore note: $e');
   }
+
+  // Prewarm persistent in-memory repository caches for instant 0-1ms screen response
+  await RepositoryCacheWarmer.prewarmAll();
 
   // Initialize Supabase client asynchronously in background (non-blocking for instant app boot)
   try {

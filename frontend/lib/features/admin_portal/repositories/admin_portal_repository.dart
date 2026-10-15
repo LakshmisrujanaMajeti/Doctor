@@ -6,11 +6,23 @@ import '../../../core/storage/secure_storage_service.dart';
 import '../../auth/repositories/auth_repository.dart';
 import '../models/admin_portal_models.dart';
 import '../../patient_portal/models/patient_portal_models.dart';
+import '../../patients/repositories/patient_repository.dart';
+import '../../visits/repositories/visit_repository.dart';
 
 class AdminPortalRepository {
   final DioClient _dioClient;
 
-  final List<AdminUserModel> _localUsers = [];
+  // Shared static in-memory cache for instant 0ms access
+  static final List<AdminUserModel> _localUsers = [];
+  static bool _isLoaded = false;
+
+  static List<AdminUserModel> get cachedUsers => List.unmodifiable(_localUsers);
+
+  static void initializeCache(List<AdminUserModel> users) {
+    _localUsers.clear();
+    _localUsers.addAll(users);
+    _isLoaded = true;
+  }
 
   AdminPortalRepository(this._dioClient);
 
@@ -26,6 +38,7 @@ class AdminPortalRepository {
         }
       }
     } catch (_) {}
+    _isLoaded = true;
   }
 
   Future<void> _saveCache() async {
@@ -36,83 +49,78 @@ class AdminPortalRepository {
   }
 
   Future<AdminDashboardMetricsModel> getDashboardSummary() async {
-    try {
-      final response = await _dioClient.dio.get(ApiEndpoints.adminDashboardSummary);
-      var metrics = AdminDashboardMetricsModel.fromJson(response.data['data'] as Map<String, dynamic>);
-      if (metrics.totalPatientsRegistered == 0) {
-        try {
-          final rawPat = await SecureStorageService.getPatientsJson();
-          if (rawPat != null && rawPat.isNotEmpty) {
-            final pList = jsonDecode(rawPat) as List<dynamic>;
-            if (pList.isNotEmpty) {
-              metrics = metrics.copyWith(totalPatientsRegistered: pList.length);
-            }
-          }
-        } catch (_) {}
-      }
-      return metrics;
-    } catch (_) {
-      // Dynamic fallback based on cached active users and real counters
-      await _loadCacheIfNeeded();
-      final byRole = <String, int>{};
-      for (final u in _localUsers) {
-        byRole[u.roleName] = (byRole[u.roleName] ?? 0) + 1;
-      }
-
-      int totalPatients = 0;
+    if (DioClient.isHostReachable) {
       try {
-        final rawPat = await SecureStorageService.getPatientsJson();
-        if (rawPat != null && rawPat.isNotEmpty) {
-          final pList = jsonDecode(rawPat) as List<dynamic>;
-          totalPatients = pList.length;
-        }
-      } catch (_) {}
-
-      int totalVisitsToday = 0;
-      final qBreakdown = <String, int>{'WAITING': 0, 'TRIAGED': 0, 'COMPLETED': 0};
-      try {
-        final rawVis = await SecureStorageService.getVisitsJson();
-        if (rawVis != null && rawVis.isNotEmpty) {
-          final vList = jsonDecode(rawVis) as List<dynamic>;
-          totalVisitsToday = vList.length;
-          for (final v in vList) {
-            final st = (v['status'] ?? 'WAITING').toString().toUpperCase();
-            if (st.contains('WAIT') || st.contains('REG')) {
-              qBreakdown['WAITING'] = (qBreakdown['WAITING'] ?? 0) + 1;
-            } else if (st.contains('TRIAG')) {
-              qBreakdown['TRIAGED'] = (qBreakdown['TRIAGED'] ?? 0) + 1;
-            } else if (st.contains('COMPLET')) {
-              qBreakdown['COMPLETED'] = (qBreakdown['COMPLETED'] ?? 0) + 1;
-            }
+        final response = await _dioClient.dio.get(ApiEndpoints.adminDashboardSummary);
+        var metrics = AdminDashboardMetricsModel.fromJson(response.data['data'] as Map<String, dynamic>);
+        if (metrics.totalPatientsRegistered == 0) {
+          final count = PatientRepository.cachedPatients.length;
+          if (count > 0) {
+            metrics = metrics.copyWith(totalPatientsRegistered: count);
           }
         }
+        return metrics;
       } catch (_) {}
-
-      return AdminDashboardMetricsModel(
-        totalPatientsRegistered: totalPatients,
-        visitsTodayCount: totalVisitsToday,
-        queueBreakdown: qBreakdown,
-        activeClinicsCount: 1,
-        activeDoctorsCount: _localUsers.where((u) => u.roleName == 'doctor').length,
-        revenueToday: 0.0,
-        revenueMonth: 0.0,
-        pendingBillsCount: 0,
-        pendingBillsAmount: 0.0,
-        revenueByMethod: {},
-        lowStockItemsCount: 0,
-        expiringSoonItemsCount: 0,
-        totalMedicinesInFormulary: 0,
-        pendingLabOrdersCount: 0,
-        completedLabTodayCount: 0,
-        totalStaffAccounts: _localUsers.length,
-        staffByRole: byRole,
-        inactiveAccountsCount: _localUsers.where((u) => !u.isActive).length,
-        lockedAccountsCount: 0,
-      );
     }
+
+    // Dynamic 0ms fallback based on cached active users and real in-memory counters
+    await _loadCacheIfNeeded();
+    final byRole = <String, int>{};
+    for (final u in _localUsers) {
+      byRole[u.roleName] = (byRole[u.roleName] ?? 0) + 1;
+    }
+
+    final totalPatients = PatientRepository.cachedPatients.length;
+    final cachedVisits = VisitRepository.cachedVisits;
+    final totalVisitsToday = cachedVisits.length;
+    final qBreakdown = <String, int>{'WAITING': 0, 'TRIAGED': 0, 'COMPLETED': 0};
+
+    for (final v in cachedVisits) {
+      final st = v.status.toUpperCase();
+      if (st.contains('WAIT') || st.contains('REG')) {
+        qBreakdown['WAITING'] = (qBreakdown['WAITING'] ?? 0) + 1;
+      } else if (st.contains('TRIAG')) {
+        qBreakdown['TRIAGED'] = (qBreakdown['TRIAGED'] ?? 0) + 1;
+      } else if (st.contains('COMPLET')) {
+        qBreakdown['COMPLETED'] = (qBreakdown['COMPLETED'] ?? 0) + 1;
+      }
+    }
+
+    return AdminDashboardMetricsModel(
+      totalPatientsRegistered: totalPatients,
+      visitsTodayCount: totalVisitsToday,
+      queueBreakdown: qBreakdown,
+      activeClinicsCount: 1,
+      activeDoctorsCount: _localUsers.where((u) => u.roleName == 'doctor').length,
+      revenueToday: 0.0,
+      revenueMonth: 0.0,
+      pendingBillsCount: 0,
+      pendingBillsAmount: 0.0,
+      revenueByMethod: {},
+      lowStockItemsCount: 0,
+      expiringSoonItemsCount: 0,
+      totalMedicinesInFormulary: 0,
+      pendingLabOrdersCount: 0,
+      completedLabTodayCount: 0,
+      totalStaffAccounts: _localUsers.length,
+      staffByRole: byRole,
+      inactiveAccountsCount: _localUsers.where((u) => !u.isActive).length,
+      lockedAccountsCount: 0,
+    );
   }
 
   Future<List<AdminUserModel>> getUsers({String? role, bool? isActive, String? search}) async {
+    await _loadCacheIfNeeded();
+
+    // 1. If we have cached users, return immediately (0ms) and background sync
+    if (_localUsers.isNotEmpty) {
+      if (DioClient.isHostReachable) {
+        _syncUsersFromServer(role, isActive, search);
+      }
+      return _filterUsers(_localUsers, role, isActive, search);
+    }
+
+    // 2. Cold first run with empty local cache
     try {
       final Map<String, dynamic> q = {};
       if (role != null && role.isNotEmpty) q['role'] = role;
@@ -140,9 +148,32 @@ class AdminPortalRepository {
         return fetched;
       }
     } catch (_) {
-      await _loadCacheIfNeeded();
       return _filterUsers(_localUsers, role, isActive, search);
     }
+  }
+
+  void _syncUsersFromServer(String? role, bool? isActive, String? search) {
+    Future.microtask(() async {
+      try {
+        final Map<String, dynamic> q = {};
+        if (role != null && role.isNotEmpty) q['role'] = role;
+        if (isActive != null) q['is_active'] = isActive;
+        if (search != null && search.isNotEmpty) q['search'] = search;
+
+        final response = await _dioClient.dio.get(ApiEndpoints.adminUsers, queryParameters: q);
+        final list = (response.data['data'] as List?) ?? [];
+        final fetched = list.map((u) => AdminUserModel.fromJson(u as Map<String, dynamic>)).toList();
+        for (final f in fetched) {
+          final idx = _localUsers.indexWhere((x) => x.id == f.id || x.email == f.email);
+          if (idx != -1) {
+            _localUsers[idx] = f;
+          } else {
+            _localUsers.add(f);
+          }
+        }
+        await _saveCache();
+      } catch (_) {}
+    });
   }
 
   List<AdminUserModel> _filterUsers(List<AdminUserModel> users, String? role, bool? isActive, String? search) {

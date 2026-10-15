@@ -27,11 +27,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 400),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -40,16 +40,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
     _animController.forward();
 
-    // High performance splash: 1.2s displays hospital branding crisply while loading instantly
-    _timer = Timer(const Duration(milliseconds: 1200), _handleNavigation);
+    // High performance splash: 450ms ensures snappy launch into the dashboard in 1ms
+    _timer = Timer(const Duration(milliseconds: 450), _handleNavigation);
   }
 
   void _handleNavigation() {
     if (!mounted) return;
     try {
-      context.goNamed(RouteNames.login);
+      if (GoRouter.maybeOf(context) != null) {
+        final auth = ref.read(authProvider);
+        if (auth.isAuthenticated) {
+          context.goNamed(RouteNames.dashboard);
+        } else {
+          context.goNamed(RouteNames.login);
+        }
+      }
     } catch (e) {
-      debugPrint('Navigation error: $e');
+      debugPrint('Navigation note: $e');
     }
   }
 
@@ -66,9 +73,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBg : Colors.white,
-      body: SafeArea(
-        child: Center(
-          child: FadeTransition(
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _handleNavigation,
+        child: SafeArea(
+          child: Center(
+            child: FadeTransition(
             opacity: _fadeAnimation,
             child: ScaleTransition(
               scale: _scaleAnimation,
@@ -163,6 +173,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

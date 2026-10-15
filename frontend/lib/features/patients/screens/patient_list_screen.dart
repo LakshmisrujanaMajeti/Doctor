@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/input_sanitizer.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
@@ -83,7 +84,11 @@ class PatientListScreen extends ConsumerWidget {
                   }
 
                 return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Responsive.horizontalPadding(context),
+                    vertical: 8,
+                  ),
                   itemCount: patients.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {

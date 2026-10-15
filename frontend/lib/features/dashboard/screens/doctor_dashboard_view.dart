@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/triage_chip.dart';
 import '../models/doctor_dashboard_model.dart';
 import '../providers/doctor_dashboard_provider.dart';
@@ -94,83 +95,108 @@ class _DoctorDashboardViewState extends ConsumerState<DoctorDashboardView> with 
     }
 
     return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       child: content,
     );
   }
 
   Widget _buildMetricsGrid(BuildContext context, DoctorDashboardStatsModel stats, bool isDark) {
+    final isTablet = context.isTablet || context.isDesktop;
+
+    final cards = [
+      _MetricCard(
+        title: "Today's Appointments",
+        value: '${stats.todayAppointments}',
+        icon: Icons.calendar_today_rounded,
+        color: AppColors.primaryBlue,
+        subtitle: 'Scheduled Visits',
+      ),
+      _MetricCard(
+        title: 'Waiting Patients',
+        value: '${stats.waitingPatients}',
+        icon: Icons.hourglass_top_rounded,
+        color: const Color(0xFFF59E0B),
+        subtitle: 'Ready in Queue',
+      ),
+      _MetricCard(
+        title: 'In Consultation',
+        value: '${stats.underConsultation}',
+        icon: Icons.medical_services_rounded,
+        color: const Color(0xFF3B82F6),
+        subtitle: 'Active Chamber',
+      ),
+      _MetricCard(
+        title: 'Completed',
+        value: '${stats.completedConsultations}',
+        icon: Icons.task_alt_rounded,
+        color: const Color(0xFF10B981),
+        subtitle: 'Concluded Today',
+      ),
+      _MetricCard(
+        title: 'Pending Labs',
+        value: '${stats.pendingInvestigations}',
+        icon: Icons.biotech_rounded,
+        color: const Color(0xFF8B5CF6),
+        subtitle: 'Awaiting Results',
+      ),
+      _MetricCard(
+        title: 'Follow-ups',
+        value: '${stats.followUpAppointments}',
+        icon: Icons.event_repeat_rounded,
+        color: AppColors.primaryTeal,
+        subtitle: 'Upcoming Reviews',
+      ),
+    ];
+
+    if (isTablet) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: cards[0]),
+              const SizedBox(width: 12),
+              Expanded(child: cards[1]),
+              const SizedBox(width: 12),
+              Expanded(child: cards[2]),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: cards[3]),
+              const SizedBox(width: 12),
+              Expanded(child: cards[4]),
+              const SizedBox(width: 12),
+              Expanded(child: cards[5]),
+            ],
+          ),
+        ],
+      );
+    }
+
     return Column(
       children: [
         Row(
           children: [
-            Expanded(
-              child: _MetricCard(
-                title: "Today's Appointments",
-                value: '${stats.todayAppointments}',
-                icon: Icons.calendar_today_rounded,
-                color: AppColors.primaryBlue,
-                subtitle: 'Scheduled Visits',
-              ),
-            ),
+            Expanded(child: cards[0]),
             const SizedBox(width: 12),
-            Expanded(
-              child: _MetricCard(
-                title: 'Waiting Patients',
-                value: '${stats.waitingPatients}',
-                icon: Icons.hourglass_top_rounded,
-                color: const Color(0xFFF59E0B),
-                subtitle: 'Ready in Queue',
-              ),
-            ),
+            Expanded(child: cards[1]),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(
-              child: _MetricCard(
-                title: 'In Consultation',
-                value: '${stats.underConsultation}',
-                icon: Icons.medical_services_rounded,
-                color: const Color(0xFF3B82F6),
-                subtitle: 'Active Chamber',
-              ),
-            ),
+            Expanded(child: cards[2]),
             const SizedBox(width: 12),
-            Expanded(
-              child: _MetricCard(
-                title: 'Completed',
-                value: '${stats.completedConsultations}',
-                icon: Icons.task_alt_rounded,
-                color: const Color(0xFF10B981),
-                subtitle: 'Concluded Today',
-              ),
-            ),
+            Expanded(child: cards[3]),
           ],
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(
-              child: _MetricCard(
-                title: 'Pending Labs',
-                value: '${stats.pendingInvestigations}',
-                icon: Icons.biotech_rounded,
-                color: const Color(0xFF8B5CF6),
-                subtitle: 'Awaiting Results',
-              ),
-            ),
+            Expanded(child: cards[4]),
             const SizedBox(width: 12),
-            Expanded(
-              child: _MetricCard(
-                title: 'Follow-ups',
-                value: '${stats.followUpAppointments}',
-                icon: Icons.event_repeat_rounded,
-                color: AppColors.primaryTeal,
-                subtitle: 'Upcoming Reviews',
-              ),
-            ),
+            Expanded(child: cards[5]),
           ],
         ),
       ],
@@ -576,23 +602,40 @@ class _MetricCard extends StatelessWidget {
                   ),
                   child: Icon(icon, color: color, size: 18),
                 ),
-                Text(
-                  value,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: context.responsiveFont(20),
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11.5, height: 1.2),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: context.responsiveFont(11.5),
+                height: 1.2,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.grey[600], fontSize: 10),
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: context.responsiveFont(10),
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

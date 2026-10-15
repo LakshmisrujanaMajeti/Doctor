@@ -31,6 +31,18 @@ class _CacheEntry {
 class DioClient {
   late final Dio dio;
   static final Map<String, _CacheEntry> _cache = {};
+  static DateTime? _hostUnreachableUntil;
+
+  static bool get isHostReachable =>
+      _hostUnreachableUntil == null || DateTime.now().isAfter(_hostUnreachableUntil!);
+
+  static void markHostUnreachable() {
+    _hostUnreachableUntil = DateTime.now().add(const Duration(seconds: 15));
+  }
+
+  static void resetCircuitBreaker() {
+    _hostUnreachableUntil = null;
+  }
 
   static void clearCache() {
     _cache.clear();
@@ -42,6 +54,7 @@ class DioClient {
 
   void updateBaseUrl(String newUrl) {
     dio.options.baseUrl = newUrl;
+    resetCircuitBreaker();
     clearCache();
   }
 
@@ -59,18 +72,43 @@ class DioClient {
       ),
     );
 
-    // Caching & Offline Resilience Interceptor
+    // Caching & Ultra-Fast Offline Circuit Breaker Interceptor
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Invalidate cache immediately on mutations
+          // Invalidate cache immediately on mutations and reset breaker
           if (options.method != 'GET') {
             _cache.clear();
+            resetCircuitBreaker();
             return handler.next(options);
           }
 
+          final cacheKey = options.uri.toString();
+          final cached = _cache[cacheKey];
+
+          // Circuit breaker: if host recently failed on this physical device, resolve in 0ms
+          if (!isHostReachable) {
+            if (cached != null) {
+              return handler.resolve(
+                Response(
+                  requestOptions: options,
+                  data: cached.data,
+                  statusCode: cached.statusCode,
+                  headers: cached.headers,
+                ),
+              );
+            }
+            return handler.reject(
+              DioException(
+                requestOptions: options,
+                type: DioExceptionType.connectionError,
+                error: 'Fast offline fallback (host unreachable circuit breaker active)',
+              ),
+            );
+          }
+
           // Clinical endpoints (visits, queues, stats, orders, bills, prescriptions)
-          // must ALWAYS fetch fresh from live database when online to prevent sync delays
+          // must fetch fresh when online to prevent sync delays, unless cached recently (<3s)
           final path = options.path;
           final isLiveClinicalData = path.contains('/visits') ||
               path.contains('/queue') ||
@@ -86,8 +124,6 @@ class DioClient {
           }
 
           // Check if cached entry is fresh for static resources (e.g. static catalogues)
-          final cacheKey = options.uri.toString();
-          final cached = _cache[cacheKey];
           if (cached != null && !cached.isExpired) {
             return handler.resolve(
               Response(
@@ -103,6 +139,7 @@ class DioClient {
         },
         onResponse: (response, handler) {
           if (response.requestOptions.method == 'GET' && response.statusCode == 200) {
+            resetCircuitBreaker();
             final path = response.requestOptions.path;
             // Short TTL for clinical data, longer TTL for static catalogues
             Duration ttl = const Duration(seconds: 10);
@@ -125,21 +162,25 @@ class DioClient {
           // Offline fallback: if network failure or timeout occurs on a GET request, serve cached copy if available
           final isNetworkIssue = error.type == DioExceptionType.connectionTimeout ||
               error.type == DioExceptionType.receiveTimeout ||
+              error.type == DioExceptionType.sendTimeout ||
               error.type == DioExceptionType.connectionError;
 
-          if (isNetworkIssue && error.requestOptions.method == 'GET') {
-            final cacheKey = error.requestOptions.uri.toString();
-            final cached = _cache[cacheKey];
-            if (cached != null && !cached.isGraceExpired) {
-              debugPrint('⚡ [DIO CACHE] Serving offline cached data for: $cacheKey');
-              return handler.resolve(
-                Response(
-                  requestOptions: error.requestOptions,
-                  data: cached.data,
-                  statusCode: cached.statusCode,
-                  headers: cached.headers,
-                ),
-              );
+          if (isNetworkIssue) {
+            markHostUnreachable();
+            if (error.requestOptions.method == 'GET') {
+              final cacheKey = error.requestOptions.uri.toString();
+              final cached = _cache[cacheKey];
+              if (cached != null && !cached.isGraceExpired) {
+                debugPrint('⚡ [DIO CACHE] Serving offline cached data for: $cacheKey');
+                return handler.resolve(
+                  Response(
+                    requestOptions: error.requestOptions,
+                    data: cached.data,
+                    statusCode: cached.statusCode,
+                    headers: cached.headers,
+                  ),
+                );
+              }
             }
           }
 

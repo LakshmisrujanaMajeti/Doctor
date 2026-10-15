@@ -8,6 +8,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/input_sanitizer.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
 import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
@@ -345,8 +346,15 @@ class _HospitalAdminWorkspaceViewState
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Center(child: Text('Error loading operations: $err')),
       data: (metrics) {
+        final isTablet = MediaQuery.sizeOf(context).width >= 650;
+        final isSmall = MediaQuery.sizeOf(context).width < 360;
+
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.horizontalPadding(context),
+            vertical: 16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -359,14 +367,14 @@ class _HospitalAdminWorkspaceViewState
                 ),
               ),
               const SizedBox(height: 12),
-              // Queue Breakdown: Responsive 2x2 Grid
+              // Queue Breakdown: Responsive Grid across Tablets and Phones
               GridView.count(
-                crossAxisCount: 2,
+                crossAxisCount: isTablet ? 4 : 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 2.1,
+                crossAxisSpacing: isSmall ? 8 : 12,
+                mainAxisSpacing: isSmall ? 8 : 12,
+                childAspectRatio: isTablet ? 2.4 : (isSmall ? 1.7 : 2.05),
                 children: [
                   _buildMetricCard(
                     title: 'Waiting in Queue',
@@ -608,9 +616,17 @@ class _HospitalAdminWorkspaceViewState
               ),
             ],
           ),
-          Text(
-            value,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
           ),
         ],
       ),

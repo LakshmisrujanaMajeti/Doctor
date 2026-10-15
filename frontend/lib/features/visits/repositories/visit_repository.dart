@@ -9,7 +9,17 @@ import '../../patients/models/patient_model.dart';
 class VisitRepository {
   final DioClient _dioClient;
 
-  final List<OPDVisitModel> _localVisits = [];
+  // Local offline cache - shared static in-memory cache for instant 0ms access
+  static final List<OPDVisitModel> _localVisits = [];
+  static bool _isLoaded = false;
+
+  static List<OPDVisitModel> get cachedVisits => List.unmodifiable(_localVisits);
+
+  static void initializeCache(List<OPDVisitModel> visits) {
+    _localVisits.clear();
+    _localVisits.addAll(visits);
+    _isLoaded = true;
+  }
 
   VisitRepository(this._dioClient);
 
@@ -32,6 +42,7 @@ class VisitRepository {
         }
       } catch (_) {}
     }
+    _isLoaded = true;
   }
 
   Future<void> _saveCache() async {
@@ -41,7 +52,20 @@ class VisitRepository {
     } catch (_) {}
   }
 
+  /// Instant Stale-While-Revalidate: returns cached visits in 0-1ms,
+  /// then asynchronously updates from backend when online without blocking the UI.
   Future<List<OPDVisitModel>> getVisits({String? status, String? departmentId, String? query}) async {
+    await _loadCacheIfNeeded();
+
+    // 1. If we have cached visits, return immediately (0ms) and background sync
+    if (_localVisits.isNotEmpty) {
+      if (DioClient.isHostReachable) {
+        _syncVisitsFromServer(status, departmentId, query);
+      }
+      return _filterVisits(_localVisits, status, departmentId, query);
+    }
+
+    // 2. Cold first run with empty local storage: fetch from server
     try {
       final res = await _dioClient.dio.get(
         ApiEndpoints.visits,
@@ -60,13 +84,40 @@ class VisitRepository {
           _localVisits.addAll(fetched);
           await _saveCache();
         }
-        return fetched;
+        return _filterVisits(fetched, status, departmentId, query);
       }
     } catch (_) {}
 
-    await _loadCacheIfNeeded();
+    return _filterVisits(_localVisits, status, departmentId, query);
+  }
 
-    var results = List<OPDVisitModel>.from(_localVisits);
+  void _syncVisitsFromServer(String? status, String? departmentId, String? query) {
+    Future.microtask(() async {
+      try {
+        final res = await _dioClient.dio.get(
+          ApiEndpoints.visits,
+          queryParameters: {
+            if (status != null && status.isNotEmpty) 'status': status,
+            if (departmentId != null && departmentId.isNotEmpty) 'department_id': departmentId,
+            if (query != null && query.isNotEmpty) 'query': query,
+          },
+        );
+
+        if (res.data['status'] == 'success') {
+          final list = res.data['data'] as List<dynamic>;
+          final fetched = list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
+          if ((status == null || status.isEmpty) && (departmentId == null || departmentId.isEmpty) && (query == null || query.isEmpty)) {
+            _localVisits.clear();
+            _localVisits.addAll(fetched);
+            await _saveCache();
+          }
+        }
+      } catch (_) {}
+    });
+  }
+
+  List<OPDVisitModel> _filterVisits(List<OPDVisitModel> source, String? status, String? departmentId, String? query) {
+    var results = List<OPDVisitModel>.from(source);
 
     if (status != null && status.isNotEmpty) {
       results = results.where((v) => v.status == status).toList();

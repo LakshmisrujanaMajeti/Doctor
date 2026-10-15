@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/smvmch_hospital_logo.dart';
@@ -236,7 +237,11 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                   }
 
                   return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.horizontalPadding(context),
+                      vertical: 8,
+                    ),
                     itemCount: filteredVisits.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {

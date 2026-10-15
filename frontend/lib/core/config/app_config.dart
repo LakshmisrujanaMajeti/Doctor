@@ -35,7 +35,9 @@ class AppConfig {
     return 'http://localhost:8000/api/v1';
   }
 
-  static const Duration connectTimeout = Duration(seconds: 15);
-  static const Duration receiveTimeout = Duration(seconds: 30);
-  static const Duration sendTimeout = Duration(seconds: 15);
+  /// Fast fail-safe timeouts: prevents screen freezing on physical mobile devices
+  /// when default emulator loopback (10.0.2.2) or unreachable Wi-Fi endpoints are queried.
+  static const Duration connectTimeout = Duration(milliseconds: 1500);
+  static const Duration receiveTimeout = Duration(milliseconds: 3000);
+  static const Duration sendTimeout = Duration(milliseconds: 2000);
 }

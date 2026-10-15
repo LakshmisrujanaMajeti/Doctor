@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../../../shared/widgets/stat_metric_card.dart';
 import '../../../shared/widgets/status_badge.dart';
@@ -67,8 +68,11 @@ class DashboardScreen extends ConsumerWidget {
           ref.invalidate(visitListProvider);
         },
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.horizontalPadding(context),
+            vertical: 16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -154,61 +158,77 @@ class DashboardScreen extends ConsumerWidget {
 
               // KPI Stats Grid
               statsAsync.when(
-                data: (stats) => Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: StatMetricCard(
-                            title: 'Total Patients',
-                            value: stats.totalPatients.toString(),
-                            icon: Icons.people_alt_rounded,
-                            color: AppColors.primaryTeal,
-                            subtitle: 'All UHIDs',
-                            onTap: () => context.push('/patients'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: StatMetricCard(
-                            title: "Today's Visits",
-                            value: stats.totalVisits.toString(),
-                            icon: Icons.assignment_turned_in_rounded,
-                            color: AppColors.secondaryNavy,
-                            subtitle: 'Active Queue',
-                            onTap: () => context.push('/queue'),
-                          ),
-                        ),
-                      ],
+                data: (stats) {
+                  final isTablet = context.isTablet || context.isDesktop;
+                  final cards = [
+                    StatMetricCard(
+                      title: 'Total Patients',
+                      value: stats.totalPatients.toString(),
+                      icon: Icons.people_alt_rounded,
+                      color: AppColors.primaryTeal,
+                      subtitle: 'All UHIDs',
+                      onTap: () => context.push('/patients'),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: StatMetricCard(
-                            title: 'Waiting Triage',
-                            value: stats.waiting.toString(),
-                            icon: Icons.hourglass_top_rounded,
-                            color: AppColors.triagePriority,
-                            subtitle: 'In Line',
-                            onTap: () => context.push('/queue'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: StatMetricCard(
-                            title: 'Consulted',
-                            value: stats.completed.toString(),
-                            icon: Icons.check_circle_rounded,
-                            color: AppColors.triageNormal,
-                            subtitle: 'Concluded',
-                            onTap: () => context.push('/queue'),
-                          ),
-                        ),
-                      ],
+                    StatMetricCard(
+                      title: "Today's Visits",
+                      value: stats.totalVisits.toString(),
+                      icon: Icons.assignment_turned_in_rounded,
+                      color: AppColors.secondaryNavy,
+                      subtitle: 'Active Queue',
+                      onTap: () => context.push('/queue'),
                     ),
-                  ],
-                ),
+                    StatMetricCard(
+                      title: 'Waiting Triage',
+                      value: stats.waiting.toString(),
+                      icon: Icons.hourglass_top_rounded,
+                      color: AppColors.triagePriority,
+                      subtitle: 'In Line',
+                      onTap: () => context.push('/queue'),
+                    ),
+                    StatMetricCard(
+                      title: 'Consulted',
+                      value: stats.completed.toString(),
+                      icon: Icons.check_circle_rounded,
+                      color: AppColors.triageNormal,
+                      subtitle: 'Concluded',
+                      onTap: () => context.push('/queue'),
+                    ),
+                  ];
+
+                  if (isTablet) {
+                    return Row(
+                      children: [
+                        Expanded(child: cards[0]),
+                        const SizedBox(width: 12),
+                        Expanded(child: cards[1]),
+                        const SizedBox(width: 12),
+                        Expanded(child: cards[2]),
+                        const SizedBox(width: 12),
+                        Expanded(child: cards[3]),
+                      ],
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: cards[0]),
+                          const SizedBox(width: 12),
+                          Expanded(child: cards[1]),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: cards[2]),
+                          const SizedBox(width: 12),
+                          Expanded(child: cards[3]),
+                        ],
+                      ),
+                    ],
+                  );
+                },
                 loading: () => const Center(
                   child: Padding(
                     padding: EdgeInsets.all(24),
