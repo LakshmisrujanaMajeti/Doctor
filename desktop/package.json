@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "package:mac": "electron-packager . \"OPD Connect\" --platform=darwin --out=dist --overwrite",
+    "package:win": "electron-packager . \"OPD Connect\" --platform=win32 --arch=x64 --out=dist --overwrite",
     "package:all": "electron-packager . \"OPD Connect\" --all --out=dist --overwrite"
   },
   "keywords": [

@@ -146,6 +146,26 @@ flutter run
 
 ---
 
+## Quick Multi-Platform Launchers & Credentials
+
+### 1. Workstation Launchers (Zero-Setup)
+
+| Target Platform | Launcher Command / File | Description |
+| :--- | :--- | :--- |
+| **Windows Desktop** | `run_desktop.bat` | Double-click to launch standalone clinical desktop workstation (1280x820) |
+| **Windows Web Portal** | `run_web.bat` | Fast local production web portal server on `http://127.0.0.1:54321` |
+| **macOS Desktop** | `./run_desktop.sh` | Launch standalone native macOS app (`OPD Connect.app`) |
+| **macOS Direct App** | `desktop_builds/OPD Connect.app` | Standalone native macOS App bundle (`darwin-arm64`) |
+| **Android Mobile** | `apk_builds/opd-connect-release.apk`| Production Android APK (61 MB, install directly on Android 8.0+) |
+
+### 2. Official Login Credentials Directory (PDF)
+
+Complete hospital login credentials across all institutional roles, department specialists, and test patient UHIDs are provided in the official printable PDF:
+
+📄 **[`SMVMCH_OPD_Connect_Login_Credentials.pdf`](file:///Users/satyaalugolu/Desktop/OPD%20CONNECT/SMVMCH_OPD_Connect_Login_Credentials.pdf)** *(also in `docs/`)*
+
+---
+
 ## Default Demo Accounts
 
 The database seed provides pre-configured synthetic staff accounts with zero plain-text password persistence:
