@@ -281,7 +281,7 @@ def main():
 
     for i, p in enumerate(patients):
         pid = p["id"]
-        v_num = f"VIS-20261015-{(i+1):04d}"
+        v_num = f"SMVMCH151026{(i+1):04d}"
         token = i + 1
         d_id, doc_id, triage, status = dept_doc_routing[i]
         cond = patient_data_specs[i][14]

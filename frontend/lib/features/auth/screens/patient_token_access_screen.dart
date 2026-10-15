@@ -62,11 +62,47 @@ class _PatientTokenAccessScreenState extends ConsumerState<PatientTokenAccessScr
     // 2. Try Supabase Cloud direct query if FastAPI was unreachable
     if (data == null) {
       try {
-        final match = RegExp(r'^(?:token|tok|queue|opd|t|#|\s)*[:#-]?\s*(\d{1,4})$', caseSensitive: false).firstMatch(rawId.trim());
-        final tokenNum = match != null ? int.tryParse(match.group(1)!) : (rawId.trim().length <= 4 ? int.tryParse(rawId.trim()) : null);
+        final upperTrimmed = rawId.trim().toUpperCase();
+        int? tokenNum;
+        String? visitNumberMatch;
+
+        if (upperTrimmed.startsWith('SMVMCH')) {
+          visitNumberMatch = upperTrimmed;
+          final trailing = upperTrimmed.replaceAll(RegExp(r'[^0-9]'), '');
+          if (trailing.length >= 4) {
+            tokenNum = int.tryParse(trailing.substring(trailing.length - 4));
+          }
+        } else {
+          final match = RegExp(r'^(?:token|tok|queue|opd|t|#|\s)*[:#-]?\s*(\d{1,10})$', caseSensitive: false).firstMatch(rawId.trim());
+          if (match != null) {
+            final digits = match.group(1)!;
+            if (digits.length <= 4) {
+              tokenNum = int.tryParse(digits);
+            } else {
+              tokenNum = int.tryParse(digits.substring(digits.length - 4));
+              visitNumberMatch = 'SMVMCH$digits';
+            }
+          }
+        }
 
         dynamic visitRecord;
-        if (tokenNum != null) {
+
+        // 2a. Query by visit_number (SMVMCH1510260001)
+        if (visitNumberMatch != null) {
+          final res = await Supabase.instance.client
+              .from('opd_visits')
+              .select('*, patient:patients(*)')
+              .or('visit_number.eq.$visitNumberMatch,visit_number.ilike.%$visitNumberMatch%')
+              .order('visit_date', ascending: false)
+              .limit(1)
+              .timeout(const Duration(milliseconds: 2500));
+          if (res.isNotEmpty) {
+            visitRecord = res.first;
+          }
+        }
+
+        // 2b. Query by queue_token
+        if (visitRecord == null && tokenNum != null) {
           final res = await Supabase.instance.client
               .from('opd_visits')
               .select('*, patient:patients(*)')
@@ -79,6 +115,7 @@ class _PatientTokenAccessScreenState extends ConsumerState<PatientTokenAccessScr
           }
         }
 
+        // 2c. Query by patient UHID, phone, or registration number
         if (visitRecord == null) {
           final res = await Supabase.instance.client
               .from('patients')
@@ -107,7 +144,7 @@ class _PatientTokenAccessScreenState extends ConsumerState<PatientTokenAccessScr
             'patient': pat,
             'active_visit': {
               'id': visitRecord['id'] ?? 'vis-1',
-              'visit_number': visitRecord['visit_number'] ?? 'VIS-2026-LIVE',
+              'visit_number': visitRecord['visit_number'] ?? visitNumberMatch ?? 'SMVMCH-LIVE',
               'queue_token': visitRecord['queue_token'] ?? tokenNum ?? 1,
               'status': visitRecord['status'] ?? 'REGISTERED',
               'triage_priority': visitRecord['triage_priority'] ?? 'NORMAL',
@@ -127,8 +164,28 @@ class _PatientTokenAccessScreenState extends ConsumerState<PatientTokenAccessScr
     // 3. Fallback to Local Offline Cache
     if (data == null) {
       try {
-        final match = RegExp(r'^(?:token|tok|queue|opd|t|#|\s)*[:#-]?\s*(\d{1,4})$', caseSensitive: false).firstMatch(rawId.trim());
-        final tokenNum = match != null ? int.tryParse(match.group(1)!) : (rawId.trim().length <= 4 ? int.tryParse(rawId.trim()) : null);
+        final upperTrimmed = rawId.trim().toUpperCase();
+        int? tokenNum;
+        String? visitNumberMatch;
+
+        if (upperTrimmed.startsWith('SMVMCH')) {
+          visitNumberMatch = upperTrimmed;
+          final trailing = upperTrimmed.replaceAll(RegExp(r'[^0-9]'), '');
+          if (trailing.length >= 4) {
+            tokenNum = int.tryParse(trailing.substring(trailing.length - 4));
+          }
+        } else {
+          final match = RegExp(r'^(?:token|tok|queue|opd|t|#|\s)*[:#-]?\s*(\d{1,10})$', caseSensitive: false).firstMatch(rawId.trim());
+          if (match != null) {
+            final digits = match.group(1)!;
+            if (digits.length <= 4) {
+              tokenNum = int.tryParse(digits);
+            } else {
+              tokenNum = int.tryParse(digits.substring(digits.length - 4));
+              visitNumberMatch = 'SMVMCH$digits';
+            }
+          }
+        }
 
         final rawVisits = await SecureStorageService.getVisitsJson();
         final rawPatients = await SecureStorageService.getPatientsJson();
@@ -139,7 +196,14 @@ class _PatientTokenAccessScreenState extends ConsumerState<PatientTokenAccessScr
         Map<String, dynamic>? matchedVisit;
         Map<String, dynamic>? matchedPatient;
 
-        if (tokenNum != null) {
+        if (visitNumberMatch != null) {
+          matchedVisit = localVisits.firstWhere(
+            (v) => v['visit_number'] != null && v['visit_number'].toString().toUpperCase() == visitNumberMatch,
+            orElse: () => null,
+          );
+        }
+
+        if (matchedVisit == null && tokenNum != null) {
           matchedVisit = localVisits.firstWhere(
             (v) => v['queue_token'] == tokenNum,
             orElse: () => null,

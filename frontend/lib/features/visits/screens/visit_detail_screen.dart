@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/triage_chip.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/visit_model.dart';
 import '../providers/visit_provider.dart';
 
@@ -20,12 +21,22 @@ class VisitDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+    final currentRole = authState.user?.roleName.toLowerCase() ?? 'patient';
+    final isPatient = currentRole == 'patient';
+    final isDoctor = currentRole == 'doctor';
+    final isNurse = currentRole == 'nurse';
+    final isPharmacist = currentRole == 'pharmacist';
+    final isBilling = currentRole == 'billing';
+    final isLab = currentRole == 'laboratory' || currentRole == 'lab_tech';
+    final isAdminOrReceptionist = currentRole == 'admin' || currentRole == 'receptionist';
+
     final visitsAsync = ref.watch(visitListProvider);
     final currentVisit = visit ?? visitsAsync.asData?.value.firstWhere(
       (v) => v.id == visitId,
       orElse: () => OPDVisitModel(
         id: visitId,
-        visitNumber: 'VIS-20261012-0001',
+        visitNumber: 'SMVMCH1510260001',
         patientId: '',
         doctorId: '',
         departmentId: '',
@@ -38,9 +49,11 @@ class VisitDetailScreen extends ConsumerWidget {
       ),
     );
 
+    final displayToken = currentVisit?.formattedToken ?? currentVisit?.visitNumber ?? 'SMVMCH1510260001';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('OPD Slip #${currentVisit?.queueToken ?? 1}'),
+        title: Text('OPD Slip: $displayToken'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -50,6 +63,34 @@ class VisitDetailScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (isPatient) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.primaryTeal.withOpacity(0.25)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.shield_outlined, color: AppColors.primaryTeal, size: 20),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Patient Access Mode: View-only access to your token, OPD clinical summary, prescriptions, and billing receipts.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primaryTeal,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 // Token Card
                 Card(
                   child: Padding(
@@ -59,22 +100,25 @@ class VisitDetailScreen extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'QUEUE TOKEN #${currentVisit?.queueToken}',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppColors.primaryTeal,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'TOKEN: $displayToken',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.primaryTeal,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  'Visit No: ${currentVisit?.visitNumber}',
-                                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                                ),
-                              ],
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Department Queue #${currentVisit?.queueToken ?? 1} • ${currentVisit?.departmentName ?? "Outpatient Clinic"}',
+                                    style: const TextStyle(color: Colors.grey, fontSize: 13),
+                                  ),
+                                ],
+                              ),
                             ),
                             if (currentVisit != null)
                               TriageChip(priority: currentVisit.triagePriority),
@@ -136,34 +180,208 @@ class VisitDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Clinical Actions
-                const Text(
-                  'Outpatient Actions',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                // Actions Section - Strictly filtered by RBAC Role
+                Text(
+                  isPatient ? 'Patient Records & Documents (Read-Only)' : 'Authorized Outpatient Actions',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 10),
-                OpdButton(
-                  label: 'Triage & Vital Signs Entry',
-                  icon: Icons.monitor_heart_rounded,
-                  width: double.infinity,
-                  onPressed: () => context.push('/visits/${currentVisit?.id}/vitals', extra: currentVisit),
-                ),
-                const SizedBox(height: 12),
-                OpdButton(
-                  label: 'Doctor Consultation Booklet Sheet',
-                  icon: Icons.menu_book_rounded,
-                  width: double.infinity,
-                  color: AppColors.secondaryNavy,
-                  onPressed: () => context.push('/visits/${currentVisit?.id}/consultation', extra: currentVisit),
-                ),
-                const SizedBox(height: 12),
-                OpdButton(
-                  label: 'Prescription & Dispensary',
-                  icon: Icons.medication_rounded,
-                  width: double.infinity,
-                  isOutlined: true,
-                  onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
-                ),
+
+                // 1. Patient Role: View-only buttons
+                if (isPatient) ...[
+                  OpdButton(
+                    label: 'Open Digital OPD Booklet & Vitals',
+                    icon: Icons.menu_book_rounded,
+                    width: double.infinity,
+                    color: AppColors.primaryBlue,
+                    onPressed: () {
+                      final pid = currentVisit?.patientId ?? '';
+                      if (pid.isNotEmpty) {
+                        context.push('/patients/$pid/booklet');
+                      } else {
+                        context.push('/patient/portal');
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'View Prescriptions & Medications',
+                    icon: Icons.medication_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'View Patient Portal & Invoices',
+                    icon: Icons.receipt_long_rounded,
+                    width: double.infinity,
+                    color: AppColors.secondaryNavy,
+                    onPressed: () => context.push('/patient/portal'),
+                  ),
+                ],
+
+                // 2. Doctor Role: Clinical Consultation Sheet & Prescriptions
+                if (isDoctor) ...[
+                  OpdButton(
+                    label: 'Doctor Consultation Booklet Sheet',
+                    icon: Icons.menu_book_rounded,
+                    width: double.infinity,
+                    color: AppColors.secondaryNavy,
+                    onPressed: () => context.push('/visits/${currentVisit?.id}/consultation', extra: currentVisit),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'Prescription & Dispensary',
+                    icon: Icons.medication_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'View Digital OPD Booklet',
+                    icon: Icons.auto_stories_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () {
+                      final pid = currentVisit?.patientId ?? '';
+                      if (pid.isNotEmpty) {
+                        context.push('/patients/$pid/booklet');
+                      }
+                    },
+                  ),
+                ],
+
+                // 3. Nurse Role: Triage & Vital Signs Entry
+                if (isNurse) ...[
+                  OpdButton(
+                    label: 'Triage & Vital Signs Entry',
+                    icon: Icons.monitor_heart_rounded,
+                    width: double.infinity,
+                    color: AppColors.primaryTeal,
+                    onPressed: () => context.push('/visits/${currentVisit?.id}/vitals', extra: currentVisit),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'View Digital OPD Booklet',
+                    icon: Icons.menu_book_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () {
+                      final pid = currentVisit?.patientId ?? '';
+                      if (pid.isNotEmpty) {
+                        context.push('/patients/$pid/booklet');
+                      }
+                    },
+                  ),
+                ],
+
+                // 4. Pharmacist Role: Dispensary Verification & Prescriptions
+                if (isPharmacist) ...[
+                  OpdButton(
+                    label: 'Prescription & Dispensary Verification',
+                    icon: Icons.medication_rounded,
+                    width: double.infinity,
+                    color: AppColors.primaryTeal,
+                    onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'Pharmacy Dispensary Queue',
+                    icon: Icons.local_pharmacy_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () => context.push('/pharmacy'),
+                  ),
+                ],
+
+                // 5. Billing Role: Invoicing & Receipt
+                if (isBilling) ...[
+                  OpdButton(
+                    label: 'Open Billing Counter & Receipt',
+                    icon: Icons.receipt_long_rounded,
+                    width: double.infinity,
+                    color: Colors.green.shade700,
+                    onPressed: () => context.push('/billing'),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'View Digital OPD Booklet',
+                    icon: Icons.menu_book_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () {
+                      final pid = currentVisit?.patientId ?? '';
+                      if (pid.isNotEmpty) {
+                        context.push('/patients/$pid/booklet');
+                      }
+                    },
+                  ),
+                ],
+
+                // 6. Lab Role: Laboratory Worklist
+                if (isLab) ...[
+                  OpdButton(
+                    label: 'Laboratory Diagnostics Worklist',
+                    icon: Icons.biotech_rounded,
+                    width: double.infinity,
+                    color: const Color(0xFF6366F1),
+                    onPressed: () => context.push('/laboratory'),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'View Digital OPD Booklet',
+                    icon: Icons.menu_book_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () {
+                      final pid = currentVisit?.patientId ?? '';
+                      if (pid.isNotEmpty) {
+                        context.push('/patients/$pid/booklet');
+                      }
+                    },
+                  ),
+                ],
+
+                // 7. Admin & Receptionist: Full Clinical Operations
+                if (isAdminOrReceptionist) ...[
+                  OpdButton(
+                    label: 'Triage & Vital Signs Entry',
+                    icon: Icons.monitor_heart_rounded,
+                    width: double.infinity,
+                    onPressed: () => context.push('/visits/${currentVisit?.id}/vitals', extra: currentVisit),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'Doctor Consultation Booklet Sheet',
+                    icon: Icons.menu_book_rounded,
+                    width: double.infinity,
+                    color: AppColors.secondaryNavy,
+                    onPressed: () => context.push('/visits/${currentVisit?.id}/consultation', extra: currentVisit),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'Prescription & Dispensary',
+                    icon: Icons.medication_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
+                  ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'Open Digital OPD Booklet',
+                    icon: Icons.auto_stories_rounded,
+                    width: double.infinity,
+                    isOutlined: true,
+                    onPressed: () {
+                      final pid = currentVisit?.patientId ?? '';
+                      if (pid.isNotEmpty) {
+                        context.push('/patients/$pid/booklet');
+                      }
+                    },
+                  ),
+                ],
               ],
             ),
           ),

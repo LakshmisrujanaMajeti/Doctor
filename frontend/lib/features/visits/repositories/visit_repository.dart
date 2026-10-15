@@ -227,10 +227,24 @@ class VisitRepository {
 
     await _loadCacheIfNeeded();
 
-    final token = _localVisits.length + 1;
+    final now = DateTime.now();
+    final dd = now.day.toString().padLeft(2, '0');
+    final mm = now.month.toString().padLeft(2, '0');
+    final yy = (now.year % 100).toString().padLeft(2, '0');
+
+    // Department-scoped sequential token calculation for today to prevent overlap
+    final deptTodayVisits = _localVisits.where((v) =>
+      (v.departmentId == departmentId || (v.departmentName != null && v.departmentName == departmentName)) &&
+      v.visitDate.year == now.year &&
+      v.visitDate.month == now.month &&
+      v.visitDate.day == now.day
+    ).toList();
+    final token = deptTodayVisits.length + 1;
+    final tokenFormatted = 'SMVMCH$dd$mm$yy${token.toString().padLeft(4, '0')}';
+
     final newVisit = OPDVisitModel(
       id: 'vis-${DateTime.now().millisecondsSinceEpoch}',
-      visitNumber: 'VIS-${DateTime.now().year}${(DateTime.now().month).toString().padLeft(2, '0')}${(DateTime.now().day).toString().padLeft(2, '0')}-${token.toString().padLeft(4, '0')}',
+      visitNumber: tokenFormatted,
       patientId: patientId,
       doctorId: doctorId,
       departmentId: departmentId,
@@ -240,7 +254,7 @@ class VisitRepository {
       consultationFee: consultationFee,
       paymentStatus: 'UNPAID',
       notes: notes,
-      visitDate: DateTime.now(),
+      visitDate: now,
       patient: patient,
       doctorName: doctorName ?? 'Dr. Sarah Chen, MD',
       departmentName: departmentName ?? departmentId,

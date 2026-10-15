@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/opd_constants.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../visits/models/visit_model.dart';
 import '../models/prescription_model.dart';
 import '../providers/prescription_provider.dart';
@@ -639,16 +640,28 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   @override
   Widget build(BuildContext context) {
     final rxListAsync = ref.watch(prescriptionListProvider(widget.visitId));
+    final authState = ref.watch(authProvider);
+    final currentRole = authState.user?.roleName.toLowerCase() ?? 'doctor';
+    final isPatient = currentRole == 'patient';
+    final isPharmacist = currentRole == 'pharmacist';
+    final canPrescribe = currentRole == 'doctor' || currentRole == 'admin';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Doctor Prescription Portal'),
+        title: Text(
+          isPatient
+              ? 'Prescribed Medications (Patient View)'
+              : isPharmacist
+                  ? 'Dispensary Verification'
+                  : 'Doctor Prescription Portal',
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            tooltip: 'Add Drug',
-            onPressed: _showAddMedicineDialog,
-          ),
+          if (canPrescribe)
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              tooltip: 'Add Drug',
+              onPressed: _showAddMedicineDialog,
+            ),
         ],
       ),
       body: SingleChildScrollView(
@@ -656,17 +669,45 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (isPatient) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTeal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primaryTeal.withOpacity(0.25)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.shield_outlined, color: AppColors.primaryTeal, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Patient View (Read-Only): Authorized prescription history and dosages prescribed by your attending doctor.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.primaryTeal,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // 1. Patient & Clinician Banner
             if (widget.visit != null) _buildPatientHeaderCard(),
             const SizedBox(height: 16),
 
             // 2. Critical Allergy Warning Alert (if any active warnings)
-            if (_activeAllergyWarnings.isNotEmpty) _buildAllergyAlertBanner(),
-            if (_activeAllergyWarnings.isNotEmpty) const SizedBox(height: 16),
+            if (canPrescribe && _activeAllergyWarnings.isNotEmpty) _buildAllergyAlertBanner(),
+            if (canPrescribe && _activeAllergyWarnings.isNotEmpty) const SizedBox(height: 16),
 
             // 3. Newly Added Prescription Draft Workspace
-            if (_newItems.isNotEmpty) _buildDraftWorkspaceCard(),
-            if (_newItems.isNotEmpty) const SizedBox(height: 24),
+            if (canPrescribe && _newItems.isNotEmpty) _buildDraftWorkspaceCard(),
+            if (canPrescribe && _newItems.isNotEmpty) const SizedBox(height: 24),
 
             // 4. Server Prescriptions (Distinguished by DRAFT, SIGNED, AMENDED, CANCELLED)
             const Text(
@@ -682,7 +723,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
                 }
 
                 return Column(
-                  children: rxList.map((rx) => _buildPrescriptionCard(rx)).toList(),
+                  children: rxList.map((rx) => _buildPrescriptionCard(rx, canPrescribe: canPrescribe)).toList(),
                 );
               },
               loading: () => const Center(
@@ -889,7 +930,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     );
   }
 
-  Widget _buildPrescriptionCard(PrescriptionModel rx) {
+  Widget _buildPrescriptionCard(PrescriptionModel rx, {bool canPrescribe = true}) {
     Color statusColor = AppColors.statusCompleted;
     String statusLabel = rx.status.toUpperCase();
     if (rx.isDraft) {
@@ -930,7 +971,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
                     Text('Version ${rx.version}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.grey)),
                   ],
                 ),
-                if (!rx.isCancelled)
+                if (canPrescribe && !rx.isCancelled)
                   PopupMenuButton<String>(
                     onSelected: (val) {
                       if (val == 'sign') {

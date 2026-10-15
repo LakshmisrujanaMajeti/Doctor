@@ -110,6 +110,97 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return '/login';
       }
 
+      // 5. RBAC Route Access Enforcement for Authenticated Users
+      if (isAuth) {
+        final role = authState.user?.roleName.toLowerCase() ?? 'patient';
+
+        // Patients: View-only access to their portal, token, visits, booklet, invoices
+        if (role == 'patient') {
+          final isAllowedForPatient = path == '/dashboard' ||
+              path == '/patient/portal' ||
+              path == '/queue' ||
+              path == '/notifications' ||
+              path == '/settings' ||
+              (path.startsWith('/patients/') && path.endsWith('/booklet')) ||
+              (path.startsWith('/visits/') && !path.contains('/consultation') && !path.contains('/vitals')) ||
+              path.startsWith('/billing/invoice/') ||
+              path == '/unauthorized';
+
+          if (!isAllowedForPatient) {
+            return '/patient/portal';
+          }
+        }
+
+        // Doctors: Clinical Sheet & Prescriptions, restricted from Admin, Billing & Pharmacy
+        if (role == 'doctor') {
+          if (path.startsWith('/admin') || path == '/billing' || path == '/pharmacy') {
+            return '/unauthorized';
+          }
+        }
+
+        // Nurses: Triage & Vitals assessment, restricted from Admin, Diagnosis Consultation, Billing, Pharmacy, Lab
+        if (role == 'nurse') {
+          if (path.startsWith('/admin') ||
+              path.contains('/consultation') ||
+              path == '/billing' ||
+              path == '/pharmacy' ||
+              path == '/laboratory') {
+            return '/unauthorized';
+          }
+        }
+
+        // Receptionists: Front desk registration & token issuance, restricted from Clinical, Lab, Billing, Pharmacy, Admin
+        if (role == 'receptionist') {
+          if (path.startsWith('/admin') ||
+              path.contains('/consultation') ||
+              path.contains('/vitals') ||
+              path == '/billing' ||
+              path == '/pharmacy' ||
+              path == '/laboratory') {
+            return '/unauthorized';
+          }
+        }
+
+        // Pharmacists: Pharmacy dispensing & formulary, restricted from Clinical editing, Intake, Billing, Lab, Admin
+        if (role == 'pharmacist') {
+          if (path.startsWith('/admin') ||
+              path.contains('/consultation') ||
+              path.contains('/vitals') ||
+              path == '/patients/new' ||
+              path == '/visits/new' ||
+              path == '/billing' ||
+              path == '/laboratory') {
+            return '/unauthorized';
+          }
+        }
+
+        // Laboratory Technicians: Diagnostics & report entry, restricted from Clinical notes, Registration, Billing, Pharmacy, Admin
+        if (role == 'laboratory' || role == 'lab_tech') {
+          if (path.startsWith('/admin') ||
+              path.contains('/consultation') ||
+              path.contains('/vitals') ||
+              path == '/patients/new' ||
+              path == '/visits/new' ||
+              path == '/billing' ||
+              path == '/pharmacy') {
+            return '/unauthorized';
+          }
+        }
+
+        // Billing Cashiers: Fee collection & invoices, restricted from Clinical sheets, Vitals, Intake, Pharmacy, Lab, Admin
+        if (role == 'billing') {
+          if (path.startsWith('/admin') ||
+              path.contains('/consultation') ||
+              path.contains('/vitals') ||
+              path == '/patients/new' ||
+              path == '/visits/new' ||
+              path == '/pharmacy' ||
+              path == '/laboratory') {
+            return '/unauthorized';
+          }
+        }
+      }
+
       return null;
     },
     errorBuilder: (context, state) => NotFoundScreen(path: state.uri.path),

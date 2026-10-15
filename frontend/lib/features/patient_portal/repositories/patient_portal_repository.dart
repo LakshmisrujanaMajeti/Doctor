@@ -176,7 +176,7 @@ class PatientPortalRepository {
         final list = jsonDecode(raw) as List<dynamic>;
         return list.map((v) => UpcomingAppointment(
           visitId: v['id'] ?? 'vis-1',
-          visitNumber: v['visit_number'] ?? 'VIS-20261014-0001',
+          visitNumber: v['visit_number'] ?? 'SMVMCH1510260001',
           doctorName: v['doctor_name'] ?? 'Dr. Sarah Chen, MD',
           departmentName: v['department_name'] ?? 'General Medicine',
           scheduledDate: v['visit_date'] ?? DateTime.now().toIso8601String(),

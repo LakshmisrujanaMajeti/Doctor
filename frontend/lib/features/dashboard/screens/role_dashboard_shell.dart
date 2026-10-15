@@ -166,46 +166,78 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           ),
 
           actions: [
-            // Quick Role Switcher Pill (One tap to test any role)
-            InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _showUserProfileSheet(context, ref, authState, currentRole),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppColors.primaryBlue.withValues(alpha: 0.3),
+            // Role Badge (Pill) - Only staff can tap to view profile options; Patient has dedicated read-only badge
+            if (currentRole != 'patient')
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _showUserProfileSheet(context, ref, authState, currentRole),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getRoleIcon(currentRole),
+                        size: 13,
+                        color: AppColors.primaryBlue,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        currentRole.toUpperCase(),
+                        style: const TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        size: 15,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.teal.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      _getRoleIcon(currentRole),
+                      Icons.person_rounded,
                       size: 13,
-                      color: AppColors.primaryBlue,
+                      color: Colors.teal,
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Text(
-                      currentRole.toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.primaryBlue,
+                      'PATIENT PORTAL',
+                      style: TextStyle(
+                        color: Colors.teal,
                         fontWeight: FontWeight.w800,
                         fontSize: 10,
                         letterSpacing: 0.4,
                       ),
                     ),
-                    const Icon(
-                      Icons.arrow_drop_down,
-                      size: 15,
-                      color: AppColors.primaryBlue,
-                    ),
                   ],
                 ),
               ),
-            ),
             const SizedBox(width: 2),
 
             // Notifications Icon with Badge
@@ -336,87 +368,327 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           ),
         ),
         ),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            border: Border(
-              top: BorderSide(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                width: 1,
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
-              ),
-            ],
+        bottomNavigationBar: _buildRoleBottomNavigationBar(context, currentRole, isDark),
+      ),
+    );
+  }
+
+  Widget _buildRoleBottomNavigationBar(BuildContext context, String role, bool isDark) {
+    List<NavigationDestination> destinations;
+    ValueChanged<int> onSelect;
+
+    switch (role) {
+      case 'patient':
+        destinations = const [
+          NavigationDestination(
+            icon: Icon(Icons.health_and_safety_rounded),
+            label: 'My Health',
           ),
-          child: SafeArea(
-            top: false,
-            bottom: true,
-            child: NavigationBarTheme(
-              data: NavigationBarThemeData(
-                height: 60,
-                indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.14),
-                labelTextStyle: WidgetStateProperty.resolveWith((states) {
-                  final isSelected = states.contains(WidgetState.selected);
-                  return TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected
-                        ? AppColors.primaryBlue
-                        : (isDark ? Colors.grey[400] : Colors.grey[600]),
-                  );
-                }),
-                iconTheme: WidgetStateProperty.resolveWith((states) {
-                  final isSelected = states.contains(WidgetState.selected);
-                  return IconThemeData(
-                    size: 22,
-                    color: isSelected
-                        ? AppColors.primaryBlue
-                        : (isDark ? Colors.grey[400] : Colors.grey[600]),
-                  );
-                }),
-              ),
-              child: NavigationBar(
-                height: 60,
-                elevation: 0,
-                backgroundColor: Colors.transparent,
-                selectedIndex: _currentTabIndex,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                onDestinationSelected: (idx) {
-                  setState(() => _currentTabIndex = idx);
-                  if (idx == 1) context.push('/queue');
-                  if (idx == 2) context.push('/patients');
-                  if (idx == 3) context.push('/notifications');
-                  if (idx == 4) context.push('/settings');
-                },
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.dashboard_rounded),
-                    label: 'Dashboard',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.queue_play_next_rounded),
-                    label: 'Queue',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.people_alt_rounded),
-                    label: 'Patients',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.notifications_rounded),
-                    label: 'Alerts',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.person_rounded),
-                    label: 'Profile',
-                  ),
-                ],
-              ),
-            ),
+          NavigationDestination(
+            icon: Icon(Icons.confirmation_number_rounded),
+            label: 'My Token',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.folder_shared_rounded),
+            label: 'Records',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_rounded),
+            label: 'Bills',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ];
+        onSelect = (idx) {
+          setState(() => _currentTabIndex = idx);
+          if (idx == 1) context.push('/queue');
+          if (idx == 2) context.push('/patient/portal');
+          if (idx == 3) context.push('/patient/portal');
+          if (idx == 4) context.push('/settings');
+        };
+        break;
+
+      case 'doctor':
+        destinations = const [
+          NavigationDestination(
+            icon: Icon(Icons.medical_services_rounded),
+            label: 'Doctor OPD',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.queue_play_next_rounded),
+            label: 'Queue',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_alt_rounded),
+            label: 'Patients',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_rounded),
+            label: 'Alerts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ];
+        onSelect = (idx) {
+          setState(() => _currentTabIndex = idx);
+          if (idx == 1) context.push('/queue');
+          if (idx == 2) context.push('/patients');
+          if (idx == 3) context.push('/notifications');
+          if (idx == 4) context.push('/settings');
+        };
+        break;
+
+      case 'nurse':
+        destinations = const [
+          NavigationDestination(
+            icon: Icon(Icons.monitor_heart_rounded),
+            label: 'Nursing',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.queue_play_next_rounded),
+            label: 'Triage Queue',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_alt_rounded),
+            label: 'Patients',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_rounded),
+            label: 'Alerts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ];
+        onSelect = (idx) {
+          setState(() => _currentTabIndex = idx);
+          if (idx == 1) context.push('/queue');
+          if (idx == 2) context.push('/patients');
+          if (idx == 3) context.push('/notifications');
+          if (idx == 4) context.push('/settings');
+        };
+        break;
+
+      case 'receptionist':
+        destinations = const [
+          NavigationDestination(
+            icon: Icon(Icons.desk_rounded),
+            label: 'Front Desk',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.queue_play_next_rounded),
+            label: 'Queue',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_add_alt_1_rounded),
+            label: 'Intake / Reg',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_rounded),
+            label: 'Alerts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ];
+        onSelect = (idx) {
+          setState(() => _currentTabIndex = idx);
+          if (idx == 1) context.push('/queue');
+          if (idx == 2) context.push('/patients');
+          if (idx == 3) context.push('/notifications');
+          if (idx == 4) context.push('/settings');
+        };
+        break;
+
+      case 'pharmacist':
+        destinations = const [
+          NavigationDestination(
+            icon: Icon(Icons.local_pharmacy_rounded),
+            label: 'Pharmacy',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.queue_play_next_rounded),
+            label: 'OPD Queue',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.medication_rounded),
+            label: 'Formulary',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_rounded),
+            label: 'Alerts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ];
+        onSelect = (idx) {
+          setState(() => _currentTabIndex = idx);
+          if (idx == 1) context.push('/queue');
+          if (idx == 2) context.push('/pharmacy');
+          if (idx == 3) context.push('/notifications');
+          if (idx == 4) context.push('/settings');
+        };
+        break;
+
+      case 'laboratory':
+      case 'lab_tech':
+        destinations = const [
+          NavigationDestination(
+            icon: Icon(Icons.biotech_rounded),
+            label: 'Laboratory',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.queue_play_next_rounded),
+            label: 'Queue',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.science_rounded),
+            label: 'Worklist',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_rounded),
+            label: 'Alerts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ];
+        onSelect = (idx) {
+          setState(() => _currentTabIndex = idx);
+          if (idx == 1) context.push('/queue');
+          if (idx == 2) context.push('/laboratory');
+          if (idx == 3) context.push('/notifications');
+          if (idx == 4) context.push('/settings');
+        };
+        break;
+
+      case 'billing':
+        destinations = const [
+          NavigationDestination(
+            icon: Icon(Icons.point_of_sale_rounded),
+            label: 'Cashier',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.queue_play_next_rounded),
+            label: 'OPD Queue',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_rounded),
+            label: 'Billing Counter',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_rounded),
+            label: 'Alerts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ];
+        onSelect = (idx) {
+          setState(() => _currentTabIndex = idx);
+          if (idx == 1) context.push('/queue');
+          if (idx == 2) context.push('/billing');
+          if (idx == 3) context.push('/notifications');
+          if (idx == 4) context.push('/settings');
+        };
+        break;
+
+      case 'admin':
+      default:
+        destinations = const [
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_rounded),
+            label: 'Overview',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.queue_play_next_rounded),
+            label: 'Queue',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.admin_panel_settings_rounded),
+            label: 'Admin Portal',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.people_alt_rounded),
+            label: 'Patients',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ];
+        onSelect = (idx) {
+          setState(() => _currentTabIndex = idx);
+          if (idx == 1) context.push('/queue');
+          if (idx == 2) context.push('/admin/portal');
+          if (idx == 3) context.push('/patients');
+          if (idx == 4) context.push('/settings');
+        };
+        break;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        bottom: true,
+        child: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            height: 60,
+            indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.14),
+            labelTextStyle: WidgetStateProperty.resolveWith((states) {
+              final isSelected = states.contains(WidgetState.selected);
+              return TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? AppColors.primaryBlue
+                    : (isDark ? Colors.grey[400] : Colors.grey[600]),
+              );
+            }),
+            iconTheme: WidgetStateProperty.resolveWith((states) {
+              final isSelected = states.contains(WidgetState.selected);
+              return IconThemeData(
+                size: 22,
+                color: isSelected
+                    ? AppColors.primaryBlue
+                    : (isDark ? Colors.grey[400] : Colors.grey[600]),
+              );
+            }),
+          ),
+          child: NavigationBar(
+            height: 60,
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            selectedIndex: _currentTabIndex.clamp(0, destinations.length - 1),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            onDestinationSelected: onSelect,
+            destinations: destinations,
           ),
         ),
       ),
@@ -667,7 +939,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
         return _buildResponsiveMetricRow(context, [
           StatMetricCard(
             title: 'Your Token',
-            value: myVisit != null ? '#${myVisit.queueToken}' : 'No Token',
+            value: myVisit != null ? myVisit.formattedToken : 'No Token',
             icon: Icons.confirmation_number_rounded,
             color: AppColors.primaryBlue,
             subtitle: myVisit?.departmentName ?? 'OPD Intake',
@@ -1317,11 +1589,17 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
               ),
             ),
-            TextButton.icon(
-              onPressed: () => context.push('/queue'),
-              icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-              label: const Text('View All Queue'),
-            ),
+            role == 'patient'
+                ? TextButton.icon(
+                    onPressed: () => context.push('/patient/portal'),
+                    icon: const Icon(Icons.folder_shared_rounded, size: 16),
+                    label: const Text('My Health Records'),
+                  )
+                : TextButton.icon(
+                    onPressed: () => context.push('/queue'),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                    label: const Text('View All Queue'),
+                  ),
           ],
         ),
         const SizedBox(height: 8),
@@ -1403,23 +1681,44 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                     children: [
                       // Token Badge
                       Container(
-                        width: 44,
-                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.2)),
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          '#${v.queueToken}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: AppColors.primaryBlue,
-                          ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'TOKEN',
+                              style: TextStyle(
+                                fontSize: 7.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryBlue,
+                              ),
+                            ),
+                            Text(
+                              v.formattedToken,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 9.5,
+                                color: AppColors.primaryBlue,
+                              ),
+                            ),
+                            Text(
+                              'Seq #${v.queueToken}',
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

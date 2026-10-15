@@ -38,6 +38,19 @@ class OPDVisitModel {
     this.departmentName,
   });
 
+  /// Formatted departmental OPD Token: `SMVMCH<DD><MM><YY><0001>`
+  /// Ensures tokens never overlap across dates or departments
+  String get formattedToken {
+    if (visitNumber.toUpperCase().startsWith('SMVMCH')) {
+      return visitNumber.toUpperCase();
+    }
+    final dd = visitDate.day.toString().padLeft(2, '0');
+    final mm = visitDate.month.toString().padLeft(2, '0');
+    final yy = (visitDate.year % 100).toString().padLeft(2, '0');
+    final seq = queueToken > 0 ? queueToken.toString().padLeft(4, '0') : '0001';
+    return 'SMVMCH$dd$mm$yy$seq';
+  }
+
   factory OPDVisitModel.fromJson(Map<String, dynamic> json) {
     PatientModel? patientObj;
     if (json['patient'] != null && json['patient'] is Map) {

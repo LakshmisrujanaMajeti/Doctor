@@ -9,6 +9,7 @@ import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/triage_chip.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/visit_provider.dart';
 
 class OpdQueueScreen extends ConsumerStatefulWidget {
@@ -44,6 +45,9 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
     final visitsAsync = ref.watch(visitListProvider);
     final currentFilter = ref.watch(visitStatusFilterProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authState = ref.watch(authProvider);
+    final currentRole = authState.user?.roleName.toLowerCase() ?? 'patient';
+    final isPatient = currentRole == 'patient';
 
     return Scaffold(
       appBar: AppBar(
@@ -101,13 +105,15 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primaryTeal,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Book Visit'),
-        onPressed: () => context.push('/visits/new'),
-      ),
+      floatingActionButton: isPatient
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: AppColors.primaryTeal,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Book Visit'),
+              onPressed: () => context.push('/visits/new'),
+            ),
       body: MedicalIllustratorBackground(
         variant: MedicalBackgroundVariant.clinical,
         child: Column(
@@ -198,6 +204,9 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                           // Exact or prefixed token match
                           if (tokenStr == q || tokenPrefixed == q) return true;
 
+                          // Formatted token match (e.g. SMVMCH1510260001 or substring)
+                          if (v.formattedToken.toLowerCase().contains(q)) return true;
+
                           // Token number extracted from "token 1", "tok #1", "# 1", "T-1", "01" (tokens are < 1000)
                           if (queryNumber != null && queryNumber < 1000 && queryNumber == token) return true;
 
@@ -259,12 +268,11 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                 children: [
                                   // Token Number
                                   Container(
-                                    width: 52,
-                                    height: 52,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: AppColors.hospitalMaroon.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppColors.hospitalMaroon.withOpacity(0.3)),
+                                      color: AppColors.hospitalMaroon.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppColors.hospitalMaroon.withOpacity(0.25)),
                                     ),
                                     alignment: Alignment.center,
                                     child: Column(
@@ -273,23 +281,31 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                         const Text(
                                           'TOKEN',
                                           style: TextStyle(
-                                            fontSize: 9,
+                                            fontSize: 8,
                                             fontWeight: FontWeight.w700,
                                             color: AppColors.hospitalMaroon,
                                           ),
                                         ),
                                         Text(
-                                          '#${visit.queueToken}',
+                                          visit.formattedToken,
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w800,
-                                            fontSize: 18,
+                                            fontSize: 10.5,
                                             color: AppColors.hospitalMaroon,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Seq #${visit.queueToken}',
+                                          style: TextStyle(
+                                            fontSize: 8.5,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.grey[600],
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 14),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,55 +378,87 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                               const SizedBox(height: 14),
 
                               // Action Buttons Row
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      icon: const Icon(Icons.monitor_heart_rounded, size: 15),
-                                      label: Text(
-                                        visit.vitals == null ? 'Vitals' : 'Edit Vitals',
-                                        overflow: TextOverflow.ellipsis,
+                              if (isPatient)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Icons.receipt_rounded, size: 15),
+                                        label: const Text('View OPD Slip', overflow: TextOverflow.ellipsis),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onPressed: () => context.push('/visits/${visit.id}', extra: visit),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        icon: const Icon(Icons.auto_stories_rounded, size: 15),
+                                        label: const Text('Digital Booklet', overflow: TextOverflow.ellipsis),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primaryTeal,
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onPressed: () => context.push('/patients/${visit.patientId}/booklet'),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Icons.monitor_heart_rounded, size: 15),
+                                        label: Text(
+                                          visit.vitals == null ? 'Vitals' : 'Edit Vitals',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onPressed: () => context.push('/visits/${visit.id}/vitals', extra: visit),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        icon: const Icon(Icons.edit_note_rounded, size: 15),
+                                        label: const Text('Consult', overflow: TextOverflow.ellipsis),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primaryTeal,
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onPressed: () => context.push('/visits/${visit.id}/consultation', extra: visit),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    OutlinedButton.icon(
+                                      icon: const Icon(Icons.auto_stories_rounded, size: 15, color: AppColors.hospitalMaroon),
+                                      label: const Text(
+                                        'Booklet',
+                                        style: TextStyle(color: AppColors.hospitalMaroon, fontWeight: FontWeight.bold),
                                       ),
                                       style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                        side: const BorderSide(color: AppColors.hospitalMaroon),
+                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
-                                      onPressed: () => context.push('/visits/${visit.id}/vitals', extra: visit),
+                                      onPressed: () {
+                                        context.push('/patients/${visit.patientId}/booklet');
+                                      },
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      icon: const Icon(Icons.edit_note_rounded, size: 15),
-                                      label: const Text('Consult', overflow: TextOverflow.ellipsis),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.primaryTeal,
-                                        foregroundColor: Colors.white,
-                                        elevation: 0,
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      onPressed: () => context.push('/visits/${visit.id}/consultation', extra: visit),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.auto_stories_rounded, size: 15, color: AppColors.hospitalMaroon),
-                                    label: const Text(
-                                      'Booklet',
-                                      style: TextStyle(color: AppColors.hospitalMaroon, fontWeight: FontWeight.bold),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: AppColors.hospitalMaroon),
-                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                    onPressed: () {
-                                      context.push('/patients/${visit.patientId}/booklet');
-                                    },
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                ),
                             ],
                           ),
                         ),

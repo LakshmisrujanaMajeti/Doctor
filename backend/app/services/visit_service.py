@@ -15,8 +15,8 @@ from app.models.audit import AuditLog
 class VisitService:
     @staticmethod
     def generate_visit_number(db: Session) -> str:
-        today_str = datetime.utcnow().strftime("%Y%m%d")
-        prefix = f"VIS-{today_str}-"
+        today_str = datetime.utcnow().strftime("%d%m%y")
+        prefix = f"SMVMCH{today_str}"
         count = db.query(func.count(OPDVisit.id)).filter(OPDVisit.visit_number.like(f"{prefix}%")).scalar() or 0
         return f"{prefix}{str(count + 1).zfill(4)}"
 

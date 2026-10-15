@@ -385,10 +385,10 @@ class _BarcodeScannerModalState extends ConsumerState<BarcodeScannerModal> with 
                 },
               ),
               ActionChip(
-                label: const Text('VIS:VIS-20261012-0001', style: TextStyle(fontSize: 11)),
+                label: const Text('VIS:SMVMCH1510260001', style: TextStyle(fontSize: 11)),
                 onPressed: () {
-                  _manualScanController.text = 'VIS:VIS-20261012-0001';
-                  _handleScan('VIS:VIS-20261012-0001');
+                  _manualScanController.text = 'VIS:SMVMCH1510260001';
+                  _handleScan('VIS:SMVMCH1510260001');
                 },
               ),
               ActionChip(
