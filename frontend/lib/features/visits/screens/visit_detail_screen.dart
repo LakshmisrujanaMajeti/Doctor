@@ -167,13 +167,13 @@ class VisitDetailScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _infoRow(Icons.person, 'Full Name', currentVisit?.patient?.fullName ?? 'Johnathan Reynolds'),
+                        _infoRow(Icons.person, 'Full Name', currentVisit?.patient?.fullName ?? 'Outpatient'),
                         const Divider(height: 16),
-                        _infoRow(Icons.badge, 'UHID', currentVisit?.patient?.uhid ?? 'UHID-2026-00001'),
+                        _infoRow(Icons.badge, 'UHID', currentVisit?.patient?.uhid ?? '--'),
                         const Divider(height: 16),
-                        _infoRow(Icons.phone, 'Contact', currentVisit?.patient?.phone ?? '+1 555-123-4567'),
+                        _infoRow(Icons.phone, 'Contact', currentVisit?.patient?.phone ?? '--'),
                         const Divider(height: 16),
-                        _infoRow(Icons.bloodtype, 'Blood Group', currentVisit?.patient?.bloodGroup ?? 'O+'),
+                        _infoRow(Icons.bloodtype, 'Blood Group', currentVisit?.patient?.bloodGroup ?? '--'),
                       ],
                     ),
                   ),

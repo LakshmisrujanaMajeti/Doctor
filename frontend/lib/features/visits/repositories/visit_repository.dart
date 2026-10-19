@@ -231,16 +231,49 @@ class VisitRepository {
     final dd = now.day.toString().padLeft(2, '0');
     final mm = now.month.toString().padLeft(2, '0');
     final yy = (now.year % 100).toString().padLeft(2, '0');
+    final todayPrefix = 'SMVMCH$dd$mm$yy';
 
-    // Department-scoped sequential token calculation for today to prevent overlap
-    final deptTodayVisits = _localVisits.where((v) =>
-      (v.departmentId == departmentId || (v.departmentName != null && v.departmentName == departmentName)) &&
-      v.visitDate.year == now.year &&
-      v.visitDate.month == now.month &&
-      v.visitDate.day == now.day
-    ).toList();
-    final token = deptTodayVisits.length + 1;
-    final tokenFormatted = 'SMVMCH$dd$mm$yy${token.toString().padLeft(4, '0')}';
+    // Strictly unique sequential token calculation across all patients and departments today
+    int maxTodayToken = 0;
+    for (final v in _localVisits) {
+      if (v.visitDate.year == now.year &&
+          v.visitDate.month == now.month &&
+          v.visitDate.day == now.day) {
+        if (v.queueToken > maxTodayToken) {
+          maxTodayToken = v.queueToken;
+        }
+        if (v.visitNumber.startsWith(todayPrefix)) {
+          final suffixStr = v.visitNumber.substring(todayPrefix.length);
+          final parsed = int.tryParse(suffixStr);
+          if (parsed != null && parsed > maxTodayToken) {
+            maxTodayToken = parsed;
+          }
+        }
+      }
+    }
+
+    try {
+      final supaVisits = await SupabaseService.fetchVisits();
+      for (final sv in supaVisits) {
+        if (sv.visitDate.year == now.year &&
+            sv.visitDate.month == now.month &&
+            sv.visitDate.day == now.day) {
+          if (sv.queueToken > maxTodayToken) {
+            maxTodayToken = sv.queueToken;
+          }
+          if (sv.visitNumber.startsWith(todayPrefix)) {
+            final suffixStr = sv.visitNumber.substring(todayPrefix.length);
+            final parsed = int.tryParse(suffixStr);
+            if (parsed != null && parsed > maxTodayToken) {
+              maxTodayToken = parsed;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    final token = maxTodayToken + 1;
+    final tokenFormatted = '$todayPrefix${token.toString().padLeft(4, '0')}';
 
     final newVisit = OPDVisitModel(
       id: 'vis-${DateTime.now().millisecondsSinceEpoch}',
@@ -256,7 +289,7 @@ class VisitRepository {
       notes: notes,
       visitDate: now,
       patient: patient,
-      doctorName: doctorName ?? 'Dr. Sarah Chen, MD',
+      doctorName: doctorName ?? 'OPD Consulting Physician',
       departmentName: departmentName ?? departmentId,
     );
     _localVisits.insert(0, newVisit);

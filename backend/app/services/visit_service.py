@@ -14,22 +14,23 @@ from app.models.audit import AuditLog
 
 class VisitService:
     @staticmethod
-    def generate_visit_number(db: Session) -> str:
-        today_str = datetime.utcnow().strftime("%d%m%y")
-        prefix = f"SMVMCH{today_str}"
-        count = db.query(func.count(OPDVisit.id)).filter(OPDVisit.visit_number.like(f"{prefix}%")).scalar() or 0
-        return f"{prefix}{str(count + 1).zfill(4)}"
-
-    @staticmethod
-    def get_next_queue_token(db: Session, doctor_id: str, visit_date: date) -> int:
+    def get_next_queue_token(db: Session, visit_date: date) -> int:
         start_of_day = datetime.combine(visit_date, datetime.min.time())
         end_of_day = datetime.combine(visit_date, datetime.max.time())
         max_token = db.query(func.max(OPDVisit.queue_token)).filter(
-            OPDVisit.doctor_id == doctor_id,
             OPDVisit.visit_date >= start_of_day,
             OPDVisit.visit_date <= end_of_day
         ).scalar()
         return (max_token or 0) + 1
+
+    @staticmethod
+    def generate_visit_number(db: Session, queue_token: Optional[int] = None) -> str:
+        today_str = datetime.utcnow().strftime("%d%m%y")
+        prefix = f"SMVMCH{today_str}"
+        if queue_token is not None:
+            return f"{prefix}{str(queue_token).zfill(4)}"
+        count = db.query(func.count(OPDVisit.id)).filter(OPDVisit.visit_number.like(f"{prefix}%")).scalar() or 0
+        return f"{prefix}{str(count + 1).zfill(4)}"
 
     @staticmethod
     def create_visit(db: Session, visit_in: OPDVisitCreate, current_user_id: Optional[str] = None) -> OPDVisit:
@@ -59,8 +60,8 @@ class VisitService:
         if not doctor:
             raise NotFoundException(f"Doctor with ID '{visit_in.doctor_id}' not found")
 
-        visit_num = VisitService.generate_visit_number(db)
-        queue_tok = VisitService.get_next_queue_token(db, doctor.id, datetime.utcnow().date())
+        queue_tok = VisitService.get_next_queue_token(db, datetime.utcnow().date())
+        visit_num = VisitService.generate_visit_number(db, queue_tok)
 
         visit = OPDVisit(
             visit_number=visit_num,

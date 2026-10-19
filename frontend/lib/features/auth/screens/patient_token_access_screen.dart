@@ -253,7 +253,7 @@ class _PatientTokenAccessScreenState extends ConsumerState<PatientTokenAccessScr
                     'queue_token': qTok,
                     'status': matchedVisit['status'] ?? 'REGISTERED',
                     'triage_priority': matchedVisit['triage_priority'] ?? 'NORMAL',
-                    'doctor_name': matchedVisit['doctor_name'] ?? 'Dr. Sarah Chen, MD',
+                    'doctor_name': matchedVisit['doctor_name'] ?? 'OPD Consulting Physician',
                     'department_name': matchedVisit['department_name'] ?? 'General Medicine',
                     'room_number': 'Room 104',
                     'patients_ahead': 0,

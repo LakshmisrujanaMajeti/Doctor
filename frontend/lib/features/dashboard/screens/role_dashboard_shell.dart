@@ -1855,6 +1855,18 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
               const SizedBox(height: 12),
               ListTile(
                 contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.edit_note_rounded, color: AppColors.primaryBlue),
+                title: const Text('Edit Profile & Credentials', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: const Text('Update full name, phone number, and password', style: TextStyle(fontSize: 11)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push('/profile-setup');
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.settings_outlined, color: Colors.grey),
                 title: const Text('System Preferences', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                 subtitle: const Text('Appearance, notifications, security', style: TextStyle(fontSize: 11)),
@@ -1916,23 +1928,23 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
   String _getDefaultNameForRole(String role) {
     switch (role) {
       case 'doctor':
-        return 'Dr. Sarah Chen, MD';
+        return 'Consulting Physician';
       case 'nurse':
-        return 'Nurse Station (East Wing)';
+        return 'OPD Triage Nurse';
       case 'admin':
-        return 'Hospital Admin Console';
+        return 'Hospital Administrator';
       case 'patient':
-        return 'Johnathan Reynolds';
+        return 'Patient';
       case 'laboratory':
       case 'lab_tech':
-        return 'Marcus Vance (Lab Tech)';
+        return 'Laboratory Specialist';
       case 'pharmacist':
-        return 'Elena Rostova (Pharmacist)';
+        return 'Pharmacy Specialist';
       case 'billing':
-        return 'Anita Sharma (Billing Counter)';
+        return 'Billing Cashier';
       case 'receptionist':
       default:
-        return 'Receptionist Desk (OPD)';
+        return 'OPD Receptionist';
     }
   }
 }

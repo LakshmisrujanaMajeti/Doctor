@@ -566,6 +566,63 @@ class AuthRepository {
     return user;
   }
 
+  Future<UserModel> updateProfile({
+    required UserModel currentUser,
+    required String fullName,
+    String? phone,
+    String? newPassword,
+    Map<String, dynamic>? roleMetadata,
+  }) async {
+    final cleanName = fullName.trim();
+    final cleanPhone = phone?.trim();
+    final cleanEmail = currentUser.email.trim().toLowerCase();
+
+    await _loadDynamicDirectoryIfNeeded();
+
+    // 1. Strict duplicate phone check if updated
+    if (cleanPhone != null && cleanPhone.isNotEmpty && cleanPhone != currentUser.phone) {
+      if (_staffPhoneDirectory.containsKey(cleanPhone)) {
+        final existingEmail = _staffPhoneDirectory[cleanPhone]?['email'];
+        if (existingEmail != null && existingEmail != cleanEmail) {
+          throw Exception('An account with this phone number ($cleanPhone) is already registered in the hospital system.');
+        }
+      }
+    }
+
+    final updatedUser = currentUser.copyWith(
+      fullName: cleanName,
+      phone: cleanPhone ?? currentUser.phone,
+    );
+
+    // 2. Update dynamic directory & secure storage
+    await registerDynamicStaff(
+      email: cleanEmail,
+      password: (newPassword != null && newPassword.trim().isNotEmpty) ? newPassword.trim() : 'Updated@123',
+      role: updatedUser.roleName,
+      fullName: cleanName,
+      phone: cleanPhone,
+    );
+
+    await SecureStorageService.saveUserData(updatedUser.toJson());
+
+    // 3. Update Supabase Cloud users table
+    try {
+      final cli = SupabaseService.client;
+      if (cli != null) {
+        final updatePayload = <String, dynamic>{
+          'full_name': cleanName,
+          if (cleanPhone != null) 'phone': cleanPhone,
+        };
+        if (newPassword != null && newPassword.trim().isNotEmpty) {
+          updatePayload['hashed_password'] = newPassword.trim();
+        }
+        await cli.from('users').update(updatePayload).eq('id', currentUser.id);
+      }
+    } catch (_) {}
+
+    return updatedUser;
+  }
+
   Future<String> requestPasswordResetOtp(String identifier) async {
     await _loadDynamicDirectoryIfNeeded();
     final cleanId = identifier.trim();

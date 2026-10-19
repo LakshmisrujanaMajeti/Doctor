@@ -123,6 +123,38 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<bool> updateProfile({
+    required String fullName,
+    String? phone,
+    String? newPassword,
+    Map<String, dynamic>? roleMetadata,
+  }) async {
+    final curUser = state.user;
+    if (curUser == null) return false;
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final updatedUser = await _repository.updateProfile(
+        currentUser: curUser,
+        fullName: fullName,
+        phone: phone,
+        newPassword: newPassword,
+        roleMetadata: roleMetadata,
+      );
+      state = state.copyWith(
+        user: updatedUser,
+        isLoading: false,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
   Future<String?> forgotPassword(String identifier) async {
     return await requestPasswordResetOtp(identifier);
   }

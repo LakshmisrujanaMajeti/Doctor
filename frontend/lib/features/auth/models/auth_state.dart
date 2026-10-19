@@ -37,6 +37,20 @@ class UserModel {
     'phone': phone,
     'role_name': roleName,
   };
+
+  UserModel copyWith({
+    String? id,
+    String? email,
+    String? fullName,
+    String? phone,
+    String? roleName,
+  }) => UserModel(
+    id: id ?? this.id,
+    email: email ?? this.email,
+    fullName: fullName ?? this.fullName,
+    phone: phone ?? this.phone,
+    roleName: roleName ?? this.roleName,
+  );
 }
 
 class AuthState {

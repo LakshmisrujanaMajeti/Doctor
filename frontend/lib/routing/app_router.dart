@@ -79,11 +79,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      // 3. Prevent authenticated users from returning to welcome / onboarding / profile-setup
-      if (isAuth &&
-          (path == '/welcome' ||
-              path == '/onboarding' ||
-              path == '/profile-setup')) {
+      // 3. Prevent authenticated users from returning to welcome / onboarding
+      if (isAuth && (path == '/welcome' || path == '/onboarding')) {
         return '/dashboard';
       }
 

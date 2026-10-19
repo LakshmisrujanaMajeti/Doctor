@@ -81,7 +81,7 @@ class SettingsScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            user?.fullName ?? 'Dr. Sarah Chen, MD',
+                            user?.fullName.isNotEmpty == true ? user!.fullName : 'Hospital User',
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: 18,

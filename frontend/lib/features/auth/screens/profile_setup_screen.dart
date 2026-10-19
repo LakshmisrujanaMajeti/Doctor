@@ -68,9 +68,27 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   String _selectedGender = 'MALE';
   String _selectedBloodGroup = 'O+';
   bool _isSaving = false;
+  bool _isEditMode = false;
 
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _genders = ['MALE', 'FEMALE', 'OTHER'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(authProvider).user;
+      if (user != null && mounted) {
+        setState(() {
+          _isEditMode = true;
+          _selectedRole = user.roleName.toLowerCase();
+          _nameController.text = user.fullName;
+          _emailController.text = user.email;
+          _phoneController.text = user.phone ?? '';
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -127,6 +145,42 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       final cleanName = InputSanitizer.sanitizeText(_nameController.text);
       final cleanPhone = InputSanitizer.sanitizePhone(_phoneController.text);
       final cleanEmail = rawEmail.isNotEmpty ? InputSanitizer.sanitizeEmail(rawEmail) : null;
+
+      if (_isEditMode) {
+        final newPass = _passwordController.text.trim();
+        final success = await authNotifier.updateProfile(
+          fullName: cleanName,
+          phone: cleanPhone.isNotEmpty ? cleanPhone : null,
+          newPassword: newPass.isNotEmpty ? newPass : null,
+        );
+
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.statusCompleted,
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Profile and credentials for $cleanName updated successfully!',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            context.goNamed(RouteNames.dashboard);
+          }
+        }
+        return;
+      }
+
       final bool success;
 
       if (_selectedRole == 'patient') {
@@ -218,11 +272,16 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: SmvmchHospitalLogo(size: 28),
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Navigator.canPop(context)
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.maybePop(context),
+                )
+              : const SmvmchHospitalLogo(size: 28),
         ),
-        title: const Text('Hospital Profile Setup'),
+        title: Text(_isEditMode ? 'Edit Profile & Credentials' : 'Hospital Profile Setup'),
       ),
       body: MedicalIllustratorBackground(
         variant: MedicalBackgroundVariant.portal,
@@ -271,7 +330,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _getRoleTitle(_selectedRole),
+                                    _isEditMode ? 'Update Profile & Login Credentials' : _getRoleTitle(_selectedRole),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
@@ -279,7 +338,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    _getRoleDescription(_selectedRole),
+                                    _isEditMode
+                                        ? 'Modify your hospital identity details, phone number, and password.'
+                                        : _getRoleDescription(_selectedRole),
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -299,50 +360,53 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                           onDismiss: () => ref.read(authProvider.notifier).checkCurrentUser(),
                         ),
 
-                      // Section 1: Role Selector
-                      _buildSectionHeader('1. Authorized Role *'),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        initialValue: _selectedRole,
-                        isExpanded: true,
-                        items: const [
-                          DropdownMenuItem(value: 'patient', child: Text('Patient (Self-Service UHID)')),
-                          DropdownMenuItem(value: 'doctor', child: Text('Consulting Doctor (MD / Specialist)')),
-                          DropdownMenuItem(value: 'nurse', child: Text('Clinical Nurse / Triage Specialist')),
-                          DropdownMenuItem(value: 'receptionist', child: Text('Front Desk / Receptionist')),
-                          DropdownMenuItem(value: 'billing', child: Text('Billing Counter / Cashier')),
-                          DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist / Dispensing Unit')),
-                          DropdownMenuItem(value: 'laboratory', child: Text('Laboratory Staff / Lab Tech')),
-                          DropdownMenuItem(value: 'admin', child: Text('Hospital Administrator')),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) setState(() => _selectedRole = v);
-                        },
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.badge_rounded, color: AppColors.primaryBlue),
-                          labelText: 'Hospital Role Assignment',
+                      // Section 1: Role Selector (Only for new registrations)
+                      if (!_isEditMode) ...[
+                        _buildSectionHeader('1. Authorized Role *'),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedRole,
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(value: 'patient', child: Text('Patient (Self-Service UHID)')),
+                            DropdownMenuItem(value: 'doctor', child: Text('Consulting Doctor (MD / Specialist)')),
+                            DropdownMenuItem(value: 'nurse', child: Text('Clinical Nurse / Triage Specialist')),
+                            DropdownMenuItem(value: 'receptionist', child: Text('Front Desk / Receptionist')),
+                            DropdownMenuItem(value: 'billing', child: Text('Billing Counter / Cashier')),
+                            DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist / Dispensing Unit')),
+                            DropdownMenuItem(value: 'laboratory', child: Text('Laboratory Staff / Lab Tech')),
+                            DropdownMenuItem(value: 'admin', child: Text('Hospital Administrator')),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) setState(() => _selectedRole = v);
+                          },
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.badge_rounded, color: AppColors.primaryBlue),
+                            labelText: 'Hospital Role Assignment',
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 20),
+                      ],
 
                       // Section 2: Universal Account Credentials
-                      _buildSectionHeader('2. Account Credentials & Contact'),
+                      _buildSectionHeader(_isEditMode ? 'Account Details & Credentials' : '2. Account Credentials & Contact'),
                       const SizedBox(height: 10),
                       OpdTextField(
                         label: 'Full Name *',
-                        hint: _selectedRole == 'doctor' ? 'Dr. Johnathan Reynolds, MD' : 'Full legal name',
+                        hint: _selectedRole == 'doctor' ? 'e.g. Dr. A. Ramanathan, MD' : 'Full legal name',
                         controller: _nameController,
                         prefixIcon: Icons.person_outline_rounded,
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
                       ),
                       const SizedBox(height: 14),
                       OpdTextField(
-                        label: _selectedRole == 'patient' ? 'Email Address (Optional)' : 'Work Email Address *',
+                        label: _isEditMode ? 'Work Email Address' : (_selectedRole == 'patient' ? 'Email Address (Optional)' : 'Work Email Address *'),
                         hint: 'name@opdconnect.com',
                         controller: _emailController,
+                        readOnly: _isEditMode,
                         prefixIcon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
-                        validator: (v) => InputSanitizer.validateEmail(v, isRequired: _selectedRole != 'patient'),
+                        validator: (v) => _isEditMode ? null : InputSanitizer.validateEmail(v, isRequired: _selectedRole != 'patient'),
                       ),
                       const SizedBox(height: 14),
                       OpdTextField(
@@ -359,29 +423,32 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                       ),
                       const SizedBox(height: 14),
                       OpdTextField(
-                        label: 'Secure Password *',
-                        hint: 'At least 8 chars (Aa-Zz, 0-9, special char)',
+                        label: _isEditMode ? 'New Password (Optional)' : 'Secure Password *',
+                        hint: _isEditMode ? 'Leave blank to keep existing password' : 'At least 8 chars (Aa-Zz, 0-9, special char)',
                         controller: _passwordController,
                         prefixIcon: Icons.lock_outline_rounded,
                         obscureText: true,
                         enablePasswordToggle: true,
-                        validator: (v) => InputSanitizer.validateStrongPassword(v),
+                        validator: (v) {
+                          if (_isEditMode && (v == null || v.trim().isEmpty)) return null;
+                          return InputSanitizer.validateStrongPassword(v);
+                        },
                       ),
                       const SizedBox(height: 22),
 
-                      // Section 3: Dynamic Role-Specific Hospital Fields
-                      _buildSectionHeader('3. ${_getRoleSpecificSectionTitle(_selectedRole)}'),
-                      const SizedBox(height: 10),
-
-                      _buildRoleSpecificFields(isDark),
-
-                      const SizedBox(height: 32),
+                      // Section 3: Dynamic Role-Specific Hospital Fields (if not patient in edit mode)
+                      if (!_isEditMode || _selectedRole != 'patient') ...[
+                        _buildSectionHeader(_isEditMode ? 'Role-Specific Professional Info' : '3. ${_getRoleSpecificSectionTitle(_selectedRole)}'),
+                        const SizedBox(height: 10),
+                        _buildRoleSpecificFields(isDark),
+                        const SizedBox(height: 32),
+                      ],
 
                       // Submit Button
                       OpdButton(
-                        label: 'Complete Registration & Launch Portal',
+                        label: _isEditMode ? 'Save Profile & Credentials' : 'Complete Registration & Launch Portal',
                         isLoading: _isSaving,
-                        icon: Icons.rocket_launch_rounded,
+                        icon: _isEditMode ? Icons.check_circle_outline_rounded : Icons.rocket_launch_rounded,
                         width: double.infinity,
                         onPressed: _handleSave,
                       ),

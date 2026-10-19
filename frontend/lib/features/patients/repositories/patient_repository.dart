@@ -304,9 +304,18 @@ class PatientRepository {
       }
     } catch (_) {}
 
-    // Fallback local registration
-    final generatedUhid = 'UHID-2026-${(_localPatients.length + 1).toString().padLeft(5, '0')}';
-    final generatedReg = 'REG-2026-${(_localPatients.length + 1).toString().padLeft(5, '0')}';
+    int maxUhidNum = 0;
+    for (final p in _localPatients) {
+      if (p.uhid.startsWith('UHID-2026-')) {
+        final numPart = int.tryParse(p.uhid.substring('UHID-2026-'.length));
+        if (numPart != null && numPart > maxUhidNum) {
+          maxUhidNum = numPart;
+        }
+      }
+    }
+    final nextUhidNum = maxUhidNum + 1;
+    final generatedUhid = 'UHID-2026-${nextUhidNum.toString().padLeft(5, '0')}';
+    final generatedReg = 'REG-2026-${nextUhidNum.toString().padLeft(5, '0')}';
     final newPat = PatientModel(
       id: patient.id.isNotEmpty ? patient.id : 'pat-${DateTime.now().millisecondsSinceEpoch}',
       uhid: patient.uhid.isNotEmpty ? patient.uhid : generatedUhid,
