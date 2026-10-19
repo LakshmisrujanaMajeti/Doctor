@@ -26,7 +26,17 @@ const mimeTypes = {
 };
 
 function startLocalServer(callback) {
-  const webDir = path.join(__dirname, 'web');
+  let webDir = path.join(__dirname, 'web');
+  if (!fs.existsSync(webDir) || !fs.existsSync(path.join(webDir, 'index.html'))) {
+    const alt1 = path.join(__dirname, '..', 'web_app');
+    const alt2 = path.join(__dirname, '..', 'frontend', 'build', 'web');
+    if (fs.existsSync(path.join(alt1, 'index.html'))) {
+      webDir = alt1;
+    } else if (fs.existsSync(path.join(alt2, 'index.html'))) {
+      webDir = alt2;
+    }
+  }
+
   server = http.createServer((req, res) => {
     let reqPath = req.url.split('?')[0];
     if (reqPath === '/' || reqPath === '') reqPath = '/index.html';

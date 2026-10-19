@@ -32,38 +32,90 @@ if %CHOICE_VAL% EQU 4 goto RUN_FULLSTACK
 
 :RUN_PROD_WEB
 echo.
-echo [*] Starting Fast Production Web Portal on port 54321...
+echo [*] Initializing Fast Production Web Portal on port 54321...
 set PORT=54321
-cd /d "%DIR%frontend\build\web"
 
+REM Resolve compiled web app directory containing index.html
+set "WEB_DIR="
+if exist "%DIR%web_app\index.html" (
+    set "WEB_DIR=%DIR%web_app"
+) else if exist "%DIR%frontend\build\web\index.html" (
+    set "WEB_DIR=%DIR%frontend\build\web"
+) else if exist "%DIR%desktop\web\index.html" (
+    set "WEB_DIR=%DIR%desktop\web"
+)
+
+if "!WEB_DIR!"=="" (
+    echo [!] Warning: Compiled web directory not found.
+    echo [*] Checking for Flutter SDK to build web bundle...
+    where flutter >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        echo [*] Compiling web application via Flutter...
+        cd /d "%DIR%frontend"
+        call flutter build web --release
+        cd /d "%DIR%"
+        set "WEB_DIR=%DIR%frontend\build\web"
+    ) else (
+        echo [ERROR] Web application bundle is missing and Flutter is not installed.
+        echo Please ensure the 'web_app' folder exists.
+        pause
+        exit /b 1
+    )
+)
+
+echo [✓] Serving Web Portal from: !WEB_DIR!
+
+REM Start Server via dedicated Python script if available
+if exist "%DIR%serve_web.py" (
+    where python >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        echo [*] Launching Server via Python...
+        start "OPD Connect Web Server" /min python "%DIR%serve_web.py" %PORT%
+        goto OPEN_WEB
+    )
+    where py >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        echo [*] Launching Server via py launcher...
+        start "OPD Connect Web Server" /min py "%DIR%serve_web.py" %PORT%
+        goto OPEN_WEB
+    )
+)
+
+REM Start Server via PowerShell if Python missing
+if exist "%DIR%serve_web.ps1" (
+    where powershell >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        echo [*] Launching Server via Windows PowerShell...
+        start "OPD Connect Web Server" /min powershell -NoProfile -ExecutionPolicy Bypass -File "%DIR%serve_web.ps1" -Port %PORT%
+        goto OPEN_WEB
+    )
+)
+
+REM Fallback: cd strictly to WEB_DIR before running http.server
+cd /d "!WEB_DIR!"
 where python >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     start "OPD Connect Web Server" /min python -m http.server %PORT% --bind 127.0.0.1
+    cd /d "%DIR%"
     goto OPEN_WEB
 )
-
 where py >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     start "OPD Connect Web Server" /min py -m http.server %PORT% --bind 127.0.0.1
+    cd /d "%DIR%"
     goto OPEN_WEB
 )
-
-where npx >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
-    start "OPD Connect Web Server" /min npx -y serve -s . -l %PORT%
-    goto OPEN_WEB
-)
-
-start "" "%DIR%frontend\build\web\index.html"
-exit /b 0
+cd /d "%DIR%"
 
 :OPEN_WEB
 timeout /t 2 >nul
-echo [OK] Opening Web Portal in browser...
+echo [✓] Opening Web Portal in browser...
 start http://127.0.0.1:%PORT%
 echo.
-echo [OK] Web Portal is running at http://127.0.0.1:%PORT%
-echo Keep this window open while using the portal.
+echo ================================================================================
+echo  [✓] Web Portal is running at: http://127.0.0.1:%PORT%
+echo  Keep this console window open while using the hospital portal.
+echo ================================================================================
 pause >nul
 exit /b 0
 

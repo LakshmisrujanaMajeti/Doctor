@@ -50,11 +50,21 @@ fi
 # 4. Fallback: Local Clinical Workstation Server + Dedicated App Window
 echo "[*] Starting local desktop workstation server..."
 PORT=54321
-cd "$DIR/frontend/build/web"
 
-# Launch in background
-python3 -m http.server $PORT --bind 127.0.0.1 > /dev/null 2>&1 &
-SERVER_PID=$!
+# Launch using dedicated serve_web.py if available
+if [ -f "$DIR/serve_web.py" ]; then
+    python3 "$DIR/serve_web.py" $PORT > /dev/null 2>&1 &
+    SERVER_PID=$!
+else
+    WEB_DIR="$DIR/web_app"
+    if [ ! -f "$WEB_DIR/index.html" ]; then
+        WEB_DIR="$DIR/frontend/build/web"
+    fi
+    cd "$WEB_DIR"
+    python3 -m http.server $PORT --bind 127.0.0.1 > /dev/null 2>&1 &
+    SERVER_PID=$!
+    cd "$DIR"
+fi
 
 trap "kill $SERVER_PID 2>/dev/null || true" EXIT
 
