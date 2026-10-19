@@ -153,7 +153,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     // Identifier Field (Email or Phone)
                     OpdTextField(
                       label: 'Hospital Email or Phone Number',
-                      hint: 'name@opdconnect.com or 10-digit phone',
+                      hint: 'staff@smvmch.ac.in or 10-digit mobile number',
                       controller: _emailController,
                       prefixIcon: Icons.account_circle_outlined,
                       keyboardType: TextInputType.emailAddress,
