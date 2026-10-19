@@ -184,7 +184,7 @@ void main() {
 
       expect(find.text(AppStrings.appName), findsOneWidget);
       expect(find.text('Sign In to Portal'), findsOneWidget);
-      expect(find.text('Register New Account'), findsOneWidget);
+      expect(find.text('Patient Self-Registration'), findsOneWidget);
       expect(find.text('Doctor Portal'), findsOneWidget);
     });
 
@@ -215,8 +215,8 @@ void main() {
         ),
       );
 
-      expect(find.text('New Patient Registration'), findsWidgets);
-      expect(find.text('Full Name *'), findsOneWidget);
+      expect(find.text('New Patient Outpatient Registration'), findsWidgets);
+      expect(find.text('Full Legal Name *'), findsOneWidget);
     });
 
     testWidgets('NotificationsScreen displays category filter chips',

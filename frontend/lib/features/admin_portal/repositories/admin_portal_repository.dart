@@ -329,6 +329,7 @@ class AdminPortalRepository {
       role: cleanRole,
       fullName: cleanName,
       phone: phone?.trim(),
+      departmentName: departmentName,
     );
 
     // If role is doctor, register into DoctorRepository directory and cache

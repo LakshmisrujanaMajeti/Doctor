@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/opd_constants.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/network/dio_client.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
@@ -19,6 +18,8 @@ import '../../patient_portal/models/patient_portal_models.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patient_provider.dart';
 import '../../doctors/repositories/doctor_repository.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../../routing/route_names.dart';
 
 class HospitalAdminWorkspaceView extends ConsumerStatefulWidget {
   final int initialTabIndex;
@@ -166,6 +167,25 @@ class _HospitalAdminWorkspaceViewState
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh All Portals',
             onPressed: _refreshAll,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 21),
+            tooltip: 'Logout Admin',
+            onPressed: () async {
+              final confirm = await showOpdConfirmDialog(
+                context: context,
+                title: 'Sign Out Admin?',
+                message: 'Are you sure you want to log out of the SMVMCH Hospital Admin Portal?',
+                confirmText: 'Sign Out',
+                isDestructive: true,
+              );
+              if (confirm == true && context.mounted) {
+                await ref.read(authProvider.notifier).logout();
+                if (context.mounted) {
+                  context.goNamed(RouteNames.welcome);
+                }
+              }
+            },
           ),
         ],
       ),
@@ -1295,12 +1315,17 @@ class _HospitalAdminWorkspaceViewState
                             if (val != null) setDialogState(() => selectedRole = val);
                           },
                         ),
-                        if (isDoc) ...[
+                        if (isDoc || selectedRole == 'nurse' || selectedRole == 'receptionist') ...[
                           const SizedBox(height: 10),
                           TextFormField(
                             controller: deptCtrl,
-                            decoration: const InputDecoration(labelText: 'Department / Specialization', isDense: true),
+                            decoration: InputDecoration(
+                              labelText: isDoc ? 'Department / Specialization' : 'Assigned Department / Clinical Unit',
+                              isDense: true,
+                            ),
                           ),
+                        ],
+                        if (isDoc) ...[
                           const SizedBox(height: 10),
                           TextFormField(
                             controller: roomCtrl,
@@ -1336,7 +1361,7 @@ class _HospitalAdminWorkspaceViewState
                           email: emailCtrl.text.trim(),
                           phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
                           roleName: selectedRole,
-                          departmentName: isDoc ? deptCtrl.text.trim() : null,
+                          departmentName: (isDoc || selectedRole == 'nurse' || selectedRole == 'receptionist') ? deptCtrl.text.trim() : null,
                           roomNumber: isDoc ? roomCtrl.text.trim() : null,
                           qualification: isDoc ? qualCtrl.text.trim() : null,
                           consultationFee: isDoc ? feeCtrl.text.trim() : null,
@@ -1852,11 +1877,14 @@ class _HospitalAdminWorkspaceViewState
                             if (val != null) setDialogState(() => selectedRole = val);
                           },
                         ),
-                        if (isDoc) ...[
+                        if (isDoc || selectedRole == 'nurse' || selectedRole == 'receptionist') ...[
                           const SizedBox(height: 14),
                           DropdownButtonFormField<String>(
                             value: selectedDepartment,
-                            decoration: const InputDecoration(labelText: 'Clinical Department / Specialization *', isDense: true),
+                            decoration: InputDecoration(
+                              labelText: isDoc ? 'Clinical Department / Specialization *' : 'Assigned Department / Clinical Unit *',
+                              isDense: true,
+                            ),
                             items: OpdConstants.departments.map((dept) => DropdownMenuItem(
                               value: dept,
                               child: Text(dept),
@@ -1866,19 +1894,23 @@ class _HospitalAdminWorkspaceViewState
                                 setDialogState(() {
                                   selectedDepartment = val;
                                   selectedSpecialization = val;
-                                  final matchingRole = OpdConstants.doctorRoles.firstWhere(
-                                    (r) => r['department'] == val,
-                                    orElse: () => {},
-                                  );
-                                  if (matchingRole.isNotEmpty) {
-                                    qualCtrl.text = matchingRole['qualification'] ?? 'MBBS, MD';
-                                    roomCtrl.text = matchingRole['default_room'] ?? 'OPD Room 101';
-                                    feeCtrl.text = (double.tryParse(matchingRole['fee'] ?? '500') ?? 500).toInt().toString();
+                                  if (isDoc) {
+                                    final matchingRole = OpdConstants.doctorRoles.firstWhere(
+                                      (r) => r['department'] == val,
+                                      orElse: () => {},
+                                    );
+                                    if (matchingRole.isNotEmpty) {
+                                      qualCtrl.text = matchingRole['qualification'] ?? 'MBBS, MD';
+                                      roomCtrl.text = matchingRole['default_room'] ?? 'OPD Room 101';
+                                      feeCtrl.text = (double.tryParse(matchingRole['fee'] ?? '500') ?? 500).toInt().toString();
+                                    }
                                   }
                                 });
                               }
                             },
                           ),
+                        ],
+                        if (isDoc) ...[
                           const SizedBox(height: 12),
                           Row(
                             children: [
@@ -1924,7 +1956,7 @@ class _HospitalAdminWorkspaceViewState
                           fullName: nameCtrl.text.trim(),
                           roleName: selectedRole,
                           phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                          departmentName: isDoc ? selectedDepartment : null,
+                          departmentName: (isDoc || selectedRole == 'nurse' || selectedRole == 'receptionist') ? selectedDepartment : null,
                           specialization: isDoc ? selectedSpecialization : null,
                           roomNumber: isDoc ? roomCtrl.text.trim() : null,
                           qualification: isDoc ? qualCtrl.text.trim() : null,

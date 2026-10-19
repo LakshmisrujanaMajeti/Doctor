@@ -99,7 +99,7 @@ class WelcomeScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
 
                     OpdButton(
-                      label: 'Register New Account',
+                      label: 'Patient Self-Registration',
                       icon: Icons.person_add_alt_1_rounded,
                       isOutlined: true,
                       width: double.infinity,

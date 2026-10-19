@@ -231,7 +231,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         TextButton(
                           onPressed: () => context.pushNamed(RouteNames.profileSetup),
                           child: const Text(
-                            'Register Now',
+                            'Register as Patient',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               color: AppColors.primaryBlue,

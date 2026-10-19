@@ -3,15 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/opd_constants.dart';
 import '../../../core/utils/input_sanitizer.dart';
-import '../../../core/utils/responsive.dart';
 import '../../../routing/route_names.dart';
 import '../../../shared/widgets/error_banner_widget.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_text_field.dart';
-import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../providers/auth_provider.dart';
 
 class ProfileSetupScreen extends ConsumerStatefulWidget {
@@ -24,54 +21,28 @@ class ProfileSetupScreen extends ConsumerStatefulWidget {
 class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Core Identity Controllers
+  // Patient Identity & Demographics Controllers
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
-  // Role: Doctor
-  final _qualificationController = TextEditingController(text: 'MBBS, MD');
-  final _specializationController = TextEditingController(text: 'General Medicine');
-  final _docRegNumController = TextEditingController();
-  final _roomNumberController = TextEditingController(text: 'OPD Room 101');
-  final _consultationFeeController = TextEditingController(text: '500.00');
-
-  // Role: Nurse
-  final _nursingCouncilController = TextEditingController();
-  final _wardAssignedController = TextEditingController(text: 'OPD Triage Desk');
-
-  // Role: Pharmacist
-  final _pharmacyLicenseController = TextEditingController();
-  final _dispensingUnitController = TextEditingController(text: 'Pharmacy Unit-I (24 Hours)');
-
-  // Role: Laboratory Technician
-  final _labCouncilController = TextEditingController();
-  final _labSectionController = TextEditingController(text: 'Clinical Biochemistry & Hematology');
-
-  // Role: Receptionist & Billing
-  final _counterNumberController = TextEditingController(text: 'Counter #1');
-  final _employeeCodeController = TextEditingController();
-
-  // Role: Hospital Administrator
-  final _designationController = TextEditingController(text: 'Medical Superintendent');
-
-  // Role: Patient
   final _ageController = TextEditingController();
   final _addressController = TextEditingController();
+  final _parentSpouseController = TextEditingController();
   final _emergencyNameController = TextEditingController();
   final _emergencyPhoneController = TextEditingController();
   final _emergencyRelationController = TextEditingController(text: 'Spouse / Parent');
 
-  String _selectedRole = 'patient';
-  String _selectedDepartment = 'General Medicine';
+  String _parentRelation = 'S/o'; // 'S/o', 'D/o', 'W/o', 'H/o', 'C/o'
   String _selectedGender = 'MALE';
   String _selectedBloodGroup = 'O+';
   bool _isSaving = false;
   bool _isEditMode = false;
+  String _existingRole = 'patient';
 
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _genders = ['MALE', 'FEMALE', 'OTHER'];
+  final List<String> _relations = ['S/o', 'D/o', 'W/o', 'H/o', 'C/o'];
 
   @override
   void initState() {
@@ -81,7 +52,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       if (user != null && mounted) {
         setState(() {
           _isEditMode = true;
-          _selectedRole = user.roleName.toLowerCase();
+          _existingRole = user.roleName.toLowerCase();
           _nameController.text = user.fullName;
           _emailController.text = user.email;
           _phoneController.text = user.phone ?? '';
@@ -93,31 +64,12 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
-
-    _qualificationController.dispose();
-    _specializationController.dispose();
-    _docRegNumController.dispose();
-    _roomNumberController.dispose();
-    _consultationFeeController.dispose();
-
-    _nursingCouncilController.dispose();
-    _wardAssignedController.dispose();
-
-    _pharmacyLicenseController.dispose();
-    _dispensingUnitController.dispose();
-
-    _labCouncilController.dispose();
-    _labSectionController.dispose();
-
-    _counterNumberController.dispose();
-    _employeeCodeController.dispose();
-    _designationController.dispose();
-
     _ageController.dispose();
     _addressController.dispose();
+    _parentSpouseController.dispose();
     _emergencyNameController.dispose();
     _emergencyPhoneController.dispose();
     _emergencyRelationController.dispose();
@@ -127,23 +79,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final rawEmail = _emailController.text.trim();
-    if (_selectedRole != 'patient' && rawEmail.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.triageEmergency,
-          content: Text('Staff registration requires a valid email address.'),
-        ),
-      );
-      return;
-    }
-
     setState(() => _isSaving = true);
 
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final cleanName = InputSanitizer.sanitizeText(_nameController.text);
       final cleanPhone = InputSanitizer.sanitizePhone(_phoneController.text);
+      final rawEmail = _emailController.text.trim();
       final cleanEmail = rawEmail.isNotEmpty ? InputSanitizer.sanitizeEmail(rawEmail) : null;
 
       if (_isEditMode) {
@@ -181,67 +123,25 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         return;
       }
 
-      final bool success;
+      // Strictly register as PATIENT (staff registration is exclusively via Admin Portal)
+      final parsedAge = int.tryParse(_ageController.text.trim()) ?? 30;
+      final parentSpouseFull = _parentSpouseController.text.trim().isNotEmpty
+          ? '$_parentRelation ${_parentSpouseController.text.trim()}'
+          : null;
 
-      if (_selectedRole == 'patient') {
-        final parsedAge = int.tryParse(_ageController.text.trim());
-        success = await authNotifier.registerPatient(
-          fullName: cleanName,
-          phone: cleanPhone,
-          email: cleanEmail,
-          password: null,
-          gender: _selectedGender,
-          ageYears: parsedAge ?? 30,
-          bloodGroup: _selectedBloodGroup,
-          address: _addressController.text.trim(),
-          emergencyContactName: _emergencyNameController.text.trim(),
-          emergencyContactPhone: _emergencyPhoneController.text.trim(),
-          emergencyContactRelation: _emergencyRelationController.text.trim(),
-        );
-      } else {
-        // Collect role-specific metadata
-        final Map<String, dynamic> metadata = {};
-
-        if (_selectedRole == 'doctor') {
-          metadata['qualification'] = _qualificationController.text.trim();
-          metadata['specialization'] = _specializationController.text.trim();
-          metadata['registration_number'] = _docRegNumController.text.trim().isNotEmpty
-              ? _docRegNumController.text.trim()
-              : 'MCI-2026-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
-          metadata['department_name'] = _selectedDepartment;
-          metadata['room_number'] = _roomNumberController.text.trim();
-          metadata['consultation_fee'] = _consultationFeeController.text.trim();
-        } else if (_selectedRole == 'nurse') {
-          metadata['nursing_council_reg'] = _nursingCouncilController.text.trim();
-          metadata['ward_assigned'] = _wardAssignedController.text.trim();
-          metadata['department_name'] = _selectedDepartment;
-        } else if (_selectedRole == 'pharmacist') {
-          metadata['pharmacy_license_number'] = _pharmacyLicenseController.text.trim();
-          metadata['dispensing_unit'] = _dispensingUnitController.text.trim();
-        } else if (_selectedRole == 'laboratory' || _selectedRole == 'lab_tech') {
-          metadata['lab_council_reg'] = _labCouncilController.text.trim();
-          metadata['lab_section'] = _labSectionController.text.trim();
-        } else if (_selectedRole == 'billing') {
-          metadata['counter_number'] = _counterNumberController.text.trim();
-          metadata['employee_id'] = _employeeCodeController.text.trim();
-        } else if (_selectedRole == 'receptionist') {
-          metadata['counter_number'] = _counterNumberController.text.trim();
-          metadata['employee_id'] = _employeeCodeController.text.trim();
-          metadata['department_name'] = _selectedDepartment;
-        } else if (_selectedRole == 'admin') {
-          metadata['designation'] = _designationController.text.trim();
-          metadata['employee_id'] = _employeeCodeController.text.trim();
-        }
-
-        success = await authNotifier.registerStaff(
-          fullName: cleanName,
-          email: cleanEmail ?? '',
-          password: _passwordController.text,
-          roleName: _selectedRole,
-          phone: cleanPhone.isNotEmpty ? cleanPhone : null,
-          roleMetadata: metadata,
-        );
-      }
+      final success = await authNotifier.registerPatient(
+        fullName: cleanName,
+        phone: cleanPhone,
+        email: cleanEmail,
+        password: _passwordController.text.trim().isNotEmpty ? _passwordController.text.trim() : null,
+        gender: _selectedGender,
+        ageYears: parsedAge,
+        bloodGroup: _selectedBloodGroup,
+        address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : 'Local Patient Address',
+        emergencyContactName: _emergencyNameController.text.trim().isNotEmpty ? _emergencyNameController.text.trim() : (parentSpouseFull ?? cleanName),
+        emergencyContactPhone: _emergencyPhoneController.text.trim().isNotEmpty ? _emergencyPhoneController.text.trim() : cleanPhone,
+        emergencyContactRelation: _emergencyRelationController.text.trim(),
+      );
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -253,7 +153,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Profile created for $_selectedRole: $cleanName! Logging in...',
+                    'Patient $cleanName registered successfully! Permanent UHID generated.',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -286,7 +186,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             }
           },
         ),
-        title: Text(_isEditMode ? 'Edit Profile & Credentials' : 'New Patient Registration'),
+        title: Text(_isEditMode ? 'Edit Profile & Credentials' : 'Patient Registration'),
       ),
       body: MedicalIllustratorBackground(
         variant: MedicalBackgroundVariant.portal,
@@ -321,11 +221,11 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                         child: Row(
                           children: [
                             CircleAvatar(
-                              radius: 24,
+                              radius: 26,
                               backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.12),
                               child: Icon(
-                                _getRoleIcon(_selectedRole),
-                                size: 26,
+                                _isEditMode ? Icons.badge_outlined : Icons.person_add_alt_1_rounded,
+                                size: 28,
                                 color: AppColors.primaryBlue,
                               ),
                             ),
@@ -335,17 +235,17 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _isEditMode ? 'Update Profile & Login Credentials' : 'New Patient Registration',
+                                    _isEditMode ? 'Update Profile & Login Credentials' : 'New Patient Outpatient Registration',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
+                                  const SizedBox(height: 3),
                                   Text(
                                     _isEditMode
-                                        ? 'Modify your hospital identity details, phone number, and password.'
-                                        : 'Register your official SMVMCH digital outpatient record. Passwords are not required — check in anytime with your phone or UHID.',
+                                        ? 'Modify your identity details, mobile phone number, and password.'
+                                        : 'Register for your official SMVMCH hospital UHID. Passwords are optional — check in anytime with your phone or UHID.',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -357,79 +257,303 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
 
-                      if (authState.errorMessage != null)
+                      // Staff Notice Banner (explaining that staff are only provisioned by Admin)
+                      if (!_isEditMode)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.admin_panel_settings_rounded, color: AppColors.primaryBlue, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Hospital Staff Notice: Doctor, Nurse, Receptionist, Pharmacy, Lab & Cashier accounts are provisioned exclusively through the Hospital Admin Portal.',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark ? Colors.grey[300] : Colors.grey[700],
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+
+                      if (authState.errorMessage != null) ...[
                         ErrorBannerWidget(
                           message: authState.errorMessage!,
                           onDismiss: () => ref.read(authProvider.notifier).checkCurrentUser(),
                         ),
-
-
-
-                      // Section 2: Universal Account Credentials
-                      _buildSectionHeader(_isEditMode ? 'Account Details & Credentials' : '2. Account Credentials & Contact'),
-                      const SizedBox(height: 10),
-                      OpdTextField(
-                        label: 'Full Name *',
-                        hint: _selectedRole == 'doctor' ? 'e.g. Dr. A. Ramanathan, MD' : 'Full legal name',
-                        controller: _nameController,
-                        prefixIcon: Icons.person_outline_rounded,
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
-                      ),
-                      const SizedBox(height: 14),
-                      OpdTextField(
-                        label: _isEditMode ? 'Work Email Address' : (_selectedRole == 'patient' ? 'Email Address (Optional)' : 'Work Email Address *'),
-                        hint: 'name@opdconnect.com',
-                        controller: _emailController,
-                        readOnly: _isEditMode,
-                        prefixIcon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (v) => _isEditMode ? null : InputSanitizer.validateEmail(v, isRequired: _selectedRole != 'patient'),
-                      ),
-                      const SizedBox(height: 14),
-                      OpdTextField(
-                        label: 'Mobile Phone (10 Digits) *',
-                        hint: 'e.g. 9876543210 (10 digits)',
-                        controller: _phoneController,
-                        prefixIcon: Icons.phone_outlined,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(10),
-                        ],
-                        validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Mobile Phone'),
-                      ),
-                      const SizedBox(height: 14),
-                      if (_isEditMode) ...[
-                        OpdTextField(
-                          label: 'New Password (Optional)',
-                          hint: 'Leave blank to keep existing password',
-                          controller: _passwordController,
-                          prefixIcon: Icons.lock_outline_rounded,
-                          obscureText: true,
-                          enablePasswordToggle: true,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return null;
-                            return InputSanitizer.validateStrongPassword(v);
-                          },
-                        ),
                         const SizedBox(height: 14),
                       ],
 
-                      // Section 3: Dynamic Role-Specific Hospital Fields (if not patient in edit mode)
-                      if (!_isEditMode || _selectedRole != 'patient') ...[
-                        _buildSectionHeader(_isEditMode ? 'Role-Specific Professional Info' : '3. ${_getRoleSpecificSectionTitle(_selectedRole)}'),
-                        const SizedBox(height: 10),
-                        _buildRoleSpecificFields(isDark),
-                        const SizedBox(height: 32),
-                      ],
+                      // Section 1: Personal Demographics
+                      _buildSectionHeader('1. Patient Identity & Demographics'),
+                      const SizedBox(height: 10),
+                      OpdTextField(
+                        label: 'Full Legal Name *',
+                        hint: 'e.g. Mr. RAVI PRASANTH',
+                        controller: _nameController,
+                        prefixIcon: Icons.person_outline_rounded,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Full legal name is mandatory' : null,
+                      ),
+                      const SizedBox(height: 14),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OpdTextField(
+                              label: 'Mobile Phone (10 Digits) *',
+                              hint: 'e.g. 9876543210',
+                              controller: _phoneController,
+                              prefixIcon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(10),
+                              ],
+                              validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Mobile Phone'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OpdTextField(
+                              label: 'Email (Optional)',
+                              hint: 'name@example.com',
+                              controller: _emailController,
+                              readOnly: _isEditMode,
+                              prefixIcon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) => _isEditMode ? null : InputSanitizer.validateEmail(v, isRequired: false),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Age & Gender
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 130,
+                            child: OpdTextField(
+                              label: 'Age in Years *',
+                              hint: 'e.g. 35',
+                              controller: _ageController,
+                              prefixIcon: Icons.calendar_today_outlined,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(3),
+                              ],
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Age required' : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Gender *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: _genders.map((g) {
+                                    final isSelected = _selectedGender == g;
+                                    return Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                                        child: ChoiceChip(
+                                          label: Text(
+                                            g == 'MALE' ? 'Male' : (g == 'FEMALE' ? 'Female' : 'Other'),
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                              color: isSelected ? Colors.white : null,
+                                            ),
+                                          ),
+                                          selected: isSelected,
+                                          selectedColor: AppColors.primaryBlue,
+                                          onSelected: (val) {
+                                            if (val) setState(() => _selectedGender = g);
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Blood Group Selection Chips
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Blood Group', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: _bloodGroups.map((bg) {
+                              final isSelected = _selectedBloodGroup == bg;
+                              return ChoiceChip(
+                                label: Text(
+                                  bg,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isSelected ? Colors.white : null,
+                                  ),
+                                ),
+                                selected: isSelected,
+                                selectedColor: AppColors.triageEmergency,
+                                onSelected: (val) {
+                                  if (val) setState(() => _selectedBloodGroup = bg);
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Section 2: Guardian & Residential Information
+                      _buildSectionHeader('2. Guardian & Address Details'),
+                      const SizedBox(height: 10),
+
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 105,
+                            child: DropdownButtonFormField<String>(
+                              value: _parentRelation,
+                              isExpanded: true,
+                              items: _relations.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _parentRelation = val);
+                              },
+                              decoration: const InputDecoration(
+                                labelText: 'Relation *',
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OpdTextField(
+                              label: 'Parent / Spouse / Guardian Name *',
+                              hint: 'e.g. SAMBASIVA RAO',
+                              controller: _parentSpouseController,
+                              prefixIcon: Icons.family_restroom_rounded,
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Guardian / Parent name is required' : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      OpdTextField(
+                        label: 'Residential Address *',
+                        hint: 'e.g. No. 14, Main Road, Kalitheerthalkuppam, Puducherry',
+                        controller: _addressController,
+                        prefixIcon: Icons.home_outlined,
+                        maxLines: 2,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Residential address is mandatory' : null,
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Section 3: Emergency Contact
+                      _buildSectionHeader('3. Emergency Contact Details'),
+                      const SizedBox(height: 10),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OpdTextField(
+                              label: 'Emergency Contact Person *',
+                              hint: 'Contact Person / Relative',
+                              controller: _emergencyNameController,
+                              prefixIcon: Icons.contact_emergency_outlined,
+                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Contact name required' : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OpdTextField(
+                              label: 'Emergency Phone (10 Digits) *',
+                              hint: 'e.g. 9876543210',
+                              controller: _emergencyPhoneController,
+                              prefixIcon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(10),
+                              ],
+                              validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Emergency Contact Phone'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      DropdownButtonFormField<String>(
+                        value: _emergencyRelationController.text.isNotEmpty ? _emergencyRelationController.text : 'Spouse / Parent',
+                        items: const [
+                          DropdownMenuItem(value: 'Spouse / Parent', child: Text('Spouse / Parent')),
+                          DropdownMenuItem(value: 'Father / Mother', child: Text('Father / Mother')),
+                          DropdownMenuItem(value: 'Son / Daughter', child: Text('Son / Daughter')),
+                          DropdownMenuItem(value: 'Brother / Sister', child: Text('Brother / Sister')),
+                          DropdownMenuItem(value: 'Legal Guardian', child: Text('Legal Guardian')),
+                          DropdownMenuItem(value: 'Relative / Friend', child: Text('Relative / Friend')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() => _emergencyRelationController.text = v);
+                          }
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Emergency Contact Relationship',
+                          prefixIcon: Icon(Icons.people_alt_outlined, color: AppColors.primaryBlue),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Section 4: Security Credentials
+                      _buildSectionHeader('4. Portal Security (Optional)'),
+                      const SizedBox(height: 10),
+                      OpdTextField(
+                        label: _isEditMode ? 'New Password (Optional)' : 'Portal Password (Optional)',
+                        hint: _isEditMode ? 'Leave blank to retain existing password' : 'Leave blank to use fast Phone/UHID check-in',
+                        controller: _passwordController,
+                        prefixIcon: Icons.lock_outline_rounded,
+                        obscureText: true,
+                        enablePasswordToggle: true,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return null;
+                          return InputSanitizer.validateStrongPassword(v);
+                        },
+                      ),
+                      const SizedBox(height: 28),
 
                       // Submit Button
                       OpdButton(
-                        label: _isEditMode ? 'Save Profile & Credentials' : 'Complete Registration & Launch Portal',
+                        label: _isEditMode ? 'Save Profile Changes' : 'Register Patient & Generate UHID',
                         isLoading: _isSaving,
-                        icon: _isEditMode ? Icons.check_circle_outline_rounded : Icons.rocket_launch_rounded,
+                        icon: _isEditMode ? Icons.check_circle_outline_rounded : Icons.how_to_reg_rounded,
                         width: double.infinity,
                         onPressed: _handleSave,
                       ),
@@ -448,396 +572,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
     );
-  }
-
-  Widget _buildRoleSpecificFields(bool isDark) {
-    switch (_selectedRole) {
-      case 'doctor':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DropdownButtonFormField<String>(
-              initialValue: _selectedDepartment,
-              isExpanded: true,
-              items: OpdConstants.departments
-                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedDepartment = v ?? 'General Medicine'),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.domain_rounded, color: AppColors.primaryBlue),
-                labelText: 'Clinical Department *',
-              ),
-            ),
-            const SizedBox(height: 14),
-            OpdTextField(
-              label: 'Medical Council Reg. Number *',
-              hint: 'e.g. MCI-2026-8841',
-              controller: _docRegNumController,
-              prefixIcon: Icons.verified_user_outlined,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Medical council registration is required' : null,
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Qualifications *',
-                    hint: 'MBBS, MD, MS',
-                    controller: _qualificationController,
-                    prefixIcon: Icons.school_outlined,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Specialization *',
-                    hint: 'Cardiology, etc.',
-                    controller: _specializationController,
-                    prefixIcon: Icons.health_and_safety_outlined,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Consultation Room',
-                    hint: 'Room 101',
-                    controller: _roomNumberController,
-                    prefixIcon: Icons.meeting_room_outlined,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Consultation Fee (₹)',
-                    hint: '500.00',
-                    controller: _consultationFeeController,
-                    prefixIcon: Icons.currency_rupee_rounded,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case 'nurse':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DropdownButtonFormField<String>(
-              initialValue: _selectedDepartment,
-              isExpanded: true,
-              items: OpdConstants.departments
-                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedDepartment = v ?? 'General Medicine'),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.domain_rounded, color: AppColors.primaryBlue),
-                labelText: 'Assigned Department / Ward *',
-              ),
-            ),
-            const SizedBox(height: 14),
-            OpdTextField(
-              label: 'Nursing Council Registration Number *',
-              hint: 'e.g. NC-PY-2024-0981',
-              controller: _nursingCouncilController,
-              prefixIcon: Icons.badge_outlined,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nursing council registration is required' : null,
-            ),
-            const SizedBox(height: 14),
-            OpdTextField(
-              label: 'Triage / Ward Assignment',
-              hint: 'e.g. OPD Triage Station A',
-              controller: _wardAssignedController,
-              prefixIcon: Icons.local_hospital_outlined,
-            ),
-          ],
-        );
-
-      case 'pharmacist':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            OpdTextField(
-              label: 'Pharmacy License / Reg. Number *',
-              hint: 'e.g. RLF20PY2024000071',
-              controller: _pharmacyLicenseController,
-              prefixIcon: Icons.medication_outlined,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Pharmacy license registration is required' : null,
-            ),
-            const SizedBox(height: 14),
-            OpdTextField(
-              label: 'Dispensing Unit Assignment *',
-              hint: 'Pharmacy Unit-I (24 Hours)',
-              controller: _dispensingUnitController,
-              prefixIcon: Icons.store_mall_directory_outlined,
-            ),
-          ],
-        );
-
-      case 'laboratory':
-      case 'lab_tech':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            OpdTextField(
-              label: 'Paramedical / Lab Council Reg. Number *',
-              hint: 'e.g. MLT-PY-2024-4412',
-              controller: _labCouncilController,
-              prefixIcon: Icons.biotech_outlined,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Council registration is required' : null,
-            ),
-            const SizedBox(height: 14),
-            OpdTextField(
-              label: 'Diagnostic Lab Section',
-              hint: 'e.g. Biochemistry, Hematology, Pathology',
-              controller: _labSectionController,
-              prefixIcon: Icons.science_outlined,
-            ),
-          ],
-        );
-
-      case 'billing':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Billing Counter Number *',
-                    hint: 'e.g. Counter #1 (OPD)',
-                    controller: _counterNumberController,
-                    prefixIcon: Icons.receipt_long_outlined,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Cashier Employee ID *',
-                    hint: 'e.g. BILL-102',
-                    controller: _employeeCodeController,
-                    prefixIcon: Icons.badge_outlined,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case 'receptionist':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Front Desk Counter',
-                    hint: 'e.g. Desk A - Main Lobby',
-                    controller: _counterNumberController,
-                    prefixIcon: Icons.desk_rounded,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Employee Staff ID',
-                    hint: 'e.g. REC-204',
-                    controller: _employeeCodeController,
-                    prefixIcon: Icons.badge_outlined,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case 'admin':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Administrative Designation',
-                    hint: 'e.g. Medical Superintendent',
-                    controller: _designationController,
-                    prefixIcon: Icons.admin_panel_settings_outlined,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Admin Code / ID',
-                    hint: 'e.g. ADM-001',
-                    controller: _employeeCodeController,
-                    prefixIcon: Icons.badge_outlined,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-
-      case 'patient':
-      default:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Age in Years *',
-                    hint: 'e.g. 35',
-                    controller: _ageController,
-                    prefixIcon: Icons.calendar_today_outlined,
-                    keyboardType: TextInputType.number,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Age required' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedGender,
-                    items: _genders.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                    onChanged: (v) => setState(() => _selectedGender = v ?? 'MALE'),
-                    decoration: const InputDecoration(
-                      labelText: 'Gender *',
-                      prefixIcon: Icon(Icons.people_outline_rounded, color: AppColors.primaryBlue),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedBloodGroup,
-              items: _bloodGroups.map((bg) => DropdownMenuItem(value: bg, child: Text(bg))).toList(),
-              onChanged: (v) => setState(() => _selectedBloodGroup = v ?? 'O+'),
-              decoration: const InputDecoration(
-                labelText: 'Blood Group',
-                prefixIcon: Icon(Icons.bloodtype_outlined, color: AppColors.triageEmergency),
-              ),
-            ),
-            const SizedBox(height: 14),
-            OpdTextField(
-              label: 'Residential Address *',
-              hint: 'e.g. No. 14, Main Road, Puducherry',
-              controller: _addressController,
-              prefixIcon: Icons.home_outlined,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Residential address is mandatory' : null,
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Emergency Contact Name *',
-                    hint: 'Contact Person / Guardian',
-                    controller: _emergencyNameController,
-                    prefixIcon: Icons.contact_emergency_outlined,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Emergency contact name is mandatory' : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OpdTextField(
-                    label: 'Emergency Phone (10 Digits) *',
-                    hint: 'e.g. 9876543210',
-                    controller: _emergencyPhoneController,
-                    prefixIcon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
-                    validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Emergency Contact Phone'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              value: _emergencyRelationController.text.isNotEmpty ? _emergencyRelationController.text : 'Spouse / Parent',
-              items: const [
-                DropdownMenuItem(value: 'Spouse / Parent', child: Text('Spouse / Parent')),
-                DropdownMenuItem(value: 'Father / Mother', child: Text('Father / Mother')),
-                DropdownMenuItem(value: 'Son / Daughter', child: Text('Son / Daughter')),
-                DropdownMenuItem(value: 'Brother / Sister', child: Text('Brother / Sister')),
-                DropdownMenuItem(value: 'Legal Guardian', child: Text('Legal Guardian')),
-                DropdownMenuItem(value: 'Friend / Relative', child: Text('Friend / Relative')),
-              ],
-              onChanged: (v) {
-                if (v != null) {
-                  setState(() => _emergencyRelationController.text = v);
-                }
-              },
-              decoration: const InputDecoration(
-                labelText: 'Emergency Contact Relationship *',
-                prefixIcon: Icon(Icons.people_alt_outlined, color: AppColors.primaryBlue),
-              ),
-            ),
-          ],
-        );
-    }
-  }
-
-  IconData _getRoleIcon(String role) {
-    switch (role) {
-      case 'doctor':
-        return Icons.medical_services_rounded;
-      case 'nurse':
-        return Icons.monitor_heart_rounded;
-      case 'pharmacist':
-        return Icons.medication_rounded;
-      case 'laboratory':
-      case 'lab_tech':
-        return Icons.biotech_rounded;
-      case 'billing':
-        return Icons.receipt_long_rounded;
-      case 'admin':
-        return Icons.admin_panel_settings_rounded;
-      case 'receptionist':
-        return Icons.desk_rounded;
-      case 'patient':
-      default:
-        return Icons.person_rounded;
-    }
-  }
-
-  String _getRoleSpecificSectionTitle(String role) {
-    switch (role) {
-      case 'doctor':
-        return 'Doctor Credentials & Department';
-      case 'nurse':
-        return 'Nursing Council & Ward Details';
-      case 'pharmacist':
-        return 'Pharmacy License & Dispensing Unit';
-      case 'laboratory':
-      case 'lab_tech':
-        return 'Laboratory Council & Section';
-      case 'billing':
-        return 'Cashier & Counter Assignment';
-      case 'admin':
-        return 'Administrative Credentials';
-      case 'receptionist':
-        return 'Front Desk Station Details';
-      case 'patient':
-      default:
-        return 'Patient Demographics & Emergency Info';
-    }
   }
 }

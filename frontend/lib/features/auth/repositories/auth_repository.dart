@@ -33,34 +33,34 @@ class AuthRepository {
 
   static final Map<String, Map<String, String>> _staffEmailDirectory = {
     // SMVMCH Institutional Staff Accounts
-    'admin@smvmch.ac.in': {'pass': 'Admin@123', 'alt_pass': 'Admin@123456', 'role': 'admin', 'name': 'Admin Administrator', 'phone': '+1555000001'},
-    'doctor@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002'},
-    'doctor.genmed@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002'},
-    'doctor.cardio@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. R. Venkatesh, DM', 'phone': '+1555000011'},
-    'doctor.derma@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Ananya Rao, MD', 'phone': '+1555000012'},
-    'doctor.endo@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. S. Kulkarni, DM', 'phone': '+1555000013'},
-    'doctor.gastro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Pradeep Menon, DM', 'phone': '+1555000014'},
-    'doctor.neuro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Vikram Seth, DM', 'phone': '+1555000015'},
-    'doctor.onco@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Malini Iyer, MD DM', 'phone': '+1555000016'},
-    'doctor.pulmo@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Harish Patel, MD', 'phone': '+1555000017'},
-    'doctor.nephro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Gautam Das, DM', 'phone': '+1555000018'},
-    'doctor.gynec@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Radhika Nair, MS DGO', 'phone': '+1555000019'},
-    'receptionist@smvmch.ac.in': {'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003'},
-    'reception@smvmch.ac.in': {'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003'},
-    'nurse@smvmch.ac.in': {'pass': 'Nurse@123', 'alt_pass': 'Nurse@123456', 'role': 'nurse', 'name': 'Sister Priya (Triage Nurse)', 'phone': '+1555000006'},
-    'billing@smvmch.ac.in': {'pass': 'Billing@123', 'alt_pass': 'Billing@123456', 'role': 'billing', 'name': 'Rajesh Kumar (Billing Desk)', 'phone': '+1555000007'},
-    'lab@smvmch.ac.in': {'pass': 'Lab@123', 'alt_pass': 'Lab@123456', 'role': 'lab_tech', 'name': 'Marcus Vance (Lab Tech)', 'phone': '+1555000004'},
-    'pharmacy@smvmch.ac.in': {'pass': 'Pharmacy@123', 'alt_pass': 'Pharmacy@123456', 'role': 'pharmacist', 'name': 'Elena Rostova (Pharmacist)', 'phone': '+1555000005'},
+    'admin@smvmch.ac.in': {'pass': 'Admin@123', 'alt_pass': 'Admin@123456', 'role': 'admin', 'name': 'Admin Administrator', 'phone': '+1555000001', 'department': 'Hospital Administration'},
+    'doctor@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002', 'department': 'General Medicine'},
+    'doctor.genmed@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002', 'department': 'General Medicine'},
+    'doctor.cardio@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. R. Venkatesh, DM', 'phone': '+1555000011', 'department': 'Cardiology'},
+    'doctor.derma@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Ananya Rao, MD', 'phone': '+1555000012', 'department': 'Dermatology'},
+    'doctor.endo@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. S. Kulkarni, DM', 'phone': '+1555000013', 'department': 'Endocrinology'},
+    'doctor.gastro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Pradeep Menon, DM', 'phone': '+1555000014', 'department': 'Gastroenterology'},
+    'doctor.neuro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Vikram Seth, DM', 'phone': '+1555000015', 'department': 'Neurology'},
+    'doctor.onco@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Malini Iyer, MD DM', 'phone': '+1555000016', 'department': 'Oncology'},
+    'doctor.pulmo@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Harish Patel, MD', 'phone': '+1555000017', 'department': 'Pulmonology'},
+    'doctor.nephro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Gautam Das, DM', 'phone': '+1555000018', 'department': 'Nephrology'},
+    'doctor.gynec@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Radhika Nair, MS DGO', 'phone': '+1555000019', 'department': 'Obstetrics & Gynecology'},
+    'receptionist@smvmch.ac.in': {'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003', 'department': 'Central OPD Reception'},
+    'reception@smvmch.ac.in': {'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003', 'department': 'Central OPD Reception'},
+    'nurse@smvmch.ac.in': {'pass': 'Nurse@123', 'alt_pass': 'Nurse@123456', 'role': 'nurse', 'name': 'Sister Priya (Triage Nurse)', 'phone': '+1555000006', 'department': 'General Medicine'},
+    'billing@smvmch.ac.in': {'pass': 'Billing@123', 'alt_pass': 'Billing@123456', 'role': 'billing', 'name': 'Rajesh Kumar (Billing Desk)', 'phone': '+1555000007', 'department': 'Billing & Accounts'},
+    'lab@smvmch.ac.in': {'pass': 'Lab@123', 'alt_pass': 'Lab@123456', 'role': 'lab_tech', 'name': 'Marcus Vance (Lab Tech)', 'phone': '+1555000004', 'department': 'Clinical Pathology & Biochemistry'},
+    'pharmacy@smvmch.ac.in': {'pass': 'Pharmacy@123', 'alt_pass': 'Pharmacy@123456', 'role': 'pharmacist', 'name': 'Elena Rostova (Pharmacist)', 'phone': '+1555000005', 'department': 'Central Pharmacy'},
 
     // Standard opdconnect aliases
-    'admin@opdconnect.com': {'pass': 'Admin@123456', 'alt_pass': 'Admin@123', 'role': 'admin', 'name': 'Admin Administrator', 'phone': '+1555000001'},
-    'dr.chen@opdconnect.com': {'pass': 'Doctor@123456', 'alt_pass': 'Doctor@123', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002'},
-    'dr.arunraj@opdconnect.com': {'pass': 'Doctor@123456', 'alt_pass': 'Doctor@123', 'role': 'doctor', 'name': 'Dr. M. Arunraj, MDS', 'phone': '+1555000020'},
-    'receptionist@opdconnect.com': {'pass': 'Reception@123456', 'alt_pass': 'Reception@123', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003'},
-    'nurse@opdconnect.com': {'pass': 'Nurse@123456', 'alt_pass': 'Nurse@123', 'role': 'nurse', 'name': 'Sister Priya (Triage Nurse)', 'phone': '+1555000006'},
-    'billing@opdconnect.com': {'pass': 'Billing@123456', 'alt_pass': 'Billing@123', 'role': 'billing', 'name': 'Rajesh Kumar (Billing Desk)', 'phone': '+1555000007'},
-    'lab@opdconnect.com': {'pass': 'Lab@123456', 'alt_pass': 'Lab@123', 'role': 'lab_tech', 'name': 'Marcus Vance (Lab Tech)', 'phone': '+1555000004'},
-    'pharmacist@opdconnect.com': {'pass': 'Pharmacy@123456', 'alt_pass': 'Pharmacy@123', 'role': 'pharmacist', 'name': 'Elena Rostova (Pharmacist)', 'phone': '+1555000005'},
+    'admin@opdconnect.com': {'pass': 'Admin@123456', 'alt_pass': 'Admin@123', 'role': 'admin', 'name': 'Admin Administrator', 'phone': '+1555000001', 'department': 'Hospital Administration'},
+    'dr.chen@opdconnect.com': {'pass': 'Doctor@123456', 'alt_pass': 'Doctor@123', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002', 'department': 'General Medicine'},
+    'dr.arunraj@opdconnect.com': {'pass': 'Doctor@123456', 'alt_pass': 'Doctor@123', 'role': 'doctor', 'name': 'Dr. M. Arunraj, MDS', 'phone': '+1555000020', 'department': 'Dental Surgery'},
+    'receptionist@opdconnect.com': {'pass': 'Reception@123456', 'alt_pass': 'Reception@123', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003', 'department': 'Central OPD Reception'},
+    'nurse@opdconnect.com': {'pass': 'Nurse@123456', 'alt_pass': 'Nurse@123', 'role': 'nurse', 'name': 'Sister Priya (Triage Nurse)', 'phone': '+1555000006', 'department': 'General Medicine'},
+    'billing@opdconnect.com': {'pass': 'Billing@123456', 'alt_pass': 'Billing@123', 'role': 'billing', 'name': 'Rajesh Kumar (Billing Desk)', 'phone': '+1555000007', 'department': 'Billing & Accounts'},
+    'lab@opdconnect.com': {'pass': 'Lab@123456', 'alt_pass': 'Lab@123', 'role': 'lab_tech', 'name': 'Marcus Vance (Lab Tech)', 'phone': '+1555000004', 'department': 'Clinical Pathology & Biochemistry'},
+    'pharmacist@opdconnect.com': {'pass': 'Pharmacy@123456', 'alt_pass': 'Pharmacy@123', 'role': 'pharmacist', 'name': 'Elena Rostova (Pharmacist)', 'phone': '+1555000005', 'department': 'Central Pharmacy'},
   };
 
   static final Map<String, Map<String, String>> _dynamicStaffDirectory = {};
@@ -96,6 +96,7 @@ class AuthRepository {
     required String role,
     required String fullName,
     String? phone,
+    String? departmentName,
   }) async {
     await _loadDynamicDirectoryIfNeeded();
     final lowerEmail = email.toLowerCase().trim();
@@ -105,6 +106,7 @@ class AuthRepository {
       'role': role,
       'name': fullName,
       if (phone != null && phone.isNotEmpty) 'phone': phone.trim(),
+      if (departmentName != null && departmentName.isNotEmpty) 'department': departmentName.trim(),
     };
     _dynamicStaffDirectory[lowerEmail] = entry;
     if (phone != null && phone.trim().isNotEmpty) {
@@ -112,6 +114,7 @@ class AuthRepository {
         'email': lowerEmail,
         'role': role,
         'name': fullName,
+        if (departmentName != null && departmentName.isNotEmpty) 'department': departmentName.trim(),
       };
     }
     try {
@@ -153,6 +156,7 @@ class AuthRepository {
         fullName: staffEntry['name']!,
         phone: staffEntry['phone'],
         roleName: role,
+        departmentName: staffEntry['department'] ?? (role == 'doctor' ? 'General Medicine' : null),
       );
 
       await DioClient.saveTokens(
