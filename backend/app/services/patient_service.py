@@ -126,15 +126,27 @@ class PatientService:
                     f"A patient with Hospital Registration Number '{patient_in.hospital_reg_num}' already exists (UHID: {existing_reg.uhid})."
                 )
 
-        # Prevent duplicate if enabled and an exact match exists on phone AND full name
+        # Prevent duplicate if enabled
         if prevent_duplicates:
+            if patient_in.phone:
+                existing_phone = db.query(Patient).filter(Patient.phone == patient_in.phone.strip()).first()
+                if existing_phone:
+                    raise ConflictException(
+                        f"A patient with phone number '{patient_in.phone}' already exists (UHID: {existing_phone.uhid}, Name: {existing_phone.full_name}). Duplicate mobile numbers are not allowed."
+                    )
+            if patient_in.email:
+                existing_email = db.query(Patient).filter(Patient.email.ilike(patient_in.email.strip())).first()
+                if existing_email:
+                    raise ConflictException(
+                        f"A patient with email '{patient_in.email}' already exists (UHID: {existing_email.uhid}, Name: {existing_email.full_name}). Duplicate emails are not allowed."
+                    )
+
             dup_check = PatientService.check_duplicates(
                 db=db,
                 phone=patient_in.phone,
                 full_name=patient_in.full_name,
                 hospital_reg_num=patient_in.hospital_reg_num,
             )
-            # If any candidate matches both phone and name exactly, block accidental duplicate registration
             for c in dup_check.candidates:
                 if "Identical Phone Number and Matching Full Name" in c.match_reason:
                     raise ConflictException(

@@ -278,6 +278,19 @@ class _PatientTokenAccessScreenState extends ConsumerState<PatientTokenAccessScr
           role: 'patient',
         );
         if (patient != null) {
+          final userMap = {
+            'id': patient['id'] ?? 'pat-quick',
+            'patient_id': patient['id'] ?? 'pat-quick',
+            'uhid': patient['uhid'] ?? 'UHID-NEW',
+            'full_name': patient['full_name'] ?? 'Patient',
+            'phone': patient['phone'] ?? '',
+            'email': patient['email'] ?? 'patient@smvmch.ac.in',
+            'gender': patient['gender'] ?? 'OTHER',
+            'age_years': patient['age_years'] ?? 0,
+            'role_name': 'patient',
+          };
+          await SecureStorageService.saveUserData(userMap);
+
           final user = UserModel(
             id: patient['id'] as String? ?? 'pat-quick',
             email: patient['email'] as String? ?? 'patient@smvmch.ac.in',

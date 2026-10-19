@@ -29,27 +29,28 @@ class PatientPortalRepository {
       List<dynamic> localPatients = rawPatients != null ? jsonDecode(rawPatients) : [];
       List<dynamic> localVisits = rawVisits != null ? jsonDecode(rawVisits) : [];
 
+      final uid = userMap?['patient_id']?.toString() ?? userMap?['id']?.toString() ?? '';
+      final userPhone = userMap?['phone']?.toString().trim() ?? '';
+      final userUhid = userMap?['uhid']?.toString().trim() ?? '';
+
       Map<String, dynamic>? targetPatientJson;
-      if (userMap != null && userMap['id'] != null) {
-        final uid = userMap['id'].toString();
+      if (uid.isNotEmpty || userUhid.isNotEmpty || userPhone.isNotEmpty) {
         targetPatientJson = localPatients.firstWhere(
-          (p) => p['id'] == uid || p['uhid'] == uid,
+          (p) => (uid.isNotEmpty && (p['id'] == uid || p['uhid'] == uid)) ||
+              (userUhid.isNotEmpty && p['uhid'] == userUhid) ||
+              (userPhone.isNotEmpty && p['phone'] == userPhone),
           orElse: () => null,
         );
-      }
-
-      if (targetPatientJson == null && localPatients.isNotEmpty) {
-        targetPatientJson = localPatients.first as Map<String, dynamic>;
       }
 
       final patModel = targetPatientJson != null
           ? PatientModel.fromJson(targetPatientJson)
           : (userMap != null
               ? PatientModel(
-                  id: userMap['patient_id']?.toString() ?? userMap['id']?.toString() ?? 'pat-1',
-                  uhid: userMap['uhid']?.toString() ?? 'PAT-PROFILE',
+                  id: uid.isNotEmpty ? uid : 'pat-${DateTime.now().millisecondsSinceEpoch}',
+                  uhid: userUhid.isNotEmpty ? userUhid : 'UHID-NEW',
                   fullName: userMap['full_name']?.toString() ?? 'Patient',
-                  phone: userMap['phone']?.toString() ?? '',
+                  phone: userPhone,
                   gender: userMap['gender']?.toString() ?? 'OTHER',
                   ageYears: userMap['age_years'] as int? ?? 0,
                 )
@@ -62,14 +63,22 @@ class PatientPortalRepository {
                   ageYears: 0,
                 ));
 
-      final activeVis = localVisits.isNotEmpty ? localVisits.first : null;
+      // Strictly filter visits by this specific patient ID only
+      final patientVisits = localVisits.where((v) {
+        final pid = v['patient_id']?.toString();
+        final pObj = v['patient'] as Map<String, dynamic>?;
+        return (pid != null && (pid == patModel.id || pid == patModel.uhid)) ||
+            (pObj != null && (pObj['id'] == patModel.id || pObj['uhid'] == patModel.uhid));
+      }).toList();
+
+      final activeVis = patientVisits.isNotEmpty ? patientVisits.first : null;
 
       return PatientPortalProfile(
         patient: patModel,
         dependents: const [],
         hasActiveToken: activeVis != null,
-        activeTokenNumber: activeVis != null ? '#${activeVis['queue_token'] ?? 1}' : '#1',
-        activeTokenQueueStatus: activeVis != null ? (activeVis['status'] ?? 'REGISTERED') : 'REGISTERED',
+        activeTokenNumber: activeVis != null ? '#${activeVis['queue_token'] ?? 1}' : '#-',
+        activeTokenQueueStatus: activeVis != null ? (activeVis['status'] ?? 'REGISTERED') : 'NONE',
       );
     } catch (_) {
       return PatientPortalProfile(
@@ -138,11 +147,29 @@ class PatientPortalRepository {
     }
   }
 
+  Future<String?> _resolveTargetPatientId(String? explicitId) async {
+    if (explicitId != null && explicitId.trim().isNotEmpty) {
+      return explicitId.trim();
+    }
+    final userMap = await SecureStorageService.getUserData();
+    if (userMap != null) {
+      final pid = userMap['patient_id']?.toString();
+      if (pid != null && pid.isNotEmpty) return pid;
+      final uid = userMap['id']?.toString();
+      if (uid != null && uid.isNotEmpty) return uid;
+      final uhid = userMap['uhid']?.toString();
+      if (uhid != null && uhid.isNotEmpty) return uhid;
+    }
+    return null;
+  }
+
   Future<List<Map<String, dynamic>>> getVisits({String? patientId}) async {
+    final targetId = await _resolveTargetPatientId(patientId);
+    if (targetId == null) return const [];
+
     try {
-      final query = patientId != null ? {'patient_id': patientId} : null;
       final response = await _dioClient.dio
-          .get(ApiEndpoints.patientPortalVisits, queryParameters: query)
+          .get(ApiEndpoints.patientPortalVisits, queryParameters: {'patient_id': targetId})
           .timeout(const Duration(seconds: 10));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) return list.cast<Map<String, dynamic>>();
@@ -152,17 +179,23 @@ class PatientPortalRepository {
       final raw = await SecureStorageService.getVisitsJson();
       if (raw != null && raw.isNotEmpty) {
         final list = jsonDecode(raw) as List<dynamic>;
-        return list.cast<Map<String, dynamic>>();
+        return list.where((v) {
+          final pid = v['patient_id']?.toString();
+          final pObj = v['patient'] as Map<String, dynamic>?;
+          return pid == targetId || (pObj != null && pObj['id'] == targetId);
+        }).cast<Map<String, dynamic>>().toList();
       }
     } catch (_) {}
     return const [];
   }
 
   Future<List<UpcomingAppointment>> getAppointments({String? patientId}) async {
+    final targetId = await _resolveTargetPatientId(patientId);
+    if (targetId == null) return const [];
+
     try {
-      final query = patientId != null ? {'patient_id': patientId} : null;
       final response = await _dioClient.dio
-          .get(ApiEndpoints.patientPortalAppointments, queryParameters: query)
+          .get(ApiEndpoints.patientPortalAppointments, queryParameters: {'patient_id': targetId})
           .timeout(const Duration(seconds: 10));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) {
@@ -174,14 +207,21 @@ class PatientPortalRepository {
       final raw = await SecureStorageService.getVisitsJson();
       if (raw != null && raw.isNotEmpty) {
         final list = jsonDecode(raw) as List<dynamic>;
-        return list.map((v) => UpcomingAppointment(
+        // Strictly filter to this patient only
+        final patientVisits = list.where((v) {
+          final pid = v['patient_id']?.toString();
+          final pObj = v['patient'] as Map<String, dynamic>?;
+          return pid == targetId || (pObj != null && pObj['id'] == targetId);
+        }).toList();
+
+        return patientVisits.map((v) => UpcomingAppointment(
           visitId: v['id'] ?? 'vis-1',
-          visitNumber: v['visit_number'] ?? 'SMVMCH1510260001',
-          doctorName: v['doctor_name'] ?? 'Dr. Sarah Chen, MD',
+          visitNumber: v['visit_number'] ?? 'SMVMCH-VISIT',
+          doctorName: v['doctor_name'] ?? 'Attending Physician',
           departmentName: v['department_name'] ?? 'General Medicine',
           scheduledDate: v['visit_date'] ?? DateTime.now().toIso8601String(),
-          followUpReason: 'Routine Outpatient Consultation',
-          carePlan: 'Prescribed oral medications & blood glucose check',
+          followUpReason: v['notes'] ?? 'Routine Outpatient Consultation',
+          carePlan: 'Prescribed treatment plan & follow-up evaluation',
           isCompleted: v['status'] == 'COMPLETED',
         )).toList();
       }
@@ -190,10 +230,12 @@ class PatientPortalRepository {
   }
 
   Future<List<PatientPrescriptionSummaryItem>> getPrescriptions({String? patientId}) async {
+    final targetId = await _resolveTargetPatientId(patientId);
+    if (targetId == null) return [];
+
     try {
-      final query = patientId != null ? {'patient_id': patientId} : null;
       final response = await _dioClient.dio
-          .get(ApiEndpoints.patientPortalPrescriptions, queryParameters: query)
+          .get(ApiEndpoints.patientPortalPrescriptions, queryParameters: {'patient_id': targetId})
           .timeout(const Duration(seconds: 10));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) {
@@ -205,10 +247,12 @@ class PatientPortalRepository {
   }
 
   Future<List<PatientLabReportSummary>> getLabReports({String? patientId}) async {
+    final targetId = await _resolveTargetPatientId(patientId);
+    if (targetId == null) return [];
+
     try {
-      final query = patientId != null ? {'patient_id': patientId} : null;
       final response = await _dioClient.dio
-          .get(ApiEndpoints.patientPortalLabReports, queryParameters: query)
+          .get(ApiEndpoints.patientPortalLabReports, queryParameters: {'patient_id': targetId})
           .timeout(const Duration(seconds: 10));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) {
@@ -220,10 +264,12 @@ class PatientPortalRepository {
   }
 
   Future<List<Map<String, dynamic>>> getDocuments({String? patientId}) async {
+    final targetId = await _resolveTargetPatientId(patientId);
+    if (targetId == null) return [];
+
     try {
-      final query = patientId != null ? {'patient_id': patientId} : null;
       final response = await _dioClient.dio
-          .get(ApiEndpoints.patientPortalDocuments, queryParameters: query)
+          .get(ApiEndpoints.patientPortalDocuments, queryParameters: {'patient_id': targetId})
           .timeout(const Duration(seconds: 10));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) return list.cast<Map<String, dynamic>>();
@@ -233,14 +279,27 @@ class PatientPortalRepository {
   }
 
   Future<List<PatientBillSummary>> getBills({String? patientId}) async {
+    final targetId = await _resolveTargetPatientId(patientId);
+    if (targetId == null) return [];
+
     try {
-      final query = patientId != null ? {'patient_id': patientId} : null;
       final response = await _dioClient.dio
-          .get(ApiEndpoints.patientPortalBills, queryParameters: query)
+          .get(ApiEndpoints.patientPortalBills, queryParameters: {'patient_id': targetId})
           .timeout(const Duration(seconds: 10));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) {
         return list.map((b) => PatientBillSummary.fromJson(b as Map<String, dynamic>)).toList();
+      }
+    } catch (_) {}
+
+    try {
+      final raw = await SecureStorageService.getBillsJson();
+      if (raw != null && raw.isNotEmpty) {
+        final list = jsonDecode(raw) as List<dynamic>;
+        return list
+            .where((b) => b['patient_id'] == targetId)
+            .map((b) => PatientBillSummary.fromJson(b as Map<String, dynamic>))
+            .toList();
       }
     } catch (_) {}
 

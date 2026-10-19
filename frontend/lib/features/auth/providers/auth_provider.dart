@@ -124,17 +124,42 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<String?> forgotPassword(String identifier) async {
+    return await requestPasswordResetOtp(identifier);
+  }
+
+  Future<String?> requestPasswordResetOtp(String identifier) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final msg = await _repository.forgotPassword(identifier);
+      final code = await _repository.requestPasswordResetOtp(identifier);
       state = state.copyWith(isLoading: false);
-      return msg;
+      return code;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString().replaceAll('Exception: ', ''),
       );
       return null;
+    }
+  }
+
+  Future<bool> resetPasswordWithOtp({
+    required String identifier,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _repository.resetPasswordWithOtp(
+        identifier: identifier,
+        newPassword: newPassword,
+      );
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString().replaceAll('Exception: ', ''),
+      );
+      return false;
     }
   }
 

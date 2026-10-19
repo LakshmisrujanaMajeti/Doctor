@@ -239,6 +239,24 @@ class PatientRepository {
 
   Future<PatientModel> registerPatient(PatientModel patient, {bool allowDuplicate = false}) async {
     await _loadCacheIfNeeded();
+
+    final cleanPhone = patient.phone.trim();
+    final cleanEmail = patient.email?.trim().toLowerCase();
+
+    // 1. Strict duplicate check against existing patients in local cache
+    for (final p in _localPatients) {
+      if (cleanPhone.isNotEmpty && p.phone.trim() == cleanPhone) {
+        throw Exception(
+          'A patient with mobile number "$cleanPhone" is already registered in the hospital database (UHID: ${p.uhid}, Name: ${p.fullName}). Duplicate mobile numbers are not allowed.',
+        );
+      }
+      if (cleanEmail != null && cleanEmail.isNotEmpty && p.email != null && p.email!.trim().toLowerCase() == cleanEmail) {
+        throw Exception(
+          'A patient with email address "$cleanEmail" is already registered in the hospital database (UHID: ${p.uhid}, Name: ${p.fullName}). Duplicate emails are not allowed.',
+        );
+      }
+    }
+
     try {
       final res = await _dioClient.dio.post(
         ApiEndpoints.patients,

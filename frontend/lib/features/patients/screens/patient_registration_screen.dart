@@ -166,14 +166,26 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
   }
 
   void _showDuplicateWarningDialog(DuplicateCheckResult result) {
+    final cleanCurrentPhone = _phoneController.text.trim();
+    final hasIdenticalPhone = result.candidates.any((c) => c.phone.trim() == cleanCurrentPhone);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: AppColors.triagePriority, size: 28),
+            Icon(
+              hasIdenticalPhone ? Icons.block_rounded : Icons.warning_amber_rounded,
+              color: hasIdenticalPhone ? AppColors.triageEmergency : AppColors.triagePriority,
+              size: 28,
+            ),
             const SizedBox(width: 8),
-            const Expanded(child: Text('Duplicate Warning', style: TextStyle(fontWeight: FontWeight.bold))),
+            Expanded(
+              child: Text(
+                hasIdenticalPhone ? 'Duplicate Contact Blocked' : 'Duplicate Warning',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
         content: SizedBox(
@@ -183,8 +195,14 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Found ${result.candidates.length} existing patient record(s) matching contact or identity details:',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                hasIdenticalPhone
+                    ? 'A patient with this exact contact mobile number ($cleanCurrentPhone) already exists in the hospital database. Duplicate mobile numbers are strictly not accepted.'
+                    : 'Found ${result.candidates.length} existing patient record(s) matching contact or identity details:',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: hasIdenticalPhone ? AppColors.triageEmergency : AppColors.textSecondary,
+                  fontWeight: hasIdenticalPhone ? FontWeight.w600 : FontWeight.normal,
+                ),
               ),
               const SizedBox(height: 12),
               Flexible(
@@ -234,16 +252,17 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Review Form'),
+            child: const Text('Edit Contact Info'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _handleRegistrationSubmit(allowDuplicate: true);
-            },
-            child: const Text('Proceed (Override Duplicate)', style: TextStyle(color: Colors.white)),
-          ),
+          if (!hasIdenticalPhone)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _handleRegistrationSubmit(allowDuplicate: true);
+              },
+              child: const Text('Proceed (Override Duplicate)', style: TextStyle(color: Colors.white)),
+            ),
         ],
       ),
     );
