@@ -384,11 +384,20 @@ class _BarcodeScannerModalState extends ConsumerState<BarcodeScannerModal> with 
                   _handleScan('UHID:UHID-2026-0001');
                 },
               ),
-              ActionChip(
-                label: const Text('VIS:SMVMCH1510260001', style: TextStyle(fontSize: 11)),
-                onPressed: () {
-                  _manualScanController.text = 'VIS:SMVMCH1510260001';
-                  _handleScan('VIS:SMVMCH1510260001');
+              Builder(
+                builder: (context) {
+                  final now = DateTime.now();
+                  final dd = now.day.toString().padLeft(2, '0');
+                  final mm = now.month.toString().padLeft(2, '0');
+                  final yy = (now.year % 100).toString().padLeft(2, '0');
+                  final sampleToken = 'VIS:SMVMCH$dd$mm${yy}0001';
+                  return ActionChip(
+                    label: Text(sampleToken, style: const TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      _manualScanController.text = sampleToken;
+                      _handleScan(sampleToken);
+                    },
+                  );
                 },
               ),
               ActionChip(

@@ -126,6 +126,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back to Login',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.login);
+            }
+          },
+        ),
         title: const Text('Reset Password'),
       ),
       body: SafeArea(

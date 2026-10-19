@@ -22,7 +22,139 @@ class DoctorRepository {
     _isLoaded = true;
   }
 
+  static void addDoctorToCache(DoctorModel doc) {
+    final idx = _localDoctors.indexWhere((d) => d.id == doc.id || d.userId == doc.userId || d.name == doc.name);
+    if (idx != -1) {
+      _localDoctors[idx] = doc;
+    } else {
+      _localDoctors.insert(0, doc);
+    }
+  }
+
   DoctorRepository(this._dioClient);
+
+  static final List<DoctorModel> _default10Doctors = [
+    DoctorModel(
+      id: 'doc-genmed',
+      userId: 'user-doc-genmed',
+      name: 'Dr. Sarah Chen, MD',
+      specialization: 'General Medicine',
+      departmentId: 'General Medicine',
+      departmentName: 'General Medicine',
+      qualification: 'MBBS, MD (General Medicine)',
+      roomNumber: 'Room 101',
+      consultationFee: 500.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-cardio',
+      userId: 'user-doc-cardio',
+      name: 'Dr. R. Venkatesh, DM',
+      specialization: 'Cardiology',
+      departmentId: 'Cardiology',
+      departmentName: 'Cardiology',
+      qualification: 'MBBS, MD, DM (Cardiology)',
+      roomNumber: 'Room 102',
+      consultationFee: 750.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-derma',
+      userId: 'user-doc-derma',
+      name: 'Dr. Ananya Rao, MD',
+      specialization: 'Dermatology',
+      departmentId: 'Dermatology',
+      departmentName: 'Dermatology',
+      qualification: 'MBBS, MD (DVL)',
+      roomNumber: 'Room 103',
+      consultationFee: 600.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-endo',
+      userId: 'user-doc-endo',
+      name: 'Dr. S. Kulkarni, DM',
+      specialization: 'Endocrinology',
+      departmentId: 'Endocrinology',
+      departmentName: 'Endocrinology',
+      qualification: 'MBBS, MD, DM (Endocrinology)',
+      roomNumber: 'Room 104',
+      consultationFee: 700.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-gastro',
+      userId: 'user-doc-gastro',
+      name: 'Dr. Pradeep Menon, DM',
+      specialization: 'Gastroenterology',
+      departmentId: 'Gastroenterology',
+      departmentName: 'Gastroenterology',
+      qualification: 'MBBS, MD, DM (Gastroenterology)',
+      roomNumber: 'Room 105',
+      consultationFee: 750.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-neuro',
+      userId: 'user-doc-neuro',
+      name: 'Dr. Vikram Seth, DM',
+      specialization: 'Neurology',
+      departmentId: 'Neurology',
+      departmentName: 'Neurology',
+      qualification: 'MBBS, MD, DM (Neurology)',
+      roomNumber: 'Room 106',
+      consultationFee: 800.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-onco',
+      userId: 'user-doc-onco',
+      name: 'Dr. Malini Iyer, MD DM',
+      specialization: 'Oncology',
+      departmentId: 'Oncology',
+      departmentName: 'Oncology',
+      qualification: 'MBBS, MD, DM (Medical Oncology)',
+      roomNumber: 'Room 107',
+      consultationFee: 900.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-pulmo',
+      userId: 'user-doc-pulmo',
+      name: 'Dr. Harish Patel, MD',
+      specialization: 'Pulmonology',
+      departmentId: 'Pulmonology',
+      departmentName: 'Pulmonology',
+      qualification: 'MBBS, MD (Pulmonary Medicine)',
+      roomNumber: 'Room 108',
+      consultationFee: 650.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-nephro',
+      userId: 'user-doc-nephro',
+      name: 'Dr. Gautam Das, DM',
+      specialization: 'Nephrology',
+      departmentId: 'Nephrology',
+      departmentName: 'Nephrology',
+      qualification: 'MBBS, MD, DM (Nephrology)',
+      roomNumber: 'Room 109',
+      consultationFee: 750.0,
+      isAvailable: true,
+    ),
+    DoctorModel(
+      id: 'doc-gynec',
+      userId: 'user-doc-gynec',
+      name: 'Dr. Radhika Nair, MS DGO',
+      specialization: 'Gynecology',
+      departmentId: 'Gynecology',
+      departmentName: 'Gynecology',
+      qualification: 'MBBS, MS, DGO (Obstetrics & Gynecology)',
+      roomNumber: 'Room 110',
+      consultationFee: 600.0,
+      isAvailable: true,
+    ),
+  ];
 
   Future<void> _loadCacheIfNeeded() async {
     if (_localDoctors.isNotEmpty) return;
@@ -54,6 +186,11 @@ class DoctorRepository {
       }
     } catch (e) {
       debugPrint('Error loading doctor staff cache: $e');
+    }
+
+    // If still empty, seed with the 10 core hospital clinical doctor specialists
+    if (_localDoctors.isEmpty) {
+      _localDoctors.addAll(_default10Doctors);
     }
     _isLoaded = true;
   }

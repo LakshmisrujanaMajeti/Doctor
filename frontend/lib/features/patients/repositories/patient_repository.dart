@@ -22,6 +22,11 @@ class PatientRepository {
     _isLoaded = true;
   }
 
+  static void addPatient(PatientModel patient) {
+    _localPatients.removeWhere((p) => p.id == patient.id || p.uhid == patient.uhid);
+    _localPatients.insert(0, patient);
+  }
+
   PatientRepository(this._dioClient);
 
   Future<void> _loadCacheIfNeeded() async {

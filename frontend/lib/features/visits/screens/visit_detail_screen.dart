@@ -31,28 +31,47 @@ class VisitDetailScreen extends ConsumerWidget {
     final isLab = currentRole == 'laboratory' || currentRole == 'lab_tech';
     final isAdminOrReceptionist = currentRole == 'admin' || currentRole == 'receptionist';
 
+    final now = DateTime.now();
+    final dd = now.day.toString().padLeft(2, '0');
+    final mm = now.month.toString().padLeft(2, '0');
+    final yy = (now.year % 100).toString().padLeft(2, '0');
+    final todayTokenPrefix = 'SMVMCH$dd$mm$yy';
+
     final visitsAsync = ref.watch(visitListProvider);
-    final currentVisit = visit ?? visitsAsync.asData?.value.firstWhere(
-      (v) => v.id == visitId,
-      orElse: () => OPDVisitModel(
-        id: visitId,
-        visitNumber: 'SMVMCH1510260001',
-        patientId: '',
-        doctorId: '',
-        departmentId: '',
-        queueToken: 1,
-        triagePriority: 'NORMAL',
-        status: 'REGISTERED',
-        consultationFee: 500.0,
-        paymentStatus: 'UNPAID',
-        visitDate: DateTime.now(),
-      ),
+    final currentVisit = visit ?? visitsAsync.asData?.value.cast<OPDVisitModel?>().firstWhere(
+      (v) => v?.id == visitId || v?.visitNumber == visitId,
+      orElse: () => null,
+    ) ?? OPDVisitModel(
+      id: visitId,
+      visitNumber: visitId.toUpperCase().startsWith('SMVMCH') ? visitId.toUpperCase() : '$todayTokenPrefix-OPD',
+      patientId: '',
+      doctorId: '',
+      departmentId: '',
+      queueToken: 1,
+      triagePriority: 'NORMAL',
+      status: 'REGISTERED',
+      consultationFee: 500.0,
+      paymentStatus: 'UNPAID',
+      visitDate: now,
     );
 
-    final displayToken = currentVisit?.formattedToken ?? currentVisit?.visitNumber ?? 'SMVMCH1510260001';
+    final displayToken = currentVisit.formattedToken.isNotEmpty
+        ? currentVisit.formattedToken
+        : (currentVisit.visitNumber.isNotEmpty ? currentVisit.visitNumber : 'OPD Slip');
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.go('/queue');
+            }
+          },
+        ),
         title: Text('OPD Slip: $displayToken'),
       ),
       body: SingleChildScrollView(
@@ -114,14 +133,13 @@ class VisitDetailScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Department Queue #${currentVisit?.queueToken ?? 1} • ${currentVisit?.departmentName ?? "Outpatient Clinic"}',
+                                    'Department Queue #${currentVisit.queueToken} • ${currentVisit.departmentName ?? "Outpatient Clinic"}',
                                     style: const TextStyle(color: Colors.grey, fontSize: 13),
                                   ),
                                 ],
                               ),
                             ),
-                            if (currentVisit != null)
-                              TriageChip(priority: currentVisit.triagePriority),
+                            TriageChip(priority: currentVisit.triagePriority),
                           ],
                         ),
                         const Divider(height: 24),
@@ -132,8 +150,7 @@ class VisitDetailScreen extends ConsumerWidget {
                               'Status: ',
                               style: TextStyle(color: Colors.grey[600], fontSize: 14),
                             ),
-                            if (currentVisit != null)
-                              StatusBadge(status: currentVisit.status),
+                            StatusBadge(status: currentVisit.status),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -145,7 +162,7 @@ class VisitDetailScreen extends ConsumerWidget {
                               style: TextStyle(color: Colors.grey[600], fontSize: 14),
                             ),
                             Text(
-                              '\$${currentVisit?.consultationFee ?? 500.0} (${currentVisit?.paymentStatus})',
+                              '\$${currentVisit.consultationFee} (${currentVisit.paymentStatus})',
                               style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
                           ],
@@ -167,13 +184,13 @@ class VisitDetailScreen extends ConsumerWidget {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _infoRow(Icons.person, 'Full Name', currentVisit?.patient?.fullName ?? 'Outpatient'),
+                        _infoRow(Icons.person, 'Full Name', currentVisit.patient?.fullName ?? 'Outpatient'),
                         const Divider(height: 16),
-                        _infoRow(Icons.badge, 'UHID', currentVisit?.patient?.uhid ?? '--'),
+                        _infoRow(Icons.badge, 'UHID', currentVisit.patient?.uhid ?? '--'),
                         const Divider(height: 16),
-                        _infoRow(Icons.phone, 'Contact', currentVisit?.patient?.phone ?? '--'),
+                        _infoRow(Icons.phone, 'Contact', currentVisit.patient?.phone ?? '--'),
                         const Divider(height: 16),
-                        _infoRow(Icons.bloodtype, 'Blood Group', currentVisit?.patient?.bloodGroup ?? '--'),
+                        _infoRow(Icons.bloodtype, 'Blood Group', currentVisit.patient?.bloodGroup ?? '--'),
                       ],
                     ),
                   ),
@@ -195,7 +212,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     width: double.infinity,
                     color: AppColors.primaryBlue,
                     onPressed: () {
-                      final pid = currentVisit?.patientId ?? '';
+                      final pid = currentVisit.patientId;
                       if (pid.isNotEmpty) {
                         context.push('/patients/$pid/booklet');
                       } else {
@@ -209,7 +226,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     icon: Icons.medication_rounded,
                     width: double.infinity,
                     isOutlined: true,
-                    onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
+                    onPressed: () => context.push('/visits/${currentVisit.id}/prescriptions', extra: currentVisit),
                   ),
                   const SizedBox(height: 12),
                   OpdButton(
@@ -228,7 +245,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     icon: Icons.menu_book_rounded,
                     width: double.infinity,
                     color: AppColors.secondaryNavy,
-                    onPressed: () => context.push('/visits/${currentVisit?.id}/consultation', extra: currentVisit),
+                    onPressed: () => context.push('/visits/${currentVisit.id}/consultation', extra: currentVisit),
                   ),
                   const SizedBox(height: 12),
                   OpdButton(
@@ -236,7 +253,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     icon: Icons.medication_rounded,
                     width: double.infinity,
                     isOutlined: true,
-                    onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
+                    onPressed: () => context.push('/visits/${currentVisit.id}/prescriptions', extra: currentVisit),
                   ),
                   const SizedBox(height: 12),
                   OpdButton(
@@ -245,7 +262,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     width: double.infinity,
                     isOutlined: true,
                     onPressed: () {
-                      final pid = currentVisit?.patientId ?? '';
+                      final pid = currentVisit.patientId;
                       if (pid.isNotEmpty) {
                         context.push('/patients/$pid/booklet');
                       }
@@ -260,7 +277,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     icon: Icons.monitor_heart_rounded,
                     width: double.infinity,
                     color: AppColors.primaryTeal,
-                    onPressed: () => context.push('/visits/${currentVisit?.id}/vitals', extra: currentVisit),
+                    onPressed: () => context.push('/visits/${currentVisit.id}/vitals', extra: currentVisit),
                   ),
                   const SizedBox(height: 12),
                   OpdButton(
@@ -269,7 +286,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     width: double.infinity,
                     isOutlined: true,
                     onPressed: () {
-                      final pid = currentVisit?.patientId ?? '';
+                      final pid = currentVisit.patientId;
                       if (pid.isNotEmpty) {
                         context.push('/patients/$pid/booklet');
                       }
@@ -284,7 +301,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     icon: Icons.medication_rounded,
                     width: double.infinity,
                     color: AppColors.primaryTeal,
-                    onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
+                    onPressed: () => context.push('/visits/${currentVisit.id}/prescriptions', extra: currentVisit),
                   ),
                   const SizedBox(height: 12),
                   OpdButton(
@@ -312,7 +329,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     width: double.infinity,
                     isOutlined: true,
                     onPressed: () {
-                      final pid = currentVisit?.patientId ?? '';
+                      final pid = currentVisit.patientId;
                       if (pid.isNotEmpty) {
                         context.push('/patients/$pid/booklet');
                       }
@@ -336,7 +353,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     width: double.infinity,
                     isOutlined: true,
                     onPressed: () {
-                      final pid = currentVisit?.patientId ?? '';
+                      final pid = currentVisit.patientId;
                       if (pid.isNotEmpty) {
                         context.push('/patients/$pid/booklet');
                       }
@@ -350,7 +367,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     label: 'Triage & Vital Signs Entry',
                     icon: Icons.monitor_heart_rounded,
                     width: double.infinity,
-                    onPressed: () => context.push('/visits/${currentVisit?.id}/vitals', extra: currentVisit),
+                    onPressed: () => context.push('/visits/${currentVisit.id}/vitals', extra: currentVisit),
                   ),
                   const SizedBox(height: 12),
                   OpdButton(
@@ -358,7 +375,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     icon: Icons.menu_book_rounded,
                     width: double.infinity,
                     color: AppColors.secondaryNavy,
-                    onPressed: () => context.push('/visits/${currentVisit?.id}/consultation', extra: currentVisit),
+                    onPressed: () => context.push('/visits/${currentVisit.id}/consultation', extra: currentVisit),
                   ),
                   const SizedBox(height: 12),
                   OpdButton(
@@ -366,7 +383,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     icon: Icons.medication_rounded,
                     width: double.infinity,
                     isOutlined: true,
-                    onPressed: () => context.push('/visits/${currentVisit?.id}/prescriptions', extra: currentVisit),
+                    onPressed: () => context.push('/visits/${currentVisit.id}/prescriptions', extra: currentVisit),
                   ),
                   const SizedBox(height: 12),
                   OpdButton(
@@ -375,7 +392,7 @@ class VisitDetailScreen extends ConsumerWidget {
                     width: double.infinity,
                     isOutlined: true,
                     onPressed: () {
-                      final pid = currentVisit?.patientId ?? '';
+                      final pid = currentVisit.patientId;
                       if (pid.isNotEmpty) {
                         context.push('/patients/$pid/booklet');
                       }

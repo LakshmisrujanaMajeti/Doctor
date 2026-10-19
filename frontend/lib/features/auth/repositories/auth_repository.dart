@@ -7,6 +7,8 @@ import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../../core/network/supabase_service.dart';
 import '../models/auth_state.dart';
+import '../../patients/models/patient_model.dart';
+import '../../patients/repositories/patient_repository.dart';
 
 class AuthRepository {
   final DioClient _dioClient;
@@ -33,6 +35,16 @@ class AuthRepository {
     // SMVMCH Institutional Staff Accounts
     'admin@smvmch.ac.in': {'pass': 'Admin@123', 'alt_pass': 'Admin@123456', 'role': 'admin', 'name': 'Admin Administrator', 'phone': '+1555000001'},
     'doctor@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002'},
+    'doctor.genmed@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002'},
+    'doctor.cardio@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. R. Venkatesh, DM', 'phone': '+1555000011'},
+    'doctor.derma@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Ananya Rao, MD', 'phone': '+1555000012'},
+    'doctor.endo@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. S. Kulkarni, DM', 'phone': '+1555000013'},
+    'doctor.gastro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Pradeep Menon, DM', 'phone': '+1555000014'},
+    'doctor.neuro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Vikram Seth, DM', 'phone': '+1555000015'},
+    'doctor.onco@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Malini Iyer, MD DM', 'phone': '+1555000016'},
+    'doctor.pulmo@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Harish Patel, MD', 'phone': '+1555000017'},
+    'doctor.nephro@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Gautam Das, DM', 'phone': '+1555000018'},
+    'doctor.gynec@smvmch.ac.in': {'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Radhika Nair, MS DGO', 'phone': '+1555000019'},
     'receptionist@smvmch.ac.in': {'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003'},
     'reception@smvmch.ac.in': {'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003'},
     'nurse@smvmch.ac.in': {'pass': 'Nurse@123', 'alt_pass': 'Nurse@123456', 'role': 'nurse', 'name': 'Sister Priya (Triage Nurse)', 'phone': '+1555000006'},
@@ -254,16 +266,22 @@ class AuthRepository {
     required String fullName,
     required String phone,
     String? email,
-    required String password,
+    String? password,
     String gender = 'MALE',
     int? ageYears,
     String? bloodGroup,
     String? address,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? emergencyContactRelation,
   }) async {
     final cleanPhone = phone.trim();
     final cleanEmail = (email != null && email.trim().isNotEmpty)
         ? email.trim()
         : 'patient_${cleanPhone.replaceAll(RegExp(r'[^0-9]'), '')}@opdconnect.hospital';
+    final effectivePassword = (password != null && password.trim().isNotEmpty)
+        ? password.trim()
+        : 'Patient@${cleanPhone.length >= 4 ? cleanPhone.substring(cleanPhone.length - 4) : '2026'}';
     final generatedUhid = 'UHID-2026-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
 
     // 0. Strict duplicate check against existing patients
@@ -290,7 +308,7 @@ class AuthRepository {
     try {
       final res = await Supabase.instance.client.auth.signUp(
         email: cleanEmail,
-        password: password.trim(),
+        password: effectivePassword,
         data: {
           'full_name': fullName.trim(),
           'phone': cleanPhone,
@@ -300,6 +318,8 @@ class AuthRepository {
           if (ageYears != null) 'age_years': ageYears,
           if (bloodGroup != null) 'blood_group': bloodGroup,
           if (address != null) 'address': address,
+          if (emergencyContactName != null) 'emergency_contact_name': emergencyContactName,
+          if (emergencyContactPhone != null) 'emergency_contact_phone': emergencyContactPhone,
         },
       );
 
@@ -329,7 +349,7 @@ class AuthRepository {
           'full_name': fullName.trim(),
           'phone': cleanPhone,
           'email': cleanEmail,
-          'password': password.trim(),
+          'password': effectivePassword,
           'gender': gender,
           if (ageYears != null) 'age_years': ageYears,
           if (bloodGroup != null) 'blood_group': bloodGroup,
@@ -383,6 +403,9 @@ class AuthRepository {
       ageYears: ageYears ?? 30,
       bloodGroup: bloodGroup,
       address: address,
+      emergencyContactName: emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone,
+      emergencyContactRelation: emergencyContactRelation,
     );
 
     return registeredUser;
@@ -398,6 +421,9 @@ class AuthRepository {
     required int ageYears,
     String? bloodGroup,
     String? address,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? emergencyContactRelation,
   }) async {
     try {
       final raw = await SecureStorageService.getPatientsJson();
@@ -418,9 +444,12 @@ class AuthRepository {
         'age_months': 0,
         'blood_group': bloodGroup ?? 'O+',
         'address': address ?? 'Local Patient Address',
-        'city': 'Metro Health City',
-        'state': 'Province',
-        'postal_code': '500001',
+        'city': 'Puducherry',
+        'state': 'Puducherry',
+        'postal_code': '605107',
+        'emergency_contact_name': emergencyContactName,
+        'emergency_contact_phone': emergencyContactPhone,
+        'emergency_contact_relation': emergencyContactRelation ?? 'Spouse',
         'barcode_value': 'BAR-$uhid',
         'qr_code_data': 'OPDCONNECT+$uhid',
         'created_at': DateTime.now().toIso8601String(),
@@ -428,6 +457,7 @@ class AuthRepository {
 
       list.insert(0, newPatient);
       await SecureStorageService.savePatientsJson(jsonEncode(list));
+      PatientRepository.addPatient(PatientModel.fromJson(newPatient));
     } catch (e) {
       debugPrint('Persist local patient note: $e');
     }

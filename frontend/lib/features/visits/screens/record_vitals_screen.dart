@@ -146,6 +146,17 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.go('/queue');
+            }
+          },
+        ),
         title: const Text('Nursing Triage & Vitals'),
       ),
       body: SingleChildScrollView(

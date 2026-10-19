@@ -9,6 +9,8 @@ import '../models/admin_portal_models.dart';
 import '../../patient_portal/models/patient_portal_models.dart';
 import '../../patients/repositories/patient_repository.dart';
 import '../../visits/repositories/visit_repository.dart';
+import '../../doctors/models/doctor_model.dart';
+import '../../doctors/repositories/doctor_repository.dart';
 
 class AdminPortalRepository {
   final DioClient _dioClient;
@@ -248,6 +250,11 @@ class AdminPortalRepository {
     required String fullName,
     required String roleName,
     String? phone,
+    String? departmentName,
+    String? specialization,
+    String? roomNumber,
+    String? qualification,
+    double? consultationFee,
   }) async {
     final cleanEmail = email.trim().toLowerCase();
     final cleanName = fullName.trim();
@@ -323,6 +330,23 @@ class AdminPortalRepository {
       fullName: cleanName,
       phone: phone?.trim(),
     );
+
+    // If role is doctor, register into DoctorRepository directory and cache
+    if (cleanRole == 'doctor') {
+      final docModel = DoctorModel(
+        id: createdUser.id,
+        userId: createdUser.id,
+        name: cleanName,
+        specialization: specialization ?? departmentName ?? 'General Medicine',
+        departmentId: departmentName ?? 'General Medicine',
+        departmentName: departmentName ?? 'General Medicine',
+        qualification: qualification ?? 'MBBS, Specialist',
+        roomNumber: roomNumber ?? 'Room 101',
+        consultationFee: consultationFee ?? 500.0,
+        isAvailable: true,
+      );
+      DoctorRepository.addDoctorToCache(docModel);
+    }
 
     return createdUser;
   }

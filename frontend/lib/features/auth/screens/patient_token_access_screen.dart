@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../routing/app_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
@@ -320,6 +321,17 @@ class _PatientTokenAccessScreenState extends ConsumerState<PatientTokenAccessScr
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.welcome);
+            }
+          },
+        ),
         title: const Text('Patient Token & UHID Portal', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SingleChildScrollView(

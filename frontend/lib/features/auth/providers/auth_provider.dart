@@ -57,11 +57,14 @@ class AuthNotifier extends Notifier<AuthState> {
     required String fullName,
     required String phone,
     String? email,
-    required String password,
+    String? password,
     String gender = 'MALE',
     int? ageYears,
     String? bloodGroup,
     String? address,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
+    String? emergencyContactRelation,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
@@ -74,6 +77,9 @@ class AuthNotifier extends Notifier<AuthState> {
         ageYears: ageYears,
         bloodGroup: bloodGroup,
         address: address,
+        emergencyContactName: emergencyContactName,
+        emergencyContactPhone: emergencyContactPhone,
+        emergencyContactRelation: emergencyContactRelation,
       );
       state = state.copyWith(
         isAuthenticated: true,

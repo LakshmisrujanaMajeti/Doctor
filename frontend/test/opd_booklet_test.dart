@@ -184,7 +184,7 @@ void main() {
       await tester.tap(find.text('Contact & Addr'));
       await tester.pumpAndSettle();
       expect(find.text('Contact Phone Number *'), findsOneWidget);
-      expect(find.text('Street / Residential Address'), findsOneWidget);
+      expect(find.text('Street / Residential Address *'), findsOneWidget);
 
       // Enter phone
       final phoneFinder = find.descendant(

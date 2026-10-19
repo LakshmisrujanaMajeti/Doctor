@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../routing/app_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
@@ -51,6 +52,17 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back to Dashboard',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.dashboard);
+            }
+          },
+        ),
         title: Row(
           children: [
             const SmvmchHospitalLogo(size: 28),

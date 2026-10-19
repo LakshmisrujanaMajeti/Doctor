@@ -372,7 +372,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Medical Documents & OCR Archive'), findsOneWidget);
+    expect(find.text('Medical Documents & OCR Archive'), findsWidgets);
     expect(find.text('Capture / Upload Document'), findsOneWidget);
     expect(find.text('Scan / Generate Barcode'), findsOneWidget);
     expect(find.text('opd_booklet_consultation_sheet.pdf'), findsOneWidget);

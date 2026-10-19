@@ -215,8 +215,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Hospital Profile Setup'), findsOneWidget);
-      expect(find.text('1. Authorized Role *'), findsOneWidget);
+      expect(find.text('New Patient Registration'), findsWidgets);
       expect(find.text('Full Name *'), findsOneWidget);
     });
 

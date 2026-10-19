@@ -156,6 +156,17 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back to Queue',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.go('/queue');
+            }
+          },
+        ),
         title: const Text('Book OPD Visit & Issue Token'),
       ),
       body: SingleChildScrollView(
@@ -233,8 +244,36 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
+
+                // Clinical Health Condition Matcher
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedDepartment,
+                  hint: const Text('Select as per patient health condition / requirement'),
+                  isExpanded: true,
+                  items: OpdConstants.doctorRoles.map((dr) => DropdownMenuItem(
+                    value: dr['department'],
+                    child: Text(
+                      '${dr['conditions'] ?? ''} → ${dr['title']}',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  )).toList(),
+                  onChanged: (dept) {
+                    if (dept != null) {
+                      setState(() {
+                        _selectedDepartment = dept;
+                        _selectedDoctor = null;
+                      });
+                    }
+                  },
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.health_and_safety_outlined, color: AppColors.primaryBlue),
+                    labelText: 'Filter Doctor by Patient Health Condition',
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                DropdownButtonFormField<String>(
+                  value: _selectedDepartment,
                   items: OpdConstants.departments
                       .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                       .toList(),
@@ -274,7 +313,7 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
                           hint: const Text('Select Consulting Physician / Doctor'),
                           items: availableDocs.map((doc) => DropdownMenuItem(
                             value: doc,
-                            child: Text('${doc.name} • ${doc.roomNumber} (₹${doc.consultationFee.toInt()})'),
+                            child: Text('${doc.name} (${doc.specialization}) • ${doc.roomNumber} (₹${doc.consultationFee.toInt()})'),
                           )).toList(),
                           onChanged: (doc) {
                             if (doc != null) {

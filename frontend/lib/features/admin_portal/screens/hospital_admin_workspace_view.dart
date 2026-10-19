@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/opd_constants.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/input_sanitizer.dart';
@@ -90,6 +91,17 @@ class _HospitalAdminWorkspaceViewState
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back to Dashboard',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.go('/dashboard');
+            }
+          },
+        ),
         title: Row(
           children: [
             const SmvmchHospitalLogo(size: 32),
@@ -1770,70 +1782,132 @@ class _HospitalAdminWorkspaceViewState
     final passwordCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
+    final qualCtrl = TextEditingController(text: 'MBBS, MD');
+    final roomCtrl = TextEditingController(text: 'OPD Room 101');
+    final feeCtrl = TextEditingController(text: '500');
     String selectedRole = 'doctor';
+    String selectedDepartment = 'General Medicine';
+    String selectedSpecialization = 'General Medicine';
 
     showDialog(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final isDoc = selectedRole == 'doctor';
             return AlertDialog(
               title: const Text('Provision New Staff Account'),
               content: SizedBox(
-                width: 450,
+                width: 480,
                 child: Form(
                   key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: nameCtrl,
-                        decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
-                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: emailCtrl,
-                        decoration: const InputDecoration(labelText: 'Hospital Email *', isDense: true),
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (v) => InputSanitizer.validateEmail(v, fieldName: 'Hospital Email'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: passwordCtrl,
-                        decoration: const InputDecoration(labelText: 'Initial Password * (Strong)', isDense: true),
-                        obscureText: true,
-                        validator: (v) => InputSanitizer.validateStrongPassword(v),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: phoneCtrl,
-                        decoration: const InputDecoration(labelText: 'Phone Number (10 digits, Optional)', isDense: true),
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(10),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: nameCtrl,
+                          decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: emailCtrl,
+                          decoration: const InputDecoration(labelText: 'Hospital Email *', isDense: true),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (v) => InputSanitizer.validateEmail(v, fieldName: 'Hospital Email'),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: passwordCtrl,
+                          decoration: const InputDecoration(labelText: 'Initial Password * (Strong)', isDense: true),
+                          obscureText: true,
+                          validator: (v) => InputSanitizer.validateStrongPassword(v),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: phoneCtrl,
+                          decoration: const InputDecoration(labelText: 'Phone Number (10 digits, Optional)', isDense: true),
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                          validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Phone Number'),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: selectedRole,
+                          decoration: const InputDecoration(labelText: 'Role Permission Group', isDense: true),
+                          items: const [
+                            DropdownMenuItem(value: 'doctor', child: Text('Doctor (Clinical Access)')),
+                            DropdownMenuItem(value: 'receptionist', child: Text('Receptionist (Intake & Tokens)')),
+                            DropdownMenuItem(value: 'nurse', child: Text('Nurse (Vitals & Triage)')),
+                            DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist (Formulary & Dispensing)')),
+                            DropdownMenuItem(value: 'lab_technician', child: Text('Lab Technician (Diagnostic Testing)')),
+                            DropdownMenuItem(value: 'billing', child: Text('Billing Counter (Invoices & Cashier)')),
+                            DropdownMenuItem(value: 'admin', child: Text('Hospital Administrator (Governance)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setDialogState(() => selectedRole = val);
+                          },
+                        ),
+                        if (isDoc) ...[
+                          const SizedBox(height: 14),
+                          DropdownButtonFormField<String>(
+                            value: selectedDepartment,
+                            decoration: const InputDecoration(labelText: 'Clinical Department / Specialization *', isDense: true),
+                            items: OpdConstants.departments.map((dept) => DropdownMenuItem(
+                              value: dept,
+                              child: Text(dept),
+                            )).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDialogState(() {
+                                  selectedDepartment = val;
+                                  selectedSpecialization = val;
+                                  final matchingRole = OpdConstants.doctorRoles.firstWhere(
+                                    (r) => r['department'] == val,
+                                    orElse: () => {},
+                                  );
+                                  if (matchingRole.isNotEmpty) {
+                                    qualCtrl.text = matchingRole['qualification'] ?? 'MBBS, MD';
+                                    roomCtrl.text = matchingRole['default_room'] ?? 'OPD Room 101';
+                                    feeCtrl.text = (double.tryParse(matchingRole['fee'] ?? '500') ?? 500).toInt().toString();
+                                  }
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: roomCtrl,
+                                  decoration: const InputDecoration(labelText: 'OPD Room *', isDense: true),
+                                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: feeCtrl,
+                                  decoration: const InputDecoration(labelText: 'Consultation Fee (₹) *', isDense: true),
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: qualCtrl,
+                            decoration: const InputDecoration(labelText: 'Medical Qualification', isDense: true),
+                          ),
                         ],
-                        validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Phone Number'),
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: selectedRole,
-                        decoration: const InputDecoration(labelText: 'Role Permission Group', isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'doctor', child: Text('Doctor (Clinical Access)')),
-                          DropdownMenuItem(value: 'receptionist', child: Text('Receptionist (Intake & Tokens)')),
-                          DropdownMenuItem(value: 'nurse', child: Text('Nurse (Vitals & Triage)')),
-                          DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist (Formulary & Dispensing)')),
-                          DropdownMenuItem(value: 'lab_technician', child: Text('Lab Technician (Diagnostic Testing)')),
-                          DropdownMenuItem(value: 'billing', child: Text('Billing Counter (Invoices & Cashier)')),
-                          DropdownMenuItem(value: 'admin', child: Text('Hospital Administrator (Governance)')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) setDialogState(() => selectedRole = val);
-                        },
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1850,6 +1924,11 @@ class _HospitalAdminWorkspaceViewState
                           fullName: nameCtrl.text.trim(),
                           roleName: selectedRole,
                           phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                          departmentName: isDoc ? selectedDepartment : null,
+                          specialization: isDoc ? selectedSpecialization : null,
+                          roomNumber: isDoc ? roomCtrl.text.trim() : null,
+                          qualification: isDoc ? qualCtrl.text.trim() : null,
+                          consultationFee: isDoc ? (double.tryParse(feeCtrl.text.trim()) ?? 500.0) : null,
                         );
                         ref.invalidate(adminUsersProvider);
                         ref.invalidate(adminDashboardSummaryProvider);

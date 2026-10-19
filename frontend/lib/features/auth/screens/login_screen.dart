@@ -81,6 +81,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        tooltip: 'Back to Welcome',
+                        onPressed: () {
+                          if (Navigator.canPop(context)) {
+                            context.pop();
+                          } else {
+                            context.goNamed(RouteNames.welcome);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
                     // SMVMCH Official Crest
                     const Center(
                       child: SmvmchHospitalLogo(

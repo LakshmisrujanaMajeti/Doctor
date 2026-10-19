@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../routing/app_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
@@ -495,6 +496,17 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back to Patients',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.patients);
+            }
+          },
+        ),
         title: const Text('OPD Patient Registration', style: TextStyle(fontWeight: FontWeight.bold)),
         bottom: TabBar(
           controller: _tabController,
@@ -723,10 +735,11 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
           const SizedBox(height: 12),
           OPDTextField(
             controller: _addressController,
-            label: 'Street / Residential Address',
+            label: 'Street / Residential Address *',
             hint: 'Flat, Street, Landmark',
             maxLines: 2,
             prefixIcon: const Icon(Icons.home_outlined),
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Residential address is mandatory' : null,
           ),
           const SizedBox(height: 12),
           Row(
@@ -790,14 +803,15 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
           const SizedBox(height: 8),
           OPDTextField(
             controller: _emergencyNameController,
-            label: 'Emergency Contact Person',
+            label: 'Emergency Contact Person *',
             hint: 'Name of guardian / kin',
             prefixIcon: const Icon(Icons.person_pin_outlined),
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Emergency contact name is mandatory' : null,
           ),
           const SizedBox(height: 12),
           OPDTextField(
             controller: _emergencyPhoneController,
-            label: 'Emergency Phone Number (Optional, 10 Digits)',
+            label: 'Emergency Phone Number (10 Digits) *',
             hint: 'e.g. 9876543210',
             keyboardType: TextInputType.phone,
             inputFormatters: [
@@ -805,7 +819,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
               LengthLimitingTextInputFormatter(10),
             ],
             prefixIcon: const Icon(Icons.phone_in_talk_outlined),
-            validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Emergency Phone Number'),
+            validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Emergency Phone Number'),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(

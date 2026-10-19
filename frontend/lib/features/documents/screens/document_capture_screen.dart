@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
+import '../../../routing/app_router.dart';
 import 'package:opd_connect/core/constants/app_colors.dart';
 import 'package:opd_connect/features/documents/models/document_models.dart';
 import 'package:opd_connect/features/documents/providers/document_provider.dart';
@@ -376,6 +378,17 @@ class _DocumentCaptureScreenState extends ConsumerState<DocumentCaptureScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.documents);
+            }
+          },
+        ),
         title: const Text('Medical Document Capture'),
         actions: [
           IconButton(

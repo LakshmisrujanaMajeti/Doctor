@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../routing/app_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../core/utils/responsive.dart';
@@ -21,6 +22,17 @@ class PatientListScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back to Dashboard',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.dashboard);
+            }
+          },
+        ),
         title: const Text('Patient Directory & OPD Records', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(

@@ -189,11 +189,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
           fullName: cleanName,
           phone: cleanPhone,
           email: cleanEmail,
-          password: _passwordController.text,
+          password: null,
           gender: _selectedGender,
           ageYears: parsedAge ?? 30,
           bloodGroup: _selectedBloodGroup,
-          address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
+          address: _addressController.text.trim(),
+          emergencyContactName: _emergencyNameController.text.trim(),
+          emergencyContactPhone: _emergencyPhoneController.text.trim(),
+          emergencyContactRelation: _emergencyRelationController.text.trim(),
         );
       } else {
         // Collect role-specific metadata
@@ -272,16 +275,18 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Navigator.canPop(context)
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.maybePop(context),
-                )
-              : const SmvmchHospitalLogo(size: 28),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.welcome);
+            }
+          },
         ),
-        title: Text(_isEditMode ? 'Edit Profile & Credentials' : 'Hospital Profile Setup'),
+        title: Text(_isEditMode ? 'Edit Profile & Credentials' : 'New Patient Registration'),
       ),
       body: MedicalIllustratorBackground(
         variant: MedicalBackgroundVariant.portal,
@@ -330,7 +335,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _isEditMode ? 'Update Profile & Login Credentials' : _getRoleTitle(_selectedRole),
+                                    _isEditMode ? 'Update Profile & Login Credentials' : 'New Patient Registration',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
@@ -340,7 +345,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                                   Text(
                                     _isEditMode
                                         ? 'Modify your hospital identity details, phone number, and password.'
-                                        : _getRoleDescription(_selectedRole),
+                                        : 'Register your official SMVMCH digital outpatient record. Passwords are not required — check in anytime with your phone or UHID.',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -360,33 +365,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                           onDismiss: () => ref.read(authProvider.notifier).checkCurrentUser(),
                         ),
 
-                      // Section 1: Role Selector (Only for new registrations)
-                      if (!_isEditMode) ...[
-                        _buildSectionHeader('1. Authorized Role *'),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedRole,
-                          isExpanded: true,
-                          items: const [
-                            DropdownMenuItem(value: 'patient', child: Text('Patient (Self-Service UHID)')),
-                            DropdownMenuItem(value: 'doctor', child: Text('Consulting Doctor (MD / Specialist)')),
-                            DropdownMenuItem(value: 'nurse', child: Text('Clinical Nurse / Triage Specialist')),
-                            DropdownMenuItem(value: 'receptionist', child: Text('Front Desk / Receptionist')),
-                            DropdownMenuItem(value: 'billing', child: Text('Billing Counter / Cashier')),
-                            DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist / Dispensing Unit')),
-                            DropdownMenuItem(value: 'laboratory', child: Text('Laboratory Staff / Lab Tech')),
-                            DropdownMenuItem(value: 'admin', child: Text('Hospital Administrator')),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) setState(() => _selectedRole = v);
-                          },
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.badge_rounded, color: AppColors.primaryBlue),
-                            labelText: 'Hospital Role Assignment',
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+
 
                       // Section 2: Universal Account Credentials
                       _buildSectionHeader(_isEditMode ? 'Account Details & Credentials' : '2. Account Credentials & Contact'),
@@ -422,19 +401,21 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                         validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Mobile Phone'),
                       ),
                       const SizedBox(height: 14),
-                      OpdTextField(
-                        label: _isEditMode ? 'New Password (Optional)' : 'Secure Password *',
-                        hint: _isEditMode ? 'Leave blank to keep existing password' : 'At least 8 chars (Aa-Zz, 0-9, special char)',
-                        controller: _passwordController,
-                        prefixIcon: Icons.lock_outline_rounded,
-                        obscureText: true,
-                        enablePasswordToggle: true,
-                        validator: (v) {
-                          if (_isEditMode && (v == null || v.trim().isEmpty)) return null;
-                          return InputSanitizer.validateStrongPassword(v);
-                        },
-                      ),
-                      const SizedBox(height: 22),
+                      if (_isEditMode) ...[
+                        OpdTextField(
+                          label: 'New Password (Optional)',
+                          hint: 'Leave blank to keep existing password',
+                          controller: _passwordController,
+                          prefixIcon: Icons.lock_outline_rounded,
+                          obscureText: true,
+                          enablePasswordToggle: true,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return null;
+                            return InputSanitizer.validateStrongPassword(v);
+                          },
+                        ),
+                        const SizedBox(height: 14),
+                      ],
 
                       // Section 3: Dynamic Role-Specific Hospital Fields (if not patient in edit mode)
                       if (!_isEditMode || _selectedRole != 'patient') ...[
@@ -753,26 +734,28 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             ),
             const SizedBox(height: 14),
             OpdTextField(
-              label: 'Residential Address',
+              label: 'Residential Address *',
               hint: 'e.g. No. 14, Main Road, Puducherry',
               controller: _addressController,
               prefixIcon: Icons.home_outlined,
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Residential address is mandatory' : null,
             ),
             const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
                   child: OpdTextField(
-                    label: 'Emergency Contact Name',
-                    hint: 'Contact Person',
+                    label: 'Emergency Contact Name *',
+                    hint: 'Contact Person / Guardian',
                     controller: _emergencyNameController,
                     prefixIcon: Icons.contact_emergency_outlined,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Emergency contact name is mandatory' : null,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: OpdTextField(
-                    label: 'Emergency Phone (10 Digits)',
+                    label: 'Emergency Phone (10 Digits) *',
                     hint: 'e.g. 9876543210',
                     controller: _emergencyPhoneController,
                     prefixIcon: Icons.phone_outlined,
@@ -781,10 +764,31 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(10),
                     ],
-                    validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Emergency Phone'),
+                    validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Emergency Contact Phone'),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              value: _emergencyRelationController.text.isNotEmpty ? _emergencyRelationController.text : 'Spouse / Parent',
+              items: const [
+                DropdownMenuItem(value: 'Spouse / Parent', child: Text('Spouse / Parent')),
+                DropdownMenuItem(value: 'Father / Mother', child: Text('Father / Mother')),
+                DropdownMenuItem(value: 'Son / Daughter', child: Text('Son / Daughter')),
+                DropdownMenuItem(value: 'Brother / Sister', child: Text('Brother / Sister')),
+                DropdownMenuItem(value: 'Legal Guardian', child: Text('Legal Guardian')),
+                DropdownMenuItem(value: 'Friend / Relative', child: Text('Friend / Relative')),
+              ],
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => _emergencyRelationController.text = v);
+                }
+              },
+              decoration: const InputDecoration(
+                labelText: 'Emergency Contact Relationship *',
+                prefixIcon: Icon(Icons.people_alt_outlined, color: AppColors.primaryBlue),
+              ),
             ),
           ],
         );
@@ -811,52 +815,6 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       case 'patient':
       default:
         return Icons.person_rounded;
-    }
-  }
-
-  String _getRoleTitle(String role) {
-    switch (role) {
-      case 'doctor':
-        return 'Medical Doctor / Specialist';
-      case 'nurse':
-        return 'Clinical Nurse & Triage';
-      case 'pharmacist':
-        return 'Hospital Pharmacist';
-      case 'laboratory':
-      case 'lab_tech':
-        return 'Laboratory Technician';
-      case 'billing':
-        return 'Billing Counter & Cashier';
-      case 'admin':
-        return 'Hospital Administrator';
-      case 'receptionist':
-        return 'Front Desk & Registration';
-      case 'patient':
-      default:
-        return 'Patient Self-Service Account';
-    }
-  }
-
-  String _getRoleDescription(String role) {
-    switch (role) {
-      case 'doctor':
-        return 'Manage consultation sheets, diagnostic orders, and e-prescriptions.';
-      case 'nurse':
-        return 'Capture patient vitals, triage emergency ratings, and queue patients.';
-      case 'pharmacist':
-        return 'Review orders, verify formulary stock, and dispense medicines.';
-      case 'laboratory':
-      case 'lab_tech':
-        return 'Collect specimens, enter diagnostic results, and flag abnormal findings.';
-      case 'billing':
-        return 'Generate official invoices, collect payments, and print GST cash bills.';
-      case 'admin':
-        return 'Hospital operations, audit log governance, and staff provisioning.';
-      case 'receptionist':
-        return 'Create patient UHIDs, issue OPD slips, and manage waiting queues.';
-      case 'patient':
-      default:
-        return 'Instant access to token queue, OPD booklet, lab tests & bills.';
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../routing/app_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/data/mock_presentation_data.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
@@ -199,6 +200,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.dashboard);
+            }
+          },
+        ),
         title: Row(
           children: [
             const Text('Hospital Alerts'),

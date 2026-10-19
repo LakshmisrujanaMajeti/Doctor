@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routing/app_router.dart';
 import 'package:opd_connect/core/constants/app_colors.dart';
 import 'package:opd_connect/features/documents/models/document_models.dart';
 import 'package:opd_connect/features/documents/providers/document_provider.dart';
@@ -146,6 +148,20 @@ class _DocumentManagerWorkspaceViewState extends ConsumerState<DocumentManagerWo
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back to Dashboard',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              context.pop();
+            } else {
+              context.goNamed(RouteNames.dashboard);
+            }
+          },
+        ),
+        title: const Text('Medical Documents & OCR Archive'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(

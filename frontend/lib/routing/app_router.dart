@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+export 'route_names.dart';
 
 import '../features/auth/models/auth_state.dart';
 import '../features/auth/providers/auth_provider.dart';
@@ -346,11 +347,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/laboratory',
         builder: (context, state) => Scaffold(
           appBar: AppBar(
-            leading: const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: SmvmchHospitalLogo(size: 28),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Back to Dashboard',
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  context.pop();
+                } else {
+                  context.goNamed(RouteNames.dashboard);
+                }
+              },
             ),
-            title: const Text('Diagnostic Laboratory Desk'),
+            title: const Row(
+              children: [
+                SmvmchHospitalLogo(size: 26),
+                SizedBox(width: 8),
+                Text('Diagnostic Laboratory Desk'),
+              ],
+            ),
           ),
           body: const SingleChildScrollView(
             padding: EdgeInsets.all(16),
@@ -363,11 +377,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/pharmacy',
         builder: (context, state) => Scaffold(
           appBar: AppBar(
-            leading: const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: SmvmchHospitalLogo(size: 28),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Back to Dashboard',
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  context.pop();
+                } else {
+                  context.goNamed(RouteNames.dashboard);
+                }
+              },
             ),
-            title: const Text('Pharmacy Inventory & Dispensing'),
+            title: const Row(
+              children: [
+                SmvmchHospitalLogo(size: 26),
+                SizedBox(width: 8),
+                Text('Pharmacy Inventory & Dispensing'),
+              ],
+            ),
           ),
           body: const SingleChildScrollView(
             padding: EdgeInsets.all(16),
@@ -380,11 +407,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/billing',
         builder: (context, state) => Scaffold(
           appBar: AppBar(
-            leading: const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: SmvmchHospitalLogo(size: 28),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Back to Dashboard',
+              onPressed: () {
+                if (Navigator.canPop(context)) {
+                  context.pop();
+                } else {
+                  context.goNamed(RouteNames.dashboard);
+                }
+              },
             ),
-            title: const Text('OPD Billing & Payments Counter'),
+            title: const Row(
+              children: [
+                SmvmchHospitalLogo(size: 26),
+                SizedBox(width: 8),
+                Text('OPD Billing & Payments Counter'),
+              ],
+            ),
           ),
           body: const SingleChildScrollView(
             padding: EdgeInsets.all(16),
