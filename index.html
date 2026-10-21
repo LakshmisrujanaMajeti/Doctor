@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SMVMCH OPD Connect - Redirecting</title>
+  <meta http-equiv="refresh" content="0; url=/web_app/index.html">
+  <style>
+    body {
+      background-color: #0F172A;
+      color: #38BDF8;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .card {
+      background: #1E293B;
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid #334155;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    a {
+      color: #38BDF8;
+      text-decoration: underline;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Sri Manakula Vinayagar Medical College & Hospital</h2>
+    <p>Launching OPD Connect Clinical Workstation...</p>
+    <p><a href="/web_app/index.html">Click here if not automatically redirected</a></p>
+  </div>
+  <script>
+    if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+      window.location.href = '/web_app/index.html';
+    }
+  </script>
+</body>
+</html>
