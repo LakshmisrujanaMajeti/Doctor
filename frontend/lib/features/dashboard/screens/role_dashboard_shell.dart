@@ -966,11 +966,11 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
         final myVisit = allVisits.isNotEmpty ? allVisits.first : null;
         return _buildResponsiveMetricRow(context, [
           StatMetricCard(
-            title: 'Your Token',
-            value: myVisit != null ? myVisit.formattedToken : 'No Token',
-            icon: Icons.confirmation_number_rounded,
+            title: 'Your UHID',
+            value: myVisit?.patient?.uhid ?? 'Active Record',
+            icon: Icons.badge_outlined,
             color: AppColors.primaryBlue,
-            subtitle: myVisit?.departmentName ?? 'OPD Intake',
+            subtitle: myVisit?.departmentName ?? 'OPD Patient',
             onTap: () => context.push('/patient/portal'),
           ),
           StatMetricCard(

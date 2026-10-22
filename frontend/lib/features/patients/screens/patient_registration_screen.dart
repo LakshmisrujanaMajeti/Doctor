@@ -547,32 +547,6 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (patient.currentToken != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.teal.withOpacity(0.4)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.confirmation_number_rounded, color: Colors.teal, size: 16),
-                          const SizedBox(width: 6),
-                          Text(
-                            'OPD TOKEN: #${patient.currentToken}',
-                            style: const TextStyle(
-                              color: Colors.teal,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                   Text('Patient Unique UHID: ${patient.uhid}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryTeal, fontSize: 15)),
                   const SizedBox(height: 4),
                   Text('Hospital Reg No: ${patient.hospitalRegNum ?? "N/A"}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -662,34 +636,25 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
         ),
       ),
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))],
         ),
         child: SafeArea(
-          child: Row(
-            children: [
-              if (_tabController.index > 0) ...[
-                OutlinedButton.icon(
-                  onPressed: () => _tabController.animateTo(_tabController.index - 1),
-                  icon: const Icon(Icons.arrow_back, size: 16),
-                  label: const Text('Back'),
-                ),
-                const SizedBox(width: 8),
-              ],
-              OutlinedButton.icon(
-                onPressed: _isCheckingDuplicate ? null : _checkDuplicateWorkflow,
-                icon: _isCheckingDuplicate
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.search, size: 16),
-                label: const Text('Check Duplicate'),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 480;
+
+              final nextButton = SizedBox(
+                height: 44,
                 child: _tabController.index < 2
                     ? ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryTeal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                         onPressed: () {
                           if (_tabController.index == 0) {
                             if (_nameController.text.trim().isEmpty) {
@@ -732,15 +697,78 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                         ),
                       )
                     : ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryTeal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                         onPressed: _isSaving ? null : _showReviewBeforeSubmit,
                         icon: _isSaving
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
                         label: const Text('Review & Save Registration', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
-              ),
-            ],
+              );
+
+              final duplicateBtn = SizedBox(
+                height: 44,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _isCheckingDuplicate ? null : _checkDuplicateWorkflow,
+                  icon: _isCheckingDuplicate
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.search, size: 16),
+                  label: const Text('Check Duplicate'),
+                ),
+              );
+
+              final backBtn = _tabController.index > 0
+                  ? SizedBox(
+                      height: 44,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () => _tabController.animateTo(_tabController.index - 1),
+                        icon: const Icon(Icons.arrow_back, size: 16),
+                        label: const Text('Back'),
+                      ),
+                    )
+                  : null;
+
+              if (isNarrow) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        if (backBtn != null) ...[
+                          Expanded(child: backBtn),
+                          const SizedBox(width: 8),
+                        ],
+                        Expanded(child: duplicateBtn),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(width: double.infinity, child: nextButton),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  if (backBtn != null) ...[
+                    backBtn,
+                    const SizedBox(width: 8),
+                  ],
+                  duplicateBtn,
+                  const SizedBox(width: 8),
+                  Expanded(child: nextButton),
+                ],
+              );
+            },
           ),
         ),
       ),

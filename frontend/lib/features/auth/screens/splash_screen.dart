@@ -100,14 +100,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
                     ),
                     const SizedBox(height: 10),
 
-                    // App Name
-                    const Text(
-                      AppStrings.appName,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                        color: AppColors.primaryTeal,
+                    // App Name (Guaranteed single line on all screen sizes)
+                    const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        AppStrings.appName,
+                        maxLines: 1,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                          color: AppColors.primaryTeal,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 6),

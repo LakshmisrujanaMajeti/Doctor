@@ -79,9 +79,9 @@ class WelcomeScreen extends ConsumerWidget {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           elevation: 0,
                         ),
-                        icon: const Icon(Icons.confirmation_number_rounded, size: 22),
+                        icon: const Icon(Icons.person_search_rounded, size: 22),
                         label: const Text(
-                          'Patient Token & UHID Check-In',
+                          'Patient UHID & Records Lookup',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                         ),
                         onPressed: () => context.push('/patient/token-access'),

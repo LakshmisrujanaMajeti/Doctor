@@ -189,32 +189,6 @@ class PatientListScreen extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  if (patient.currentToken != null) ...[
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                      margin: const EdgeInsets.only(bottom: 3),
-                                      decoration: BoxDecoration(
-                                        color: Colors.teal.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.teal.withOpacity(0.35)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.confirmation_number_rounded, size: 10.5, color: Colors.teal),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            'TOKEN #${patient.currentToken}',
-                                            style: const TextStyle(
-                                              color: Colors.teal,
-                                              fontWeight: FontWeight.w800,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                     decoration: BoxDecoration(
