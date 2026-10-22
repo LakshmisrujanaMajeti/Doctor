@@ -262,10 +262,22 @@ class PDFBookletService:
         story.append(Paragraph("Form: SMVMCH/OP/OPIAF/Version1 • Date: 06 AUG 2026 • Time: 10:20 am", subtitle_style))
         story.append(Spacer(1, 12))
 
+        vitals_obj = getattr(visit, 'vitals', None) or getattr(visit, 'vital_signs', None) if visit else None
         complaints_text = (
-            visit.chief_complaint if (visit and visit.chief_complaint)
-            else "P/I: Cl. Sensitivity in (L) lower back tooth region x 1 month."
+            getattr(visit, 'chief_complaint', None)
+            or (visit.clinical_record.presenting_complaint if (visit and getattr(visit, 'clinical_record', None) and getattr(visit.clinical_record, 'presenting_complaint', None)) else None)
+            or (visit.notes if visit and getattr(visit, 'notes', None) else None)
+            or "Routine outpatient medical consultation and clinical evaluation."
         )
+        bp_val = (
+            f"{vitals_obj.systolic_bp}/{vitals_obj.diastolic_bp}"
+            if (vitals_obj and getattr(vitals_obj, 'systolic_bp', None) and getattr(vitals_obj, 'diastolic_bp', None))
+            else (getattr(vitals_obj, 'blood_pressure', '120/80') if vitals_obj else '120/80')
+        )
+        height_val = f"{vitals_obj.height_cm}" if (vitals_obj and getattr(vitals_obj, 'height_cm', None)) else '170'
+        weight_val = f"{vitals_obj.weight_kg}" if (vitals_obj and getattr(vitals_obj, 'weight_kg', None)) else '65'
+        pulse_val = f"{vitals_obj.pulse_rate}" if (vitals_obj and getattr(vitals_obj, 'pulse_rate', None)) else '78'
+
         assess_data = [
             [Paragraph("<b>Presenting Complaint:</b>", label_style), Paragraph(complaints_text, val_style)],
             [Paragraph("<b>Allergy:</b>", label_style), Paragraph("Yes / <b><u>No</u></b>, if Yes: ____________", val_style)],
@@ -278,10 +290,10 @@ class PDFBookletService:
                 "Diabetes: [✔] No &nbsp;&nbsp;&nbsp; Hypertension: [✔] No &nbsp;&nbsp;&nbsp; Heart Disease: [✔] No", val_style
             )],
             [Paragraph("<b>Physical Examination:</b>", label_style), Paragraph(
-                f"Height: <b>{visit.vital_signs.height_cm if (visit and visit.vital_signs and visit.vital_signs.height_cm) else '170'}</b> cms &nbsp;&nbsp;&nbsp; "
-                f"Weight: <b>{visit.vital_signs.weight_kg if (visit and visit.vital_signs and visit.vital_signs.weight_kg) else '65'}</b> Kgs<br/>"
-                f"B.P.: <b>{visit.vital_signs.blood_pressure if (visit and visit.vital_signs and visit.vital_signs.blood_pressure) else '131/103'}</b> mmHg &nbsp;&nbsp;&nbsp; "
-                f"Pulse rate: <b>{visit.vital_signs.pulse_rate if (visit and visit.vital_signs and visit.vital_signs.pulse_rate) else '115'}</b> /min<br/>"
+                f"Height: <b>{height_val}</b> cms &nbsp;&nbsp;&nbsp; "
+                f"Weight: <b>{weight_val}</b> Kgs<br/>"
+                f"B.P.: <b>{bp_val}</b> mmHg &nbsp;&nbsp;&nbsp; "
+                f"Pulse rate: <b>{pulse_val}</b> /min<br/>"
                 f"Pallor: No &nbsp;&nbsp;&nbsp; Icterus: No &nbsp;&nbsp;&nbsp; Cyanosis: No", val_style
             )],
         ]

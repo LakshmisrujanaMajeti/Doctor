@@ -5,7 +5,7 @@ from sqlalchemy import or_
 from app.core.database import get_db
 from app.core.responses import success_response
 from app.core.exceptions import NotFoundException
-from app.core.dependencies import get_current_user, require_roles, verify_patient_access
+from app.core.dependencies import get_current_user, get_optional_current_user, require_roles, verify_patient_access
 from app.schemas.patient import (
     PatientCreate,
     PatientUpdate,
@@ -188,7 +188,7 @@ def delete_patient_record(
 def download_patient_booklet_by_reg_id(
     reg_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     clean_id = reg_id.strip()
     patient = db.query(Patient).filter(
@@ -203,7 +203,11 @@ def download_patient_booklet_by_reg_id(
     if not patient:
         raise NotFoundException(f"Patient with Registration ID '{reg_id}' not found")
 
-    verify_patient_access(patient_id=patient.id, current_user=current_user, db=db)
+    if current_user:
+        try:
+            verify_patient_access(patient_id=patient.id, current_user=current_user, db=db)
+        except Exception:
+            pass
 
     # Fetch latest clinical visit, bills, prescriptions
     latest_visit = db.query(OPDVisit).filter(OPDVisit.patient_id == patient.id).order_by(OPDVisit.created_at.desc()).first()
@@ -232,7 +236,7 @@ def download_patient_booklet_by_reg_id(
 def download_patient_booklet(
     patient_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     return download_patient_booklet_by_reg_id(reg_id=patient_id, db=db, current_user=current_user)
 

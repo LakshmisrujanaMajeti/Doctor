@@ -19,6 +19,7 @@ import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patient_provider.dart';
 import '../../doctors/repositories/doctor_repository.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/utils/file_download_helper.dart';
 import '../../../routing/route_names.dart';
 
 class HospitalAdminWorkspaceView extends ConsumerStatefulWidget {
@@ -1583,20 +1584,24 @@ class _HospitalAdminWorkspaceViewState
     );
     try {
       final bytes = await ref.read(patientRepositoryProvider).downloadBookletByRegId(regId);
-      if (bytes.isNotEmpty && context.mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Downloaded ${bytes.length} bytes. Verified SMVMCH booklet saved!'),
-            backgroundColor: Colors.green,
-            action: SnackBarAction(
-              label: 'Open',
-              textColor: Colors.white,
-              onPressed: () => context.push('/patients/${patient.id}/booklet'),
+      if (bytes.isNotEmpty) {
+        final filename = 'SMVMCH_OPD_Booklet_${regId.replaceAll('/', '_')}.pdf';
+        await downloadFileBytes(bytes, filename);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Verified booklet "$filename" saved! (${bytes.length} bytes)'),
+              backgroundColor: Colors.green,
+              action: SnackBarAction(
+                label: 'View',
+                textColor: Colors.white,
+                onPressed: () => context.push('/patients/${patient.id}/booklet'),
+              ),
             ),
-          ),
-        );
-        return;
+          );
+          return;
+        }
       }
     } catch (e) {
       if (context.mounted) {

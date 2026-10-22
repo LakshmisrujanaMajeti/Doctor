@@ -10,6 +10,7 @@ import '../models/patient_model.dart';
 import '../providers/patient_provider.dart';
 import '../../visits/models/visit_model.dart';
 import '../../visits/providers/visit_provider.dart';
+import '../../../core/utils/file_download_helper.dart';
 
 class DigitalOpdBookletScreen extends ConsumerStatefulWidget {
   final String patientId;
@@ -59,11 +60,13 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
     );
     try {
       final bytes = await ref.read(patientRepositoryProvider).downloadBookletByRegId(regId);
+      final filename = 'SMVMCH_OPD_Booklet_${regId.replaceAll('/', '_')}.pdf';
+      await downloadFileBytes(bytes, filename);
       if (context.mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Downloaded ${bytes.length} bytes. Verified PDF saved successfully!'),
+            content: Text('Verified PDF "$filename" saved successfully! (${bytes.length} bytes)'),
             backgroundColor: Colors.green,
           ),
         );

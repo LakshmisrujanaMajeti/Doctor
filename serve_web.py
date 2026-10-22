@@ -102,7 +102,7 @@ def run_server():
     print("=" * 80)
 
     try:
-        with ReusableTCPServer(("127.0.0.1", PORT), ClinicalSPARequestHandler) as httpd:
+        with ReusableTCPServer(("0.0.0.0", PORT), ClinicalSPARequestHandler) as httpd:
             httpd.serve_forever()
     except OSError as e:
         if "Address already in use" in str(e) or getattr(e, "winerror", None) == 10048:

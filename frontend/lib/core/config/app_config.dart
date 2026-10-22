@@ -34,9 +34,18 @@ class AppConfig {
     const envUrl = String.fromEnvironment('API_BASE_URL');
     if (envUrl.isNotEmpty) return envUrl;
 
-    if (kIsWeb) return 'http://localhost:8000/api/v1';
+    if (kIsWeb) {
+      try {
+        final host = Uri.base.host;
+        if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+          final scheme = Uri.base.scheme.isNotEmpty ? Uri.base.scheme : 'http';
+          return '$scheme://$host:8000/api/v1';
+        }
+      } catch (_) {}
+      return 'http://localhost:8000/api/v1';
+    }
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000/api/v1';
+      return 'http://192.168.29.193:8000/api/v1';
     }
     return 'http://localhost:8000/api/v1';
   }

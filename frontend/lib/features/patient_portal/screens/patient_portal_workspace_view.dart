@@ -7,6 +7,9 @@ import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
+import '../../../core/utils/file_download_helper.dart';
+import '../../patients/models/patient_model.dart';
+import '../../patients/widgets/patient_identifier_card_widget.dart';
 import '../models/patient_portal_models.dart';
 import '../providers/patient_portal_provider.dart';
 import '../../patients/providers/patient_provider.dart';
@@ -27,7 +30,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
     Future.microtask(() {
       if (mounted) {
         ref.invalidate(patientProfileProvider);
@@ -61,11 +64,13 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     );
     try {
       final bytes = await ref.read(patientRepositoryProvider).downloadBookletByRegId(regId);
+      final filename = 'SMVMCH_OPD_Booklet_$regId.pdf';
+      await downloadFileBytes(bytes, filename);
       if (context.mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Downloaded ${bytes.length} bytes. Verified PDF saved successfully!'),
+            content: Text('Verified PDF "$filename" saved successfully! (${bytes.length} bytes)'),
             backgroundColor: Colors.green,
           ),
         );
@@ -364,6 +369,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                     unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                     indicatorColor: AppColors.primaryBlue,
                     tabs: const [
+                      Tab(icon: Icon(Icons.badge_rounded, size: 18), text: 'Patient ID Card'),
                       Tab(icon: Icon(Icons.calendar_month, size: 18), text: 'Appointments'),
                       Tab(icon: Icon(Icons.medication, size: 18), text: 'Prescriptions'),
                       Tab(icon: Icon(Icons.biotech, size: 18), text: 'Lab Reports'),
@@ -380,6 +386,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                   child: TabBarView(
                     controller: _tabController,
                     children: [
+                      _buildIdCardTab(patient, dependents, isDark),
                       _buildAppointmentsTab(isDark),
                       _buildPrescriptionsTab(isDark),
                       _buildLabReportsTab(isDark),
@@ -509,17 +516,52 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                             ),
                           ),
                         ],
-                        const SizedBox(height: 6),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.download_rounded, size: 14),
-                          label: const Text('Download Digital Booklet (PDF)'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.hospitalMaroon,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                          onPressed: () => _downloadBooklet(context, displayUhid),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.badge_rounded, size: 14),
+                              label: const Text('My Patient ID Card'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryBlue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () {
+                                _tabController.animateTo(0);
+                              },
+                            ),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.download_rounded, size: 14),
+                              label: const Text('Download Booklet (PDF)'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.hospitalMaroon,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () => _downloadBooklet(context, displayUhid),
+                            ),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.auto_stories_rounded, size: 14),
+                              label: const Text('View 7-Page Booklet'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.hospitalMaroon,
+                                side: const BorderSide(color: AppColors.hospitalMaroon),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () {
+                                context.pushNamed(
+                                  RouteNames.digitalOpdBooklet,
+                                  pathParameters: {'registrationId': displayUhid},
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -623,6 +665,122 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildIdCardTab(PatientModel patient, List<DependentProfile> dependents, bool isDark) {
+    final selectedId = ref.watch(selectedPortalPatientIdProvider);
+    final isViewingDependent = selectedId != null && selectedId != patient.id;
+    final activeDependent = isViewingDependent
+        ? dependents.firstWhere((d) => d.id == selectedId, orElse: () => dependents.first)
+        : null;
+
+    final targetPatient = isViewingDependent
+        ? PatientModel(
+            id: activeDependent!.id,
+            uhid: activeDependent.uhid,
+            fullName: activeDependent.fullName,
+            gender: activeDependent.gender,
+            phone: patient.phone,
+            bloodGroup: activeDependent.bloodGroup ?? patient.bloodGroup,
+            registrationDate: DateTime.tryParse(activeDependent.registrationDate),
+          )
+        : patient;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      physics: const BouncingScrollPhysics(),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              PatientIdentifierCardWidget(
+                patient: targetPatient,
+                onDownloadBooklet: () => _downloadBooklet(context, targetPatient.uhid),
+              ),
+              const SizedBox(height: 16),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
+                ),
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.verified_user_rounded, color: AppColors.hospitalMaroon, size: 22),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Official SMVMCH Hospital Identification Card',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                                color: isDark ? Colors.white : AppColors.hospitalMaroon,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'This digital card contains your verified Unique Hospital Identification (UHID) and high-density 1D/2D barcodes. Present this screen at any OPD counter, doctor consultation room, diagnostic laboratory, or pharmacy desk for immediate contactless verification and record retrieval.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.auto_stories_rounded, size: 16),
+                              label: const Text('View 7-Page Booklet'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.hospitalMaroon,
+                                side: const BorderSide(color: AppColors.hospitalMaroon),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              onPressed: () {
+                                context.pushNamed(
+                                  RouteNames.digitalOpdBooklet,
+                                  pathParameters: {'registrationId': targetPatient.uhid},
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.download_rounded, size: 16),
+                              label: const Text('Download PDF'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.hospitalMaroon,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              onPressed: () => _downloadBooklet(context, targetPatient.uhid),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

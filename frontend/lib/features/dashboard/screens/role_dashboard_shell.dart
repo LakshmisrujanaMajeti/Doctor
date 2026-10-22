@@ -1446,6 +1446,44 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           'onTap': () => context.push('/patients'),
         },
       ];
+    } else if (role == 'patient') {
+      actions = [
+        {
+          'title': 'My OPD ID Card',
+          'desc': 'Verified hospital barcode & QR',
+          'icon': Icons.badge_rounded,
+          'color': AppColors.hospitalMaroon,
+          'onTap': () => context.push('/patient/portal'),
+        },
+        {
+          'title': 'Book Consultation',
+          'desc': 'Schedule doctor visit slot',
+          'icon': Icons.calendar_month_rounded,
+          'color': AppColors.primaryBlue,
+          'onTap': () => context.push('/patient/portal'),
+        },
+        {
+          'title': 'Digital OPD Booklet',
+          'desc': 'View verified 7-page PDF',
+          'icon': Icons.auto_stories_rounded,
+          'color': AppColors.accentTeal,
+          'onTap': () => context.push('/patient/portal'),
+        },
+        {
+          'title': 'My Token Status',
+          'desc': 'Track real-time queue position',
+          'icon': Icons.confirmation_number_rounded,
+          'color': const Color(0xFF8B5CF6),
+          'onTap': () => context.push('/queue'),
+        },
+        {
+          'title': 'Bills & Receipts',
+          'desc': 'Download paid invoices',
+          'icon': Icons.receipt_long_rounded,
+          'color': Colors.green.shade700,
+          'onTap': () => context.push('/patient/portal'),
+        },
+      ];
     } else {
       // Receptionist
       actions = [

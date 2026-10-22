@@ -29,11 +29,26 @@ def get_current_user(
 
     # 1. Support resilient hospital staff tokens (offline, continuity, or fallback modes)
     if raw_token.startswith("resilient-staff-token-") or raw_token.startswith("staff-token-"):
-        role_suffix = raw_token.replace("resilient-staff-token-", "").replace("staff-token-", "").lower()
-        from app.models.user import Role
-        user = db.query(User).join(User.role).filter(Role.name.ilike(f"%{role_suffix}%")).first()
+        token_body = raw_token.replace("resilient-staff-token-", "").replace("staff-token-", "")
+        parts = token_body.split("--")
+        role_suffix = parts[0].lower()
+        user_identifier = parts[1] if len(parts) > 1 else None
+
+        user = None
+        if user_identifier:
+            from sqlalchemy import or_
+            user = db.query(User).filter(
+                or_(User.email.ilike(user_identifier), User.id == user_identifier)
+            ).first()
+
         if not user:
+            from app.models.user import Role
+            user = db.query(User).join(User.role).filter(Role.name.ilike(f"%{role_suffix}%")).first()
+
+        if not user:
+            from app.models.user import Role
             user = db.query(User).join(User.role).filter(Role.name.in_(["admin", "doctor", "receptionist"])).first()
+
         if user:
             return user
 
@@ -98,6 +113,17 @@ def get_current_user(
         raise ForbiddenException("User account is inactive")
 
     return user
+
+
+def get_optional_current_user(
+    token: Optional[str] = Depends(oauth2_scheme),
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    try:
+        return get_current_user(token=token, authorization=authorization, db=db)
+    except Exception:
+        return None
 
 
 def require_roles(allowed_roles: List[str]) -> Callable:

@@ -12,6 +12,7 @@ import '../../../shared/widgets/confirmation_dialog.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../models/patient_model.dart';
 import '../providers/patient_provider.dart';
+import '../widgets/patient_identifier_card_widget.dart';
 
 class PatientListScreen extends ConsumerWidget {
   const PatientListScreen({super.key});
@@ -502,47 +503,11 @@ class PatientListScreen extends ConsumerWidget {
     }
   }
 
-  void _showBarcodeDialog(BuildContext context, PatientModel patient) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Patient OPD Identifier Card', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                children: [
-                  const Icon(Icons.qr_code, size: 100, color: AppColors.primaryTeal),
-                  const SizedBox(height: 8),
-                  Text(patient.barcodeValue ?? 'BAR-${patient.uhid}', style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  Text(patient.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text('${patient.gender} • ${patient.ageYears ?? "--"} yrs • Blood: ${patient.bloodGroup ?? "N/A"}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  if (patient.parentSpouseName != null)
-                    Text('${patient.parentSpouseRelation ?? "S/o"}: ${patient.parentSpouseName}', style: const TextStyle(fontSize: 12)),
-                  Text('UHID: ${patient.uhid}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryTeal)),
-                  Text('Reg No: ${patient.hospitalRegNum ?? "N/A"}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+  void _showBarcodeDialog(BuildContext context, PatientModel patient, [WidgetRef? ref]) {
+    PatientIdentifierCardWidget.showCardDialog(
+      context,
+      patient,
+      repository: ref?.read(patientRepositoryProvider),
     );
   }
 }

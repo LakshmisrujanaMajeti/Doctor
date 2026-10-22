@@ -113,10 +113,11 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 650),
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 700),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -156,7 +157,7 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               Expanded(
                 child: Form(
@@ -170,6 +171,7 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
                           inventoryAsync.when(
                             data: (items) => DropdownButtonFormField<String>(
                               value: _selectedItem?.id,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Select Medicine Batch *',
                                 prefixIcon: Icon(Icons.medication_outlined, size: 18),
@@ -180,6 +182,7 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
                                   child: Text(
                                     '${item.name} (Batch: ${item.batchNumber}) • Stock: ${item.availableQuantity}',
                                     style: const TextStyle(fontSize: 13),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 );
                               }).toList(),
@@ -238,7 +241,7 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
                                 onTap: () => setState(() => _adjustmentType = 'SUBTRACT'),
                                 borderRadius: BorderRadius.circular(10),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                                   decoration: BoxDecoration(
                                     color: _adjustmentType == 'SUBTRACT'
                                         ? Colors.red.shade600.withValues(alpha: 0.15)
@@ -254,12 +257,16 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
                                     children: [
                                       Icon(Icons.remove_circle_outline,
                                           color: _adjustmentType == 'SUBTRACT' ? Colors.red.shade700 : Colors.grey, size: 18),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Deduct Stock (-)',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: _adjustmentType == 'SUBTRACT' ? Colors.red.shade700 : Colors.grey.shade700,
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          'Deduct Stock (-)',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: _adjustmentType == 'SUBTRACT' ? Colors.red.shade700 : Colors.grey.shade700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
@@ -267,13 +274,13 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: InkWell(
                                 onTap: () => setState(() => _adjustmentType = 'ADD'),
                                 borderRadius: BorderRadius.circular(10),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                                   decoration: BoxDecoration(
                                     color: _adjustmentType == 'ADD'
                                         ? Colors.green.shade600.withValues(alpha: 0.15)
@@ -289,12 +296,16 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
                                     children: [
                                       Icon(Icons.add_circle_outline,
                                           color: _adjustmentType == 'ADD' ? Colors.green.shade700 : Colors.grey, size: 18),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Add Stock (+)',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: _adjustmentType == 'ADD' ? Colors.green.shade700 : Colors.grey.shade700,
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          'Add Stock (+)',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: _adjustmentType == 'ADD' ? Colors.green.shade700 : Colors.grey.shade700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
@@ -306,41 +317,76 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
                         ),
                         const SizedBox(height: 16),
 
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _quantityController,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Quantity *',
-                                  prefixIcon: Icon(Icons.numbers, size: 18),
+                        // Quantity & Audit Reference Layout
+                        LayoutBuilder(
+                          builder: (context, qConstraints) {
+                            if (qConstraints.maxWidth < 440) {
+                              // Stack vertically on narrow mobile screens
+                              return Column(
+                                children: [
+                                  TextFormField(
+                                    controller: _quantityController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Quantity to Adjust *',
+                                      prefixIcon: Icon(Icons.numbers, size: 18),
+                                    ),
+                                    validator: (val) {
+                                      final n = int.tryParse(val ?? '');
+                                      if (n == null || n <= 0) return 'Quantity must be > 0';
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextFormField(
+                                    controller: _referenceController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Audit Reference #',
+                                      prefixIcon: Icon(Icons.receipt_outlined, size: 18),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _quantityController,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Quantity *',
+                                      prefixIcon: Icon(Icons.numbers, size: 18),
+                                    ),
+                                    validator: (val) {
+                                      final n = int.tryParse(val ?? '');
+                                      if (n == null || n <= 0) return 'Must be > 0';
+                                      return null;
+                                    },
+                                  ),
                                 ),
-                                validator: (val) {
-                                  final n = int.tryParse(val ?? '');
-                                  if (n == null || n <= 0) return 'Must be > 0';
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _referenceController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Audit Reference #',
-                                  prefixIcon: Icon(Icons.receipt_outlined, size: 18),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _referenceController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Audit Reference #',
+                                      prefixIcon: Icon(Icons.receipt_outlined, size: 18),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: 14),
 
                         DropdownButtonFormField<String>(
                           value: _reasonCategory,
+                          isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Standard Reason Category *'),
-                          items: _reasonOptions.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                          items: _reasonOptions.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))).toList(),
                           onChanged: (val) {
                             if (val != null) {
                               setState(() {
@@ -369,22 +415,54 @@ class _StockAdjustmentDialogState extends ConsumerState<StockAdjustmentDialog> {
 
               const SizedBox(height: 16),
               // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    icon: _isSubmitting
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.check, size: 18),
-                    label: Text(_isSubmitting ? 'Adjusting...' : 'Save Adjustment'),
-                    onPressed: _isSubmitting ? null : _submit,
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, btnConstraints) {
+                  if (btnConstraints.maxWidth < 420) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: OutlinedButton(
+                            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 3,
+                          child: ElevatedButton.icon(
+                            icon: _isSubmitting
+                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.check, size: 18),
+                            label: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(_isSubmitting ? 'Adjusting...' : 'Save Adjustment'),
+                            ),
+                            onPressed: _isSubmitting ? null : _submit,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton(
+                        onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        icon: _isSubmitting
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.check, size: 18),
+                        label: Text(_isSubmitting ? 'Adjusting...' : 'Save Adjustment'),
+                        onPressed: _isSubmitting ? null : _submit,
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),

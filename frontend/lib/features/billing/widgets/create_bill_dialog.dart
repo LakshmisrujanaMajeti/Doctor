@@ -235,6 +235,39 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
     Navigator.of(context).pop(result);
   }
 
+  void _applyDoctorFeeForVisit(String? visitId, List<dynamic> visits) {
+    if (visitId == null || visits.isEmpty) return;
+    dynamic visit;
+    for (final v in visits) {
+      if (v.id == visitId) {
+        visit = v;
+        break;
+      }
+    }
+    if (visit == null) return;
+
+    final double fee = (visit.consultationFee as num?)?.toDouble() ?? 500.0;
+    final String docName = visit.doctorName != null && (visit.doctorName as String).isNotEmpty
+        ? ' (${visit.doctorName})'
+        : '';
+    final String dept = visit.departmentName ?? 'General Medicine';
+
+    final consultIdx = _billItems.indexWhere((it) => it['item_type'] == 'CONSULTATION');
+    if (consultIdx != -1) {
+      _billItems[consultIdx]['unit_price'] = fee > 0 ? fee : 500.0;
+      _billItems[consultIdx]['description'] = '$dept Specialist Consultation$docName';
+    } else {
+      _billItems.insert(0, {
+        'item_type': 'CONSULTATION',
+        'item_code': 'SRV-CONS-DOC',
+        'description': '$dept Specialist Consultation$docName',
+        'unit_price': fee > 0 ? fee : 500.0,
+        'quantity': 1,
+        'tax_rate_percent': 0.0,
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final visitsAsync = ref.watch(visitListProvider);
@@ -321,6 +354,16 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
                       visitsAsync.when(
                         data: (visits) {
                           final currentId = _selectedVisitId ?? (visits.isNotEmpty ? visits.first.id : null);
+                          if (_selectedVisitId == null && currentId != null) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                setState(() {
+                                  _selectedVisitId = currentId;
+                                  _applyDoctorFeeForVisit(currentId, visits);
+                                });
+                              }
+                            });
+                          }
                           return DropdownButtonFormField<String>(
                             value: currentId,
                             isExpanded: true,
@@ -329,16 +372,22 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
                               prefixIcon: Icon(Icons.person_pin, size: 20),
                             ),
                             items: visits.map((v) {
+                              final feeText = v.consultationFee > 0 ? ' • Fee: ₹${v.consultationFee.toStringAsFixed(0)}' : '';
                               return DropdownMenuItem(
                                 value: v.id,
                                 child: Text(
-                                  '${v.patient?.fullName ?? "Patient"} (${v.patient?.uhid ?? ""}) • Visit: ${v.visitNumber}',
+                                  '${v.patient?.fullName ?? "Patient"} (${v.patient?.uhid ?? ""}) • Visit: ${v.visitNumber}$feeText',
                                   style: const TextStyle(fontSize: 13),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               );
                             }).toList(),
-                            onChanged: (id) => setState(() => _selectedVisitId = id),
+                            onChanged: (id) {
+                              setState(() {
+                                _selectedVisitId = id;
+                                _applyDoctorFeeForVisit(id, visits);
+                              });
+                            },
                           );
                         },
                         loading: () => const LinearProgressIndicator(),
