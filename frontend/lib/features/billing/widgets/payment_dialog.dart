@@ -177,10 +177,11 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 540, maxHeight: 680),
+        constraints: const BoxConstraints(maxWidth: 540, maxHeight: 720),
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
