@@ -60,8 +60,15 @@ class PatientService:
                     )
                 )
 
-        # 2. Phone number match
-        phone_matches = db.query(Patient).filter(Patient.phone == cleaned_phone).all()
+        # 2. Phone number match (exact and normalized last 10 digits)
+        clean_digits = re.sub(r"\D", "", cleaned_phone)
+        last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
+        phone_matches = db.query(Patient).filter(
+            or_(
+                Patient.phone == cleaned_phone,
+                Patient.phone.like(f"%{last10}"),
+            )
+        ).all()
         for p in phone_matches:
             if not any(c.id == p.id for c in candidates):
                 reason = "Identical Contact Phone Number"
@@ -126,14 +133,23 @@ class PatientService:
                     f"A patient with Hospital Registration Number '{patient_in.hospital_reg_num}' already exists (UHID: {existing_reg.uhid})."
                 )
 
-        # Prevent duplicate if enabled
+        # Prevent duplicate phone number
+        if patient_in.phone:
+            clean_phone = patient_in.phone.strip()
+            clean_digits = re.sub(r"\D", "", clean_phone)
+            last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
+            existing_phone = db.query(Patient).filter(
+                or_(
+                    Patient.phone == clean_phone,
+                    Patient.phone.like(f"%{last10}"),
+                )
+            ).first()
+            if existing_phone:
+                raise ConflictException(
+                    f"A patient with phone number '{patient_in.phone}' already exists (UHID: {existing_phone.uhid}, Name: {existing_phone.full_name}). Duplicate mobile numbers are strictly not allowed."
+                )
+
         if prevent_duplicates:
-            if patient_in.phone:
-                existing_phone = db.query(Patient).filter(Patient.phone == patient_in.phone.strip()).first()
-                if existing_phone:
-                    raise ConflictException(
-                        f"A patient with phone number '{patient_in.phone}' already exists (UHID: {existing_phone.uhid}, Name: {existing_phone.full_name}). Duplicate mobile numbers are not allowed."
-                    )
             if patient_in.email:
                 existing_email = db.query(Patient).filter(Patient.email.ilike(patient_in.email.strip())).first()
                 if existing_email:
@@ -154,6 +170,11 @@ class PatientService:
                     )
 
         uhid = PatientService.generate_uhid(db)
+        while db.query(Patient).filter(Patient.uhid == uhid).first():
+            prefix = f"UHID-{datetime.utcnow().year}-"
+            count = db.query(func.count(Patient.id)).filter(Patient.uhid.like(f"{prefix}%")).scalar() or 0
+            uhid = f"{prefix}{str(count + 2).zfill(5)}"
+
         reg_num = patient_in.hospital_reg_num or PatientService.generate_hospital_reg_num(db)
         barcode = patient_in.barcode_value or f"BAR-{uhid}"
         qr_code = patient_in.qr_code_data or f"OPDCONNECT+{uhid}+{reg_num}"
@@ -166,6 +187,7 @@ class PatientService:
                 staff_name = staff_user.full_name
                 staff_role = staff_user.role.name if staff_user.role else None
 
+        now = datetime.utcnow()
         patient = Patient(
             uhid=uhid,
             hospital_reg_num=reg_num,
@@ -184,7 +206,9 @@ class PatientService:
             postal_code=patient_in.postal_code,
             blood_group=patient_in.blood_group,
             abha_number=patient_in.abha_number.strip() if patient_in.abha_number else None,
-            registration_date=datetime.utcnow(),
+            registration_date=now,
+            created_at=now,
+            updated_at=now,
             barcode_value=barcode,
             qr_code_data=qr_code,
             emergency_contact_name=patient_in.emergency_contact_name,
@@ -199,6 +223,39 @@ class PatientService:
         db.commit()
         db.refresh(patient)
 
+        # Automatically issue 1 unique sequential OPD token for this registered patient
+        from app.models.department import Department
+        from app.models.doctor import Doctor
+        from app.services.visit_service import VisitService
+
+        dept = db.query(Department).filter(Department.code == "MED").first() or db.query(Department).filter(Department.is_active == True).first()
+        doc = db.query(Doctor).filter(Doctor.department_id == dept.id if dept else None, Doctor.is_available == True).first() or db.query(Doctor).first()
+
+        queue_tok = VisitService.get_next_queue_token(db, now.date())
+        visit_num = VisitService.generate_visit_number(db, queue_tok)
+
+        visit = OPDVisit(
+            patient_id=patient.id,
+            doctor_id=doc.id if doc else "default",
+            department_id=dept.id if dept else "default",
+            visit_date=now,
+            queue_token=queue_tok,
+            visit_number=visit_num,
+            triage_priority="NORMAL",
+            status="WAITING",
+            consultation_fee=500.0,
+            payment_status="PENDING",
+            notes="Initial OPD Registration Visit",
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(visit)
+        db.commit()
+        db.refresh(visit)
+
+        setattr(patient, "current_token", queue_tok)
+        setattr(patient, "current_visit_number", visit_num)
+
         # Audit
         db.add(
             AuditLog(
@@ -206,7 +263,7 @@ class PatientService:
                 action="CREATE_PATIENT",
                 entity_type="Patient",
                 entity_id=patient.id,
-                details_json=f'{{"uhid": "{patient.uhid}", "reg_num": "{patient.hospital_reg_num}", "name": "{patient.full_name}"}}',
+                details_json=f'{{"uhid": "{patient.uhid}", "reg_num": "{patient.hospital_reg_num}", "name": "{patient.full_name}", "token": {queue_tok}}}',
             )
         )
         db.commit()
@@ -215,16 +272,34 @@ class PatientService:
         try:
             from app.services.supabase_sync_service import SupabaseSyncService
             SupabaseSyncService.sync_patient(patient)
+            SupabaseSyncService.sync_visit(visit)
         except Exception as se:
             logger.debug(f"Supabase sync notice: {se}")
 
         return patient
 
     @staticmethod
+    def attach_patient_tokens(db: Session, patients: List[Patient]) -> List[Patient]:
+        if not patients:
+            return patients
+        pids = [p.id for p in patients]
+        visits = db.query(OPDVisit).filter(OPDVisit.patient_id.in_(pids)).order_by(OPDVisit.visit_date.desc()).all()
+        visit_map = {}
+        for v in visits:
+            if v.patient_id not in visit_map:
+                visit_map[v.patient_id] = v
+        for p in patients:
+            if p.id in visit_map:
+                setattr(p, "current_token", visit_map[p.id].queue_token)
+                setattr(p, "current_visit_number", visit_map[p.id].visit_number)
+        return patients
+
+    @staticmethod
     def get_patient_by_id(db: Session, patient_id: str) -> Patient:
         patient = db.query(Patient).filter(Patient.id == patient_id).first()
         if not patient:
             raise NotFoundException(f"Patient with ID '{patient_id}' not found")
+        PatientService.attach_patient_tokens(db, [patient])
         return patient
 
     @staticmethod
@@ -232,6 +307,7 @@ class PatientService:
         patient = db.query(Patient).filter(Patient.uhid == uhid.strip()).first()
         if not patient:
             raise NotFoundException(f"Patient with UHID '{uhid}' not found")
+        PatientService.attach_patient_tokens(db, [patient])
         return patient
 
     @staticmethod
@@ -239,6 +315,7 @@ class PatientService:
         patient = db.query(Patient).filter(Patient.hospital_reg_num == reg_num.strip()).first()
         if not patient:
             raise NotFoundException(f"Patient with Hospital Registration Number '{reg_num}' not found")
+        PatientService.attach_patient_tokens(db, [patient])
         return patient
 
     @staticmethod
@@ -246,6 +323,7 @@ class PatientService:
         patient = db.query(Patient).filter(Patient.barcode_value == barcode.strip()).first()
         if not patient:
             raise NotFoundException(f"Patient with Barcode/QR '{barcode}' not found")
+        PatientService.attach_patient_tokens(db, [patient])
         return patient
 
     @staticmethod
@@ -298,7 +376,9 @@ class PatientService:
                 conditions.append(Patient.id.in_(visit_by_num_ids))
 
             stmt = stmt.filter(or_(*conditions))
-        return stmt.order_by(Patient.registration_date.desc()).offset(skip).limit(limit).all()
+        results = stmt.order_by(Patient.registration_date.desc()).offset(skip).limit(limit).all()
+        return PatientService.attach_patient_tokens(db, results)
+
 
     @staticmethod
     def update_patient(

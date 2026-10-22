@@ -8,9 +8,13 @@ import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../models/patient_model.dart';
+import '../repositories/patient_repository.dart';
 import '../providers/patient_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
 import '../../admin_portal/providers/admin_portal_provider.dart';
+import '../../visits/providers/visit_provider.dart';
+import '../../visits/repositories/visit_repository.dart';
+
 
 class PatientRegistrationScreen extends ConsumerStatefulWidget {
   const PatientRegistrationScreen({super.key});
@@ -304,6 +308,24 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
       return;
     }
 
+    final enteredPhoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    final last10Digits = enteredPhoneDigits.length >= 10 ? enteredPhoneDigits.substring(enteredPhoneDigits.length - 10) : enteredPhoneDigits;
+    for (final p in PatientRepository.cachedPatients) {
+      final pPhone = p.phone.replaceAll(RegExp(r'\D'), '');
+      final pLast10 = pPhone.length >= 10 ? pPhone.substring(pPhone.length - 10) : pPhone;
+      if (last10Digits.isNotEmpty && pLast10 == last10Digits) {
+        _tabController.animateTo(1);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.triageEmergency,
+            content: Text('A patient with contact number "${_phoneController.text.trim()}" is already registered (UHID: ${p.uhid}, Name: ${p.fullName}). Duplicate mobile numbers are strictly not allowed.'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+    }
+
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please complete required fields before reviewing.')),
@@ -425,15 +447,36 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
         emergencyContactName: cleanEmerName.isNotEmpty ? cleanEmerName : null,
         emergencyContactPhone: cleanEmerPhone.isNotEmpty ? cleanEmerPhone : null,
         emergencyContactRelation: _emergencyRelation,
+        registrationDate: DateTime.now(),
+        createdAt: DateTime.now(),
       );
 
-      final registered = await ref.read(patientRepositoryProvider).registerPatient(
+      PatientModel registered = await ref.read(patientRepositoryProvider).registerPatient(
         newPatient,
         allowDuplicate: allowDuplicate,
       );
+
+      // Ensure 1 unique sequential OPD token is guaranteed for this newly registered patient
+      if (registered.currentToken == null) {
+        try {
+          final visit = await ref.read(visitRepositoryProvider).createVisit(
+            patientId: registered.id,
+            doctorId: 'doc-genmed',
+            departmentId: 'General Medicine',
+            patient: registered,
+          );
+          registered = registered.copyWith(
+            currentToken: visit.queueToken,
+            currentVisitNumber: visit.visitNumber,
+          );
+          PatientRepository.addPatient(registered);
+        } catch (_) {}
+      }
+
       ref.read(patientSearchQueryProvider.notifier).setQuery('');
       ref.invalidate(patientListProvider);
       ref.invalidate(dashboardStatsProvider);
+      ref.invalidate(visitListProvider);
       ref.invalidate(adminDashboardSummaryProvider);
       ref.invalidate(adminRegistrationsReportProvider);
       ref.invalidate(adminBillingReportProvider);
@@ -458,6 +501,16 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  String _formatDateTime(DateTime? dt) {
+    if (dt == null) return '';
+    final local = dt.toLocal();
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final hour = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.day.toString().padLeft(2, '0')} ${months[local.month - 1]} ${local.year}, $hour:$minute $ampm';
   }
 
   void _showSuccessCard(PatientModel patient) {
@@ -494,9 +547,44 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (patient.currentToken != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.teal.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.confirmation_number_rounded, color: Colors.teal, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            'OPD TOKEN: #${patient.currentToken}',
+                            style: const TextStyle(
+                              color: Colors.teal,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   Text('Patient Unique UHID: ${patient.uhid}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryTeal, fontSize: 15)),
                   const SizedBox(height: 4),
                   Text('Hospital Reg No: ${patient.hospitalRegNum ?? "N/A"}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today_rounded, size: 13, color: AppColors.primaryTeal),
+                      const SizedBox(width: 4),
+                      Text('Registration Date & Time: ${_formatDateTime(patient.registrationDate ?? patient.createdAt ?? DateTime.now())}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF1E3A8A))),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text('Registered Mobile: ${patient.phone}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                   const SizedBox(height: 6),
                   const Text(
@@ -506,8 +594,6 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            const Text('Would you like to book an OPD Visit & generate a Token now?', style: TextStyle(fontSize: 13)),
           ],
         ),
         actions: [
@@ -522,14 +608,15 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
             onPressed: () {
               Navigator.pop(ctx);
-              context.push('/visits/new', extra: patient);
+              context.push('/queue');
             },
-            child: const Text('Book OPD Visit', style: TextStyle(color: Colors.white)),
+            child: const Text('View Live Queue', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {

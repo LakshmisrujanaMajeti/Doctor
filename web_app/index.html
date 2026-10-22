@@ -42,18 +42,37 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script>
+    // Force unregister all active service workers and clear caches
     try {
-      if (!localStorage.getItem('smvmch_seed_purge_v3')) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(cacheNames) {
+          cacheNames.forEach(function(cacheName) {
+            caches.delete(cacheName);
+          });
+        });
+      }
+      // Purge cached offline/duplicate patients
+      if (!localStorage.getItem('smvmch_token_realtime_v5')) {
         localStorage.removeItem('flutter.opd_patients_data');
         localStorage.removeItem('flutter.opd_visits_data');
         localStorage.removeItem('flutter.opd_bills_data');
         localStorage.removeItem('opd_patients_data');
         localStorage.removeItem('opd_visits_data');
         localStorage.removeItem('opd_bills_data');
-        localStorage.setItem('smvmch_seed_purge_v3', '1');
+        localStorage.setItem('smvmch_token_realtime_v5', '1');
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Cache purge error:', e);
+    }
   </script>
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="flutter_bootstrap.js?v=v5_realtime" async></script>
+
 </body>
 </html>

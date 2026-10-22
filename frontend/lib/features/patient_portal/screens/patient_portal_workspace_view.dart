@@ -398,6 +398,16 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     );
   }
 
+  static String _formatPortalDateTime(DateTime? dt) {
+    if (dt == null) return '';
+    final local = dt.toLocal();
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final hour = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.day.toString().padLeft(2, '0')} ${months[local.month - 1]} ${local.year}, $hour:$minute $ampm';
+  }
+
   Widget _buildProfileHeader(
     dynamic patient,
     List<DependentProfile> dependents,
@@ -477,6 +487,17 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                           ),
                           softWrap: true,
                         ),
+                        if (patient.registrationDate != null || patient.createdAt != null) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            'Registration Date & Time: ${_formatPortalDateTime(patient.registrationDate ?? patient.createdAt)}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? Colors.grey.shade300 : const Color(0xFF1E3A8A),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                         if (patient.registeredByStaffName != null) ...[
                           const SizedBox(height: 3),
                           Text(

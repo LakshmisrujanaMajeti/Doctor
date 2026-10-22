@@ -189,6 +189,32 @@ class PatientListScreen extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
+                                  if (patient.currentToken != null) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                      margin: const EdgeInsets.only(bottom: 3),
+                                      decoration: BoxDecoration(
+                                        color: Colors.teal.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.teal.withOpacity(0.35)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.confirmation_number_rounded, size: 10.5, color: Colors.teal),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            'TOKEN #${patient.currentToken}',
+                                            style: const TextStyle(
+                                              color: Colors.teal,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                     decoration: BoxDecoration(
@@ -205,15 +231,30 @@ class PatientListScreen extends ConsumerWidget {
                                       ),
                                     ),
                                   ),
+
                                   if (patient.hospitalRegNum != null) ...[
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 3),
                                     Text(
                                       patient.hospitalRegNum!,
-                                      style: TextStyle(fontSize: 10, color: Colors.grey[600], fontWeight: FontWeight.w600),
+                                      style: TextStyle(fontSize: 10, color: Colors.grey[700], fontWeight: FontWeight.w600),
                                     ),
                                   ],
-                                  const SizedBox(height: 6),
-                                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+                                  if (patient.registrationDate != null || patient.createdAt != null) ...[
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.event_note_rounded, size: 10.5, color: Colors.grey[600]),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          _formatDateTime(patient.registrationDate ?? patient.createdAt),
+                                          style: TextStyle(fontSize: 9.5, color: Colors.grey[600], fontWeight: FontWeight.w500),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  const SizedBox(height: 4),
+                                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 18),
                                 ],
                               ),
                             ],
@@ -232,6 +273,16 @@ class PatientListScreen extends ConsumerWidget {
       ),
     ),
   );
+  }
+
+  static String _formatDateTime(DateTime? dt) {
+    if (dt == null) return '';
+    final local = dt.toLocal();
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final hour = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.day.toString().padLeft(2, '0')} ${months[local.month - 1]} ${local.year}, $hour:$minute $ampm';
   }
 
   void _showPatientOptions(BuildContext context, WidgetRef ref, PatientModel patient) {
@@ -258,10 +309,24 @@ class PatientListScreen extends ConsumerWidget {
                           patient.fullName,
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           'UHID: ${patient.uhid} • Reg: ${patient.hospitalRegNum ?? "N/A"}',
                           style: const TextStyle(color: AppColors.primaryTeal, fontSize: 13, fontWeight: FontWeight.w600),
                         ),
+                        if (patient.registrationDate != null || patient.createdAt != null) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Icon(Icons.event_available_rounded, size: 13, color: Colors.grey[600]),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Registered: ${_formatDateTime(patient.registrationDate ?? patient.createdAt)}',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[700], fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

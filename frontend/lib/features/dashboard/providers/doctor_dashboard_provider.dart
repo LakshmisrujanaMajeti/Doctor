@@ -35,7 +35,7 @@ final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async
 
   final myVisits = allVisits.where((v) {
     if (currentUser == null) return false;
-    final vDocId = v.doctorId?.toLowerCase() ?? '';
+    final vDocId = v.doctorId.toLowerCase();
     final vDocName = v.doctorName?.toLowerCase() ?? '';
     final vDept = v.departmentName?.toLowerCase() ?? '';
 

@@ -30,6 +30,8 @@ import '../../pharmacy/screens/pharmacy_workspace_view.dart';
 import '../../pharmacy/providers/pharmacy_provider.dart';
 import '../../billing/screens/billing_workspace_view.dart';
 import '../../billing/providers/billing_provider.dart';
+import '../../doctors/repositories/doctor_repository.dart';
+import '../../doctors/models/doctor_model.dart';
 
 class RoleDashboardShell extends ConsumerStatefulWidget {
   const RoleDashboardShell({super.key});
@@ -370,19 +372,34 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                     ),
                   ] else ...[
                     statsAsync.when(
+                      skipLoadingOnReload: true,
                       data: (stats) => _buildRoleMetricsGrid(
                         context: context,
                         role: currentRole,
                         stats: stats,
                         visitsAsync: visitsAsync,
                       ),
-                      loading: () => const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                      error: (err, stack) => const SizedBox(),
+                      loading: () => statsAsync.hasValue
+                          ? _buildRoleMetricsGrid(
+                              context: context,
+                              role: currentRole,
+                              stats: statsAsync.value!,
+                              visitsAsync: visitsAsync,
+                            )
+                          : const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                      error: (err, stack) => statsAsync.hasValue
+                          ? _buildRoleMetricsGrid(
+                              context: context,
+                              role: currentRole,
+                              stats: statsAsync.value!,
+                              visitsAsync: visitsAsync,
+                            )
+                          : const SizedBox(),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -466,10 +483,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Patients',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_rounded),
-            label: 'Alerts',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -478,8 +491,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/patients');
-          if (idx == 3) context.push('/notifications');
-          if (idx == 4) context.push('/settings');
+          if (idx == 3) context.push('/settings');
         };
         break;
 
@@ -498,10 +510,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Patients',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_rounded),
-            label: 'Alerts',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -510,8 +518,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/patients');
-          if (idx == 3) context.push('/notifications');
-          if (idx == 4) context.push('/settings');
+          if (idx == 3) context.push('/settings');
         };
         break;
 
@@ -530,10 +537,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Intake / Reg',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_rounded),
-            label: 'Alerts',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -542,8 +545,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/patients');
-          if (idx == 3) context.push('/notifications');
-          if (idx == 4) context.push('/settings');
+          if (idx == 3) context.push('/settings');
         };
         break;
 
@@ -562,10 +564,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Formulary',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_rounded),
-            label: 'Alerts',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -574,8 +572,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/pharmacy');
-          if (idx == 3) context.push('/notifications');
-          if (idx == 4) context.push('/settings');
+          if (idx == 3) context.push('/settings');
         };
         break;
 
@@ -595,10 +592,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Worklist',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_rounded),
-            label: 'Alerts',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -607,8 +600,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/laboratory');
-          if (idx == 3) context.push('/notifications');
-          if (idx == 4) context.push('/settings');
+          if (idx == 3) context.push('/settings');
         };
         break;
 
@@ -627,10 +619,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Billing Counter',
           ),
           NavigationDestination(
-            icon: Icon(Icons.notifications_rounded),
-            label: 'Alerts',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -639,8 +627,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/billing');
-          if (idx == 3) context.push('/notifications');
-          if (idx == 4) context.push('/settings');
+          if (idx == 3) context.push('/settings');
         };
         break;
 
@@ -970,7 +957,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             icon: Icons.medical_services_rounded,
             color: const Color(0xFF8B5CF6),
             subtitle: 'In Clinic Rooms',
-            onTap: () => context.push('/queue'),
+            onTap: () => _showDoctorRosterDialog(context),
           ),
         ]);
 
@@ -1036,7 +1023,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             icon: Icons.domain_rounded,
             color: const Color(0xFF8B5CF6),
             subtitle: 'Operational',
-            onTap: () => context.push('/queue'),
+            onTap: () => _showActiveClinicsDialog(context),
           ),
           StatMetricCard(
             title: 'Doctor Roster',
@@ -1044,9 +1031,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             icon: Icons.badge_outlined,
             color: AppColors.statusCompleted,
             subtitle: 'Consulting',
-            onTap: () => context.push('/queue'),
+            onTap: () => _showDoctorRosterDialog(context),
           ),
         ]);
+
 
       case 'laboratory':
       case 'lab_tech':
@@ -1988,4 +1976,314 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
         return 'OPD Receptionist';
     }
   }
+
+  void _showActiveClinicsDialog(BuildContext context) {
+    final clinics = [
+      {'name': 'General Medicine', 'code': 'MED', 'room': 'Rooms 101, 104', 'desc': 'Internal medicine, acute infections & chronic care', 'doctors': 'Dr. Sarah Chen, MD'},
+      {'name': 'Cardiology', 'code': 'CARD', 'room': 'Room 102', 'desc': 'Cardiac evaluation, hypertension & ECG diagnostics', 'doctors': 'Dr. R. Venkatesh, DM'},
+      {'name': 'Pediatrics', 'code': 'PED', 'room': 'Room 103', 'desc': 'Neonatal, infant care & pediatric immunizations', 'doctors': 'Dr. Ananya Roy, MD'},
+      {'name': 'Orthopedics', 'code': 'ORTH', 'room': 'Room 104', 'desc': 'Bone trauma, fracture reduction & joint pain', 'doctors': 'Dr. Vikram Mehta, MS'},
+      {'name': 'Dermatology', 'code': 'DERM', 'room': 'Room 105', 'desc': 'Clinical dermatology, allergies & skin treatments', 'doctors': 'Dr. Ananya Rao, MD'},
+      {'name': 'Endocrinology', 'code': 'ENDO', 'room': 'Room 106', 'desc': 'Diabetes mellitus, thyroid & metabolic health', 'doctors': 'Dr. S. Kulkarni, DM'},
+      {'name': 'Gastroenterology', 'code': 'GASTRO', 'room': 'Room 107', 'desc': 'Digestive disorders, liver clinic & endoscopy', 'doctors': 'Dr. Pradeep Menon, DM'},
+      {'name': 'Pulmonology', 'code': 'PULM', 'room': 'Room 108', 'desc': 'Respiratory medicine, asthma & pulmonary function', 'doctors': 'Dr. Harish Patel, MD • Dr. Uday Kumar, MD'},
+      {'name': 'Neurology', 'code': 'NEURO', 'room': 'Room 109', 'desc': 'Neuro-diagnostics, epilepsy & migraine management', 'doctors': 'Dr. Vikram Seth, DM'},
+      {'name': 'Oncology', 'code': 'ONCO', 'room': 'Room 110', 'desc': 'Medical oncology, chemo planning & screening', 'doctors': 'Dr. Malini Iyer, MD DM'},
+      {'name': 'Nephrology', 'code': 'NEPH', 'room': 'Room 111', 'desc': 'Kidney health, dialysis consults & hypertension', 'doctors': 'Dr. Gautam Das, DM'},
+      {'name': 'Gynecology', 'code': 'GYN', 'room': 'Room 112', 'desc': "Women's wellness, prenatal checks & gynecology", 'doctors': 'Dr. Radhika Nair, MS DGO'},
+      {'name': 'Dental / Maxillofacial', 'code': 'DENT', 'room': 'Room 113', 'desc': 'Oral surgery, root canals & maxillofacial consults', 'doctors': 'Dr. M. Arunraj, MDS'},
+      {'name': 'ENT (Ear, Nose, Throat)', 'code': 'ENT', 'room': 'Room 114', 'desc': 'Otolaryngology, audiometry & sinus care', 'doctors': 'Dr. Kavita Nair, MS ENT'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.92,
+        builder: (_, scrollCtrl) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 16, 16, 14),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.domain_rounded, color: Color(0xFF8B5CF6), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Active Clinical Departments',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '${clinics.length} Hospital Outpatient Clinics Operational',
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: clinics.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, idx) {
+                    final c = clinics[idx];
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.grey.withOpacity(0.18)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8B5CF6).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              c['code']!,
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6), fontSize: 11),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        c['name']!,
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text('OPERATIONAL', style: TextStyle(color: Colors.green, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(c['desc']!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.meeting_room_outlined, size: 13, color: AppColors.primaryBlue),
+                                    const SizedBox(width: 4),
+                                    Text(c['room']!, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.primaryBlue)),
+                                    const SizedBox(width: 12),
+                                    const Icon(Icons.person_outline, size: 13, color: Colors.grey),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        c['doctors']!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 11.5, color: Colors.grey),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDoctorRosterDialog(BuildContext context) {
+    final docs = DoctorRepository.cachedDoctors.isNotEmpty
+        ? DoctorRepository.cachedDoctors
+        : DoctorRepository.defaultDoctors;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.92,
+        builder: (_, scrollCtrl) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 16, 16, 14),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.statusCompleted.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.badge_outlined, color: AppColors.statusCompleted, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'On-Duty Medical Specialists Roster',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '${docs.length} Clinical Physicians & Specialists Available Today',
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, idx) {
+                    final d = docs[idx];
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.grey.withOpacity(0.18)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: AppColors.primaryBlue.withOpacity(0.12),
+                            child: const Icon(Icons.person_rounded, color: AppColors.primaryBlue, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        d.name,
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.circle, color: Colors.green, size: 6),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'ON DUTY',
+                                            style: TextStyle(
+                                              color: Colors.green,
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${d.specialization} • ${d.qualification}',
+                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.meeting_room_rounded, size: 13, color: AppColors.primaryBlue),
+                                    const SizedBox(width: 4),
+                                    Text(d.roomNumber, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.primaryBlue)),
+                                    const Spacer(),
+                                    Text('Fee: ₹${d.consultationFee.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.teal)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+

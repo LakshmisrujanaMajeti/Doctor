@@ -292,16 +292,30 @@ class AuthRepository {
     final effectivePassword = (password != null && password.trim().isNotEmpty)
         ? password.trim()
         : 'Patient@${cleanPhone.length >= 4 ? cleanPhone.substring(cleanPhone.length - 4) : '2026'}';
+    final cleanDigits = cleanPhone.replaceAll(RegExp(r'\D'), '');
+    final last10 = cleanDigits.length >= 10 ? cleanDigits.substring(cleanDigits.length - 10) : cleanDigits;
     final generatedUhid = 'UHID-2026-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
 
-    // 0. Strict duplicate check against existing patients
+    // 0. Strict duplicate check against cached patients
+    for (final p in PatientRepository.cachedPatients) {
+      final pDigits = p.phone.replaceAll(RegExp(r'\D'), '');
+      final pLast10 = pDigits.length >= 10 ? pDigits.substring(pDigits.length - 10) : pDigits;
+      if (last10.isNotEmpty && pLast10 == last10) {
+        throw Exception(
+          'A patient with mobile number "$cleanPhone" is already registered in the hospital database (UHID: ${p.uhid}, Name: ${p.fullName}). Duplicate mobile numbers are strictly not allowed.',
+        );
+      }
+    }
+
     final rawPatients = await SecureStorageService.getPatientsJson();
     if (rawPatients != null && rawPatients.isNotEmpty) {
       final list = jsonDecode(rawPatients) as List<dynamic>;
       for (final p in list) {
-        if (cleanPhone.isNotEmpty && p['phone'] != null && p['phone'].toString().trim() == cleanPhone) {
+        final pDigits = p['phone']?.toString().replaceAll(RegExp(r'\D'), '') ?? '';
+        final pLast10 = pDigits.length >= 10 ? pDigits.substring(pDigits.length - 10) : pDigits;
+        if (last10.isNotEmpty && pLast10 == last10) {
           throw Exception(
-            'A patient with mobile number "$cleanPhone" is already registered in the hospital database. Duplicate mobile numbers are not allowed.',
+            'A patient with mobile number "$cleanPhone" is already registered in the hospital database (UHID: ${p['uhid']}, Name: ${p['full_name']}). Duplicate mobile numbers are strictly not allowed.',
           );
         }
         if (email != null && email.trim().isNotEmpty && p['email'] != null && p['email'].toString().trim().toLowerCase() == cleanEmail.toLowerCase()) {
@@ -441,7 +455,7 @@ class AuthRepository {
       if (raw != null && raw.isNotEmpty) {
         list = jsonDecode(raw) as List<dynamic>;
       }
-
+      final nowIso = DateTime.now().toIso8601String();
       final newPatient = {
         'id': id,
         'uhid': uhid,
@@ -462,10 +476,25 @@ class AuthRepository {
         'emergency_contact_relation': emergencyContactRelation ?? 'Spouse',
         'barcode_value': 'BAR-$uhid',
         'qr_code_data': 'OPDCONNECT+$uhid',
-        'created_at': DateTime.now().toIso8601String(),
+        'registration_date': nowIso,
+        'created_at': nowIso,
       };
 
-      list.insert(0, newPatient);
+      final cleanDigits = phone.replaceAll(RegExp(r'\D'), '');
+      final last10 = cleanDigits.length >= 10 ? cleanDigits.substring(cleanDigits.length - 10) : cleanDigits;
+
+      final existingIndex = list.indexWhere((item) {
+        final iPhone = item['phone']?.toString().replaceAll(RegExp(r'\D'), '') ?? '';
+        final iLast10 = iPhone.length >= 10 ? iPhone.substring(iPhone.length - 10) : iPhone;
+        return (last10.isNotEmpty && iLast10 == last10) || item['uhid'] == uhid || item['id'] == id;
+      });
+
+      if (existingIndex != -1) {
+        list[existingIndex] = newPatient;
+      } else {
+        list.insert(0, newPatient);
+      }
+
       await SecureStorageService.savePatientsJson(jsonEncode(list));
       PatientRepository.addPatient(PatientModel.fromJson(newPatient));
     } catch (e) {

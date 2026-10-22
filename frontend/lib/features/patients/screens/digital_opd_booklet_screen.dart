@@ -329,10 +329,15 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                       _buildBookletFieldRow('Phone / தொலைபேசி', patient.phone),
                       _buildBookletFieldRow('Blood Group', patient.bloodGroup ?? 'O+'),
                       _buildBookletFieldRow(
-                        'Reg. Date',
-                        patient.registrationDate != null
-                            ? '${patient.registrationDate!.day.toString().padLeft(2, '0')}/${patient.registrationDate!.month.toString().padLeft(2, '0')}/${patient.registrationDate!.year} 05:55 PM'
-                            : '25/12/2024 05:55 PM',
+                        'Reg. Date & Time',
+                        () {
+                          final dt = (patient.registrationDate ?? patient.createdAt)?.toLocal();
+                          if (dt == null) return '21/10/2026 10:12 AM';
+                          final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+                          final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+                          final minute = dt.minute.toString().padLeft(2, '0');
+                          return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} $hour:$minute $ampm';
+                        }(),
                       ),
                       if (patient.registeredByStaffName != null)
                         _buildBookletFieldRow(

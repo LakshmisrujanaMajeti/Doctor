@@ -28,6 +28,8 @@ class PatientModel {
   final String? registeredByStaffName;
   final String? registeredByStaffRole;
   final DateTime? createdAt;
+  final int? currentToken;
+  final String? currentVisitNumber;
 
   PatientModel({
     required this.id,
@@ -59,7 +61,10 @@ class PatientModel {
     this.registeredByStaffName,
     this.registeredByStaffRole,
     this.createdAt,
+    this.currentToken,
+    this.currentVisitNumber,
   });
+
 
   PatientModel copyWith({
     String? id,
@@ -91,6 +96,8 @@ class PatientModel {
     String? registeredByStaffName,
     String? registeredByStaffRole,
     DateTime? createdAt,
+    int? currentToken,
+    String? currentVisitNumber,
   }) {
     return PatientModel(
       id: id ?? this.id,
@@ -122,6 +129,8 @@ class PatientModel {
       registeredByStaffName: registeredByStaffName ?? this.registeredByStaffName,
       registeredByStaffRole: registeredByStaffRole ?? this.registeredByStaffRole,
       createdAt: createdAt ?? this.createdAt,
+      currentToken: currentToken ?? this.currentToken,
+      currentVisitNumber: currentVisitNumber ?? this.currentVisitNumber,
     );
   }
 
@@ -146,8 +155,8 @@ class PatientModel {
       postalCode: json['postal_code'] as String?,
       bloodGroup: json['blood_group'] as String?,
       registrationDate: json['registration_date'] != null
-          ? DateTime.tryParse(json['registration_date'] as String)
-          : null,
+          ? DateTime.tryParse(json['registration_date'].toString())
+          : (json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null),
       barcodeValue: json['barcode_value'] as String?,
       qrCodeData: json['qr_code_data'] as String?,
       emergencyContactName: json['emergency_contact_name'] as String?,
@@ -158,8 +167,10 @@ class PatientModel {
       registeredByStaffName: json['registered_by_staff_name'] as String?,
       registeredByStaffRole: json['registered_by_staff_role'] as String?,
       createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'] as String)
-          : null,
+          ? DateTime.tryParse(json['created_at'].toString())
+          : (json['registration_date'] != null ? DateTime.tryParse(json['registration_date'].toString()) : null),
+      currentToken: json['current_token'] as int? ?? (json['queue_token'] as int?),
+      currentVisitNumber: json['current_visit_number'] as String? ?? (json['visit_number'] as String?),
     );
   }
 
@@ -182,6 +193,8 @@ class PatientModel {
     if (state != null) 'state': state,
     if (postalCode != null) 'postal_code': postalCode,
     if (bloodGroup != null) 'blood_group': bloodGroup,
+    if (registrationDate != null) 'registration_date': registrationDate!.toIso8601String(),
+    if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
     if (barcodeValue != null) 'barcode_value': barcodeValue,
     if (qrCodeData != null) 'qr_code_data': qrCodeData,
     if (emergencyContactName != null) 'emergency_contact_name': emergencyContactName,
@@ -191,7 +204,10 @@ class PatientModel {
     if (registeredByStaffId != null) 'registered_by_staff_id': registeredByStaffId,
     if (registeredByStaffName != null) 'registered_by_staff_name': registeredByStaffName,
     if (registeredByStaffRole != null) 'registered_by_staff_role': registeredByStaffRole,
+    if (currentToken != null) 'current_token': currentToken,
+    if (currentVisitNumber != null) 'current_visit_number': currentVisitNumber,
   };
+
 }
 
 class DuplicateCandidateModel {

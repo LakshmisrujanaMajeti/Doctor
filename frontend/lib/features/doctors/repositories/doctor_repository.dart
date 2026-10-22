@@ -14,8 +14,10 @@ class DoctorRepository {
   static final List<DoctorModel> _localDoctors = [];
   static bool _isLoaded = false;
 
-  static List<DoctorModel> get cachedDoctors => List.unmodifiable(_localDoctors);
+  static List<DoctorModel> get cachedDoctors =>
+      _localDoctors.isNotEmpty ? List.unmodifiable(_localDoctors) : List.unmodifiable(_default10Doctors);
   static List<DoctorModel> get defaultDoctors => List.unmodifiable(_default10Doctors);
+
 
   static void initializeCache(List<DoctorModel> doctors) {
     _localDoctors.clear();
@@ -203,7 +205,20 @@ class DoctorRepository {
       consultationFee: 550.0,
       isAvailable: true,
     ),
+    DoctorModel(
+      id: 'doc-pulmo-uday',
+      userId: 'user-doc-pulmo-uday',
+      name: 'Dr. Uday Kumar, MD',
+      specialization: 'Pulmonology',
+      departmentId: 'Pulmonology',
+      departmentName: 'Pulmonology',
+      qualification: 'MBBS, MD (Pulmonary Medicine)',
+      roomNumber: 'Room 108',
+      consultationFee: 650.0,
+      isAvailable: true,
+    ),
   ];
+
 
   Future<void> _loadCacheIfNeeded() async {
     if (_localDoctors.isNotEmpty) return;

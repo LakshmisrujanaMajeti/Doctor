@@ -102,7 +102,30 @@ class AuthService:
 
         # 2. Patient role-specific profile provisioning
         elif role.name.lower() == "patient":
+            clean_phone = phone.strip() if phone else ""
+            if clean_phone:
+                import re
+                clean_digits = re.sub(r"\D", "", clean_phone)
+                last10 = clean_digits[-10:] if len(clean_digits) >= 10 else clean_digits
+                existing_pat = db.query(Patient).filter(
+                    or_(
+                        Patient.phone == clean_phone,
+                        Patient.phone.like(f"%{last10}"),
+                    )
+                ).first()
+                if existing_pat:
+                    raise ConflictException(
+                        f"A patient with phone number '{clean_phone}' is already registered with UHID '{existing_pat.uhid}' ({existing_pat.full_name}). Duplicate registrations are not allowed."
+                    )
+
             uhid = PatientService.generate_uhid(db)
+            while db.query(Patient).filter(Patient.uhid == uhid).first():
+                prefix = f"UHID-{datetime.utcnow().year}-"
+                count = db.query(func.count(Patient.id)).filter(Patient.uhid.like(f"{prefix}%")).scalar() or 0
+                uhid = f"{prefix}{str(count + 2).zfill(5)}"
+
+            reg_num = PatientService.generate_hospital_reg_num(db)
+            now = datetime.utcnow()
             dob = None
             if data.get("date_of_birth"):
                 try:
@@ -112,14 +135,23 @@ class AuthService:
 
             patient = Patient(
                 uhid=uhid,
+                hospital_reg_num=reg_num,
                 full_name=full_name.strip(),
                 date_of_birth=dob,
                 age_years=data.get("age_years"),
                 gender=(data.get("gender") or "MALE").upper(),
-                phone=phone.strip() if phone else "",
+                phone=clean_phone,
                 email=clean_email,
                 address=data.get("address"),
-                blood_group=data.get("blood_group"),
+                city=data.get("city") or "Puducherry",
+                state=data.get("state") or "Puducherry",
+                postal_code=data.get("postal_code") or "605107",
+                blood_group=data.get("blood_group") or "O+",
+                registration_date=now,
+                created_at=now,
+                updated_at=now,
+                barcode_value=f"BAR-{uhid}",
+                qr_code_data=f"OPDCONNECT+{uhid}+{reg_num}",
                 emergency_contact_name=data.get("emergency_contact_name"),
                 emergency_contact_phone=data.get("emergency_contact_phone"),
                 emergency_contact_relation=data.get("emergency_contact_relation"),
@@ -177,8 +209,14 @@ class AuthService:
             except Exception:
                 dob = None
 
+        now = datetime.utcnow()
+        reg_num = PatientService.generate_hospital_reg_num(db)
+        barcode = f"BAR-{uhid}"
+        qr_code = f"OPDCONNECT+{uhid}+{reg_num}"
+
         patient = Patient(
             uhid=uhid,
+            hospital_reg_num=reg_num,
             full_name=req.full_name.strip(),
             date_of_birth=dob,
             age_years=req.age_years,
@@ -187,11 +225,45 @@ class AuthService:
             email=clean_email if req.email else None,
             address=req.address,
             blood_group=req.blood_group,
+            registration_date=now,
+            created_at=now,
+            updated_at=now,
+            barcode_value=barcode,
+            qr_code_data=qr_code,
             emergency_contact_name=req.emergency_contact_name,
             emergency_contact_phone=req.emergency_contact_phone,
             emergency_contact_relation=req.emergency_contact_relation,
         )
         db.add(patient)
+        db.flush()
+
+        # Create initial OPD Visit with next sequential queue token
+        from app.models.visit import OPDVisit
+        from app.models.department import Department
+        from app.models.doctor import Doctor
+        from app.services.visit_service import VisitService
+
+        dept = db.query(Department).filter(Department.code == "MED").first() or db.query(Department).filter(Department.is_active == True).first()
+        doc = db.query(Doctor).filter(Doctor.department_id == dept.id if dept else None, Doctor.is_available == True).first() or db.query(Doctor).first()
+        queue_tok = VisitService.get_next_queue_token(db, now.date())
+        visit_num = VisitService.generate_visit_number(db, queue_tok)
+
+        visit = OPDVisit(
+            patient_id=patient.id,
+            doctor_id=doc.id if doc else "default",
+            department_id=dept.id if dept else "default",
+            visit_date=now,
+            queue_token=queue_tok,
+            visit_number=visit_num,
+            triage_priority="NORMAL",
+            status="WAITING",
+            consultation_fee=500.0,
+            payment_status="PENDING",
+            notes="Initial Registration Visit",
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(visit)
         db.flush()
 
         # Create User account linked to patient
@@ -204,10 +276,14 @@ class AuthService:
             patient_id=patient.id,
             is_active=True,
             is_verified=True,
+            created_at=now,
+            updated_at=now,
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+        db.refresh(patient)
+
 
         # Audit
         db.add(AuditLog(

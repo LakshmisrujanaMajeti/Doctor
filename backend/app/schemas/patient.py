@@ -102,9 +102,13 @@ class PatientRead(PatientBase):
     uhid: str
     hospital_reg_num: Optional[str] = None
     registration_date: datetime
+    created_at: Optional[datetime] = None
     registered_by_staff_id: Optional[str] = None
     registered_by_staff_name: Optional[str] = None
     registered_by_staff_role: Optional[str] = None
+    current_token: Optional[int] = None
+    current_visit_number: Optional[str] = None
+
 
 
 class DuplicateCandidate(BaseSchema):
