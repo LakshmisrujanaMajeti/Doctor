@@ -838,11 +838,14 @@ def seed_database():
         doc_user = db.query(User).filter(User.email == "doctor@smvmch.ac.in").first()
         for u in [admin_user, doc_user]:
             if u:
-                existing_sess = db.query(RefreshTokenSession).filter(RefreshTokenSession.user_id == u.id, RefreshTokenSession.is_revoked == False).first()
+                token_hash_val = f"seed-session-hash-{u.id}"
+                existing_sess = db.query(RefreshTokenSession).filter(
+                    (RefreshTokenSession.user_id == u.id) | (RefreshTokenSession.token_hash == token_hash_val)
+                ).first()
                 if not existing_sess:
                     sess = RefreshTokenSession(
                         user_id=u.id,
-                        token_hash=f"seed-session-hash-{u.id[:8]}",
+                        token_hash=token_hash_val,
                         expires_at=datetime.utcnow() + timedelta(days=7),
                         is_revoked=False,
                         ip_address="127.0.0.1",

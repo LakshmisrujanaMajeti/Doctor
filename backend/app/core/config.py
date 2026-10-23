@@ -40,9 +40,14 @@ class Settings(BaseSettings):
         url = neon or v or "sqlite:///./opd_connect.db"
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
+        if "channel_binding=" in url:
+            url = url.replace("&channel_binding=require", "").replace("channel_binding=require&", "").replace("channel_binding=require", "")
         if ("neon.tech" in url or "supabase.co" in url) and "sslmode=" not in url:
             separator = "&" if "?" in url else "?"
             url = f"{url}{separator}sslmode=require"
+        if "neon.tech" in url and "hostaddr=" not in url:
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}hostaddr=52.14.39.200"
         return url
 
     @property
@@ -56,9 +61,14 @@ class Settings(BaseSettings):
         )
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
+        if "channel_binding=" in url:
+            url = url.replace("&channel_binding=require", "").replace("channel_binding=require&", "").replace("channel_binding=require", "")
         if ("neon.tech" in url or "supabase.co" in url) and "sslmode=" not in url:
             separator = "&" if "?" in url else "?"
             url = f"{url}{separator}sslmode=require"
+        if "neon.tech" in url and "hostaddr=" not in url:
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}hostaddr=52.14.39.200"
         return url
 
     # Supabase Settings

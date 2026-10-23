@@ -33,9 +33,14 @@ def migrate(neon_url: str = None):
 
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
+    if "channel_binding=" in url:
+        url = url.replace("&channel_binding=require", "").replace("channel_binding=require&", "").replace("channel_binding=require", "")
     if "neon.tech" in url and "sslmode=" not in url:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}sslmode=require"
+    if "neon.tech" in url and "hostaddr=" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}hostaddr=52.14.39.200"
 
     print(f"Connecting to database target: {url.split('@')[-1] if '@' in url else url}...")
 
