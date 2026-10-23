@@ -191,7 +191,7 @@ def seed_database():
             db.flush()
 
         # Receptionist
-        rec_user = db.query(User).filter((User.email == "reception@smvmch.ac.in") | (User.email == "receptionist@smvmch.ac.in") | (User.phone == "+1555000003")).first()
+        rec_user = db.query(User).filter((User.email == "reception@smvmch.ac.in") | (User.phone == "+1555000003")).first()
         if not rec_user:
             rec_user = User(
                 email="reception@smvmch.ac.in",
@@ -280,10 +280,8 @@ def seed_database():
             db.add(billing_user)
             db.flush()
 
-        # SMVMCH Official Institutional Credentials
+        # SMVMCH Official Specialty Medical Consultants
         institutional_staff = [
-            ("admin@smvmch.ac.in", "Admin Administrator", "+1555000011", "Admin@123", "admin"),
-            ("doctor@smvmch.ac.in", "Dr. Sarah Chen, MD", "+1555000012", "Doctor@123", "doctor"),
             ("pulmonology@smvmch.ac.in", "Dr. Harish Patel, MD", "+1555000031", "Doctor@123", "doctor"),
             ("cardiology@smvmch.ac.in", "Dr. R. Venkatesh, DM", "+1555000032", "Doctor@123", "doctor"),
             ("pediatrics@smvmch.ac.in", "Dr. Ananya Roy, MD", "+1555000033", "Doctor@123", "doctor"),
@@ -297,10 +295,6 @@ def seed_database():
             ("gynecology@smvmch.ac.in", "Dr. Radhika Nair, MS DGO", "+1555000041", "Doctor@123", "doctor"),
             ("dental@smvmch.ac.in", "Dr. M. Arunraj, MDS", "+1555000042", "Doctor@123", "doctor"),
             ("ent@smvmch.ac.in", "Dr. Kavita Nair, MS ENT", "+1555000043", "Doctor@123", "doctor"),
-            ("receptionist@smvmch.ac.in", "Alice Adams (Reception Desk)", "+1555000013", "Reception@123", "receptionist"),
-            ("reception@smvmch.ac.in", "Alice Adams (Reception Desk)", "+1555000014", "Reception@123", "receptionist"),
-            ("lab@smvmch.ac.in", "Marcus Vance (Lab Tech)", "+1555000015", "Lab@123", "lab_tech"),
-            ("pharmacy@smvmch.ac.in", "Elena Rostova (Pharmacist)", "+1555000016", "Pharmacy@123", "pharmacist"),
         ]
         for inst_email, inst_name, inst_phone, inst_pass, inst_role in institutional_staff:
             u_check = db.query(User).filter(User.email == inst_email).first()

@@ -64,10 +64,8 @@ class AuthRepository {
     '+1555000043': {'email': 'ent@smvmch.ac.in', 'role': 'doctor', 'name': 'Dr. Kavita Nair, MS ENT'},
     '1555000043': {'email': 'ent@smvmch.ac.in', 'role': 'doctor', 'name': 'Dr. Kavita Nair, MS ENT'},
 
-    '+1555000003': {'email': 'receptionist@smvmch.ac.in', 'role': 'receptionist', 'name': 'Alice Adams'},
-    '1555000003': {'email': 'receptionist@smvmch.ac.in', 'role': 'receptionist', 'name': 'Alice Adams'},
-    '+1555000013': {'email': 'receptionist@smvmch.ac.in', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)'},
-    '1555000013': {'email': 'receptionist@smvmch.ac.in', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)'},
+    '+1555000003': {'email': 'reception@smvmch.ac.in', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)'},
+    '1555000003': {'email': 'reception@smvmch.ac.in', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)'},
     '+1555000014': {'email': 'reception@smvmch.ac.in', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)'},
     '1555000014': {'email': 'reception@smvmch.ac.in', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)'},
 
@@ -146,8 +144,7 @@ class AuthRepository {
     'doctor.ent@smvmch.ac.in': {'id': '8bf63271-510c-4a74-bb5a-87889edb08aa', 'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Kavita Nair, MS ENT', 'phone': '+1555000043', 'department': 'ENT'},
 
     // Staff Accounts
-    'reception@smvmch.ac.in': {'id': '60de44f5-28c9-4b56-8fb6-11c7046991da', 'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)', 'phone': '+1555000014', 'department': 'Central OPD Reception'},
-    'receptionist@smvmch.ac.in': {'id': '157cbeb6-08c4-4637-bd2d-a117c58c7451', 'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)', 'phone': '+1555000013', 'department': 'Central OPD Reception'},
+    'reception@smvmch.ac.in': {'id': '60de44f5-28c9-4b56-8fb6-11c7046991da', 'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)', 'phone': '+1555000003', 'department': 'Central OPD Reception'},
     'nurse@smvmch.ac.in': {'id': '04d607eb-a1d2-43fa-a6be-73b379e49a46', 'pass': 'Nurse@123', 'alt_pass': 'Nurse@123456', 'role': 'nurse', 'name': 'Sister Priya (Triage Nurse)', 'phone': '+1555000006', 'department': 'General Medicine'},
     'billing@smvmch.ac.in': {'id': 'a71ba01d-e928-4985-948f-dedbf4ae407d', 'pass': 'Billing@123', 'alt_pass': 'Billing@123456', 'role': 'billing', 'name': 'Rajesh Kumar (Billing Desk)', 'phone': '+1555000007', 'department': 'Billing & Accounts'},
     'lab@smvmch.ac.in': {'id': 'd169ebfa-c6fe-4f8e-bdfe-a8ba01b7a66b', 'pass': 'Lab@123', 'alt_pass': 'Lab@123456', 'role': 'lab_tech', 'name': 'Marcus Vance (Lab Tech)', 'phone': '+1555000015', 'department': 'Clinical Pathology & Biochemistry'},
