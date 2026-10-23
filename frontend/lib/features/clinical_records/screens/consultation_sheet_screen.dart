@@ -1073,6 +1073,12 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
 
   void _showOrderLabDialog() {
     final tests = [
+      {'name': 'Brain MRI Scan with Contrast', 'category': 'RADIOLOGY'},
+      {'name': 'MRI Lumbar Spine / Knee Joint', 'category': 'RADIOLOGY'},
+      {'name': 'CT Scan Brain / Chest HRCT', 'category': 'RADIOLOGY'},
+      {'name': 'Ultrasound Whole Abdomen (USG)', 'category': 'RADIOLOGY'},
+      {'name': 'Chest X-Ray PA View', 'category': 'RADIOLOGY'},
+      {'name': '12-Lead Electrocardiogram (ECG)', 'category': 'CARDIOLOGY'},
       {'name': 'Complete Blood Count (CBC)', 'category': 'HEMATOLOGY'},
       {'name': 'Fasting Blood Sugar & HbA1c', 'category': 'BIOCHEMISTRY'},
       {'name': 'Liver Function Test (LFT)', 'category': 'BIOCHEMISTRY'},
@@ -1080,8 +1086,6 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
       {'name': 'Lipid Profile', 'category': 'BIOCHEMISTRY'},
       {'name': 'Serum Electrolytes (Na+, K+, Cl-)', 'category': 'BIOCHEMISTRY'},
       {'name': 'Urine Routine & Microscopy', 'category': 'CLINICAL_PATHOLOGY'},
-      {'name': 'Chest X-Ray PA View', 'category': 'RADIOLOGY'},
-      {'name': '12-Lead Electrocardiogram (ECG)', 'category': 'CARDIOLOGY'},
       {'name': 'Thyroid Stimulating Hormone (TSH)', 'category': 'ENDOCRINOLOGY'},
       {'name': 'C-Reactive Protein (CRP)', 'category': 'IMMUNOLOGY'},
     ];

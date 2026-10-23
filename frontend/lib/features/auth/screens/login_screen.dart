@@ -429,13 +429,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Center(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
+                    constraints: const BoxConstraints(maxWidth: 460),
                     child: Container(
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(22),
                         border: Border.all(
                           color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                           width: 1.5,
@@ -443,12 +443,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 26),
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -456,23 +456,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           // SMVMCH Official Crest & Hospital Title
                           const Center(
                             child: SmvmchHospitalLogo(
-                              size: 68,
+                              size: 52,
                               layout: LogoLayout.vertical,
                               showTamilText: true,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Center(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                               decoration: BoxDecoration(
                                 color: (_selectedTab == 0 ? AppColors.hospitalMaroon : AppColors.primaryTeal).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(14),
                               ),
                               child: Text(
                                 AppStrings.appName,
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w800,
                                   color: _selectedTab == 0 ? AppColors.hospitalMaroon : AppColors.primaryTeal,
                                   letterSpacing: 0.3,
@@ -480,14 +480,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
 
                           // Role Switcher: Hospital Staff vs Patient Portal (with smooth hover effects)
                           Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
                               color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                               ),
@@ -515,7 +515,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
 
                           // Sub-Tab Switcher: [ Sign In ] vs [ Sign Up ]
                           _AuthModeSwitcher(
@@ -531,7 +531,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               });
                             },
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
 
                           // AnimatedSize & AnimatedSwitcher for buttery smooth form transitions
                           AnimatedSize(

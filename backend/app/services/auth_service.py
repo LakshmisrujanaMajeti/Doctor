@@ -328,10 +328,8 @@ class AuthService:
             or_(User.email == clean_identifier, User.phone == identifier.strip())
         ).first()
 
-        if not user and "@" in clean_identifier:
-            prefix, domain = clean_identifier.split("@", 1)
-            alt_domain = "opdconnect.com" if domain == "smvmch.ac.in" else "smvmch.ac.in"
-            alt_email = f"{prefix}@{alt_domain}"
+        if not user and "@" not in clean_identifier:
+            alt_email = f"{clean_identifier}@smvmch.ac.in"
             user = db.query(User).filter(User.email == alt_email).first()
 
         now = datetime.utcnow()

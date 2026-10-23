@@ -113,7 +113,7 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            user?.email ?? 'dr.chen@opdconnect.com',
+                            user?.email ?? 'doctor@smvmch.ac.in',
                             style: TextStyle(
                               color: isDark
                                   ? AppColors.darkTextSecondary

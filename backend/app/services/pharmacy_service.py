@@ -16,6 +16,7 @@ from app.models.prescription import Prescription, PrescriptionItem
 from app.models.visit import OPDVisit
 from app.models.patient import Patient
 from app.models.user import User
+from app.models.billing import Bill, BillItem, PaymentTransaction
 from app.schemas.pharmacy import (
     StockReceiptRequest,
     StockAdjustmentRequest,
@@ -486,6 +487,56 @@ class PharmacyService:
         # Check if all prescription items are dispensed
         all_dispensed = all(item.is_dispensed for item in rx.items)
         rx.status = "DISPENSED" if all_dispensed else "PARTIAL"
+
+        # Automatically generate official SMVMCH Hospital Bill & Payment for dispensed medicines
+        if rx.visit_id and rx.patient_id and total_dispense_amount > Decimal("0.00"):
+            inv_no = f"INV-PHARM-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            pharm_bill = Bill(
+                visit_id=rx.visit_id,
+                patient_id=rx.patient_id,
+                invoice_number=inv_no,
+                subtotal=total_dispense_amount,
+                taxable_amount=total_dispense_amount,
+                total_amount=total_dispense_amount,
+                net_amount=total_dispense_amount,
+                paid_amount=total_dispense_amount,
+                outstanding_balance=Decimal("0.00"),
+                status="PAID",
+                payment_status="PAID",
+                payment_method="CASH",
+                billed_by_user_id=current_user.id,
+                billed_at=datetime.utcnow(),
+                notes=f"Pharmacy Dispense #{dispense_number} for Prescription #{rx.id[:8]}",
+                is_synthetic_pricing=False,
+            )
+            db.add(pharm_bill)
+            db.flush()
+
+            for it in payload.items:
+                inv_record = db.query(MedicineInventory).filter(MedicineInventory.id == it.inventory_id).first()
+                if inv_record:
+                    b_item = BillItem(
+                        bill_id=pharm_bill.id,
+                        item_type="PHARMACY",
+                        item_code=inv_record.batch_number,
+                        description=f"Pharmacy Medicine: {inv_record.name} (Qty: {it.quantity_to_dispense})",
+                        quantity=it.quantity_to_dispense,
+                        unit_price=Decimal(str(inv_record.unit_price)),
+                        total_price=Decimal(str(inv_record.unit_price)) * Decimal(str(it.quantity_to_dispense)),
+                        reference_id=dispense.id,
+                    )
+                    db.add(b_item)
+
+            payment = PaymentTransaction(
+                receipt_number=f"RCPT-PHARM-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                bill_id=pharm_bill.id,
+                patient_id=rx.patient_id,
+                amount=total_dispense_amount,
+                payment_method="CASH",
+                payment_status="COMPLETED",
+                notes=f"Settled at Central Pharmacy Counter for Dispense #{dispense_number}",
+            )
+            db.add(payment)
 
         db.commit()
         db.refresh(dispense)

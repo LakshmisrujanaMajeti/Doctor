@@ -140,28 +140,18 @@ class AuthRepository {
 
     // Dental & Oral Surgery Doctor
     'dental@smvmch.ac.in': {'id': '1cfb440b-e01e-47d5-9155-72bac963e1f2', 'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. M. Arunraj, MDS', 'phone': '+1555000042', 'department': 'Dental Surgery'},
-    'dr.arunraj@opdconnect.com': {'id': '1cfb440b-e01e-47d5-9155-72bac963e1f2', 'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. M. Arunraj, MDS', 'phone': '+1555000020', 'department': 'Dental Surgery'},
 
     // ENT Doctor
     'ent@smvmch.ac.in': {'id': '8bf63271-510c-4a74-bb5a-87889edb08aa', 'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Kavita Nair, MS ENT', 'phone': '+1555000043', 'department': 'ENT'},
     'doctor.ent@smvmch.ac.in': {'id': '8bf63271-510c-4a74-bb5a-87889edb08aa', 'pass': 'Doctor@123', 'alt_pass': 'Doctor@123456', 'role': 'doctor', 'name': 'Dr. Kavita Nair, MS ENT', 'phone': '+1555000043', 'department': 'ENT'},
 
     // Staff Accounts
-    'receptionist@smvmch.ac.in': {'id': '157cbeb6-08c4-4637-bd2d-a117c58c7451', 'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)', 'phone': '+1555000013', 'department': 'Central OPD Reception'},
     'reception@smvmch.ac.in': {'id': '60de44f5-28c9-4b56-8fb6-11c7046991da', 'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)', 'phone': '+1555000014', 'department': 'Central OPD Reception'},
+    'receptionist@smvmch.ac.in': {'id': '157cbeb6-08c4-4637-bd2d-a117c58c7451', 'pass': 'Reception@123', 'alt_pass': 'Reception@123456', 'role': 'receptionist', 'name': 'Alice Adams (Reception Desk)', 'phone': '+1555000013', 'department': 'Central OPD Reception'},
     'nurse@smvmch.ac.in': {'id': '04d607eb-a1d2-43fa-a6be-73b379e49a46', 'pass': 'Nurse@123', 'alt_pass': 'Nurse@123456', 'role': 'nurse', 'name': 'Sister Priya (Triage Nurse)', 'phone': '+1555000006', 'department': 'General Medicine'},
     'billing@smvmch.ac.in': {'id': 'a71ba01d-e928-4985-948f-dedbf4ae407d', 'pass': 'Billing@123', 'alt_pass': 'Billing@123456', 'role': 'billing', 'name': 'Rajesh Kumar (Billing Desk)', 'phone': '+1555000007', 'department': 'Billing & Accounts'},
     'lab@smvmch.ac.in': {'id': 'd169ebfa-c6fe-4f8e-bdfe-a8ba01b7a66b', 'pass': 'Lab@123', 'alt_pass': 'Lab@123456', 'role': 'lab_tech', 'name': 'Marcus Vance (Lab Tech)', 'phone': '+1555000015', 'department': 'Clinical Pathology & Biochemistry'},
     'pharmacy@smvmch.ac.in': {'id': 'bdf98bc0-4c0c-41a3-8a61-6ab06a879298', 'pass': 'Pharmacy@123', 'alt_pass': 'Pharmacy@123456', 'role': 'pharmacist', 'name': 'Elena Rostova (Pharmacist)', 'phone': '+1555000016', 'department': 'Central Pharmacy'},
-
-    // Standard opdconnect aliases
-    'admin@opdconnect.com': {'id': 'd2b425d9-efd8-47be-a7ac-4304409a0670', 'pass': 'Admin@123456', 'alt_pass': 'Admin@123', 'role': 'admin', 'name': 'Admin Administrator', 'phone': '+1555000001', 'department': 'Hospital Administration'},
-    'dr.chen@opdconnect.com': {'id': 'f7e55112-26ba-49fb-a17b-5abd79697e25', 'pass': 'Doctor@123456', 'alt_pass': 'Doctor@123', 'role': 'doctor', 'name': 'Dr. Sarah Chen, MD', 'phone': '+1555000002', 'department': 'General Medicine'},
-    'receptionist@opdconnect.com': {'id': '5a63ef21-a4ba-4533-adab-3606cf76d7a3', 'pass': 'Reception@123456', 'alt_pass': 'Reception@123', 'role': 'receptionist', 'name': 'Alice Adams', 'phone': '+1555000003', 'department': 'Central OPD Reception'},
-    'nurse@opdconnect.com': {'id': '04d607eb-a1d2-43fa-a6be-73b379e49a46', 'pass': 'Nurse@123456', 'alt_pass': 'Nurse@123', 'role': 'nurse', 'name': 'Sister Priya (Triage Nurse)', 'phone': '+1555000006', 'department': 'General Medicine'},
-    'billing@opdconnect.com': {'id': 'a71ba01d-e928-4985-948f-dedbf4ae407d', 'pass': 'Billing@123456', 'alt_pass': 'Billing@123', 'role': 'billing', 'name': 'Rajesh Kumar (Billing Desk)', 'phone': '+1555000007', 'department': 'Billing & Accounts'},
-    'lab@opdconnect.com': {'id': 'd169ebfa-c6fe-4f8e-bdfe-a8ba01b7a66b', 'pass': 'Lab@123456', 'alt_pass': 'Lab@123', 'role': 'lab_tech', 'name': 'Marcus Vance (Lab Tech)', 'phone': '+1555000004', 'department': 'Clinical Pathology & Biochemistry'},
-    'pharmacist@opdconnect.com': {'id': 'd3b1debe-33c6-464c-a2d7-24e8bfc040d8', 'pass': 'Pharmacy@123456', 'alt_pass': 'Pharmacy@123', 'role': 'pharmacist', 'name': 'Elena Rostova (Pharmacist)', 'phone': '+1555000005', 'department': 'Central Pharmacy'},
   };
 
   static final Map<String, Map<String, String>> _dynamicStaffDirectory = {};
@@ -239,12 +229,9 @@ class AuthRepository {
       }
     }
 
-    // 2. High-Performance Fast Path: Recognized Hospital Staff Instant Validation
     var staffEntry = _staffEmailDirectory[resolvedEmail] ?? _dynamicStaffDirectory[resolvedEmail];
-    if (staffEntry == null && resolvedEmail.contains('@')) {
-      final prefix = resolvedEmail.split('@').first;
-      final altDomain = resolvedEmail.endsWith('@smvmch.ac.in') ? 'opdconnect.com' : 'smvmch.ac.in';
-      staffEntry = _staffEmailDirectory['$prefix@$altDomain'];
+    if (staffEntry == null && !resolvedEmail.contains('@')) {
+      staffEntry = _staffEmailDirectory['$resolvedEmail@smvmch.ac.in'];
     }
 
     final expectedPass = staffEntry?['pass'];

@@ -11,6 +11,8 @@ import '../providers/patient_provider.dart';
 import '../../visits/models/visit_model.dart';
 import '../../visits/providers/visit_provider.dart';
 import '../../../core/utils/file_download_helper.dart';
+import '../../billing/repositories/billing_repository.dart';
+import '../../billing/models/billing_models.dart';
 
 class DigitalOpdBookletScreen extends ConsumerStatefulWidget {
   final String patientId;
@@ -976,6 +978,26 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
   // TAB 5: 24-HR PHARMACY UNIT-I CASH BILL (Page 6)
   // ==========================================
   Widget _buildPharmacyCashBillTab(PatientModel patient, bool isDark) {
+    final matchingBills = BillingRepository.cachedBills.where((b) {
+      final pUhid = patient.uhid.toUpperCase().trim();
+      final pId = patient.id.trim();
+      final bUhid = b.patientUhid.toUpperCase().trim();
+      final bPid = b.patientId.trim();
+      return (pUhid.isNotEmpty && bUhid == pUhid) ||
+          (pId.isNotEmpty && bPid == pId) ||
+          b.patientName.toLowerCase() == patient.fullName.toLowerCase();
+    }).toList();
+
+    final dynamicBill = matchingBills.where((b) =>
+      b.departmentName.toLowerCase().contains('pharm') ||
+      b.items.any((it) => it.itemType == 'PHARMACY')
+    ).firstOrNull ?? (matchingBills.isNotEmpty ? matchingBills.first : null);
+
+    final billNo = dynamicBill?.invoiceNumber ?? 'PB26280332';
+    final billDate = dynamicBill != null && dynamicBill.billedAt.length >= 10
+        ? dynamicBill.billedAt.substring(0, 10)
+        : '01/10/2026';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -1031,11 +1053,11 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                   color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(child: Text('PHARMACY UNIT-I (24 hours)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                    Text('CASH BILL (DUPLICATE)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                    const Expanded(child: Text('PHARMACY UNIT-I (24 hours)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                    Text(dynamicBill != null ? 'OFFICIAL RECEIPT (PAID)' : 'CASH BILL (DUPLICATE)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                   ],
                 ),
               ),
@@ -1044,8 +1066,8 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Bill No.: PB26280332', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  const Text('Date: 01/10/2026', style: TextStyle(fontSize: 12)),
+                  Text('Bill No.: $billNo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  Text('Date: $billDate', style: const TextStyle(fontSize: 12)),
                 ],
               ),
               const SizedBox(height: 4),
@@ -1080,30 +1102,46 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                     decoration: BoxDecoration(color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
                     children: const [
                       Padding(padding: EdgeInsets.all(6), child: Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('Batch / Exp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                      Padding(padding: EdgeInsets.all(6), child: Text('Batch / Form', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
                       Padding(padding: EdgeInsets.all(6), child: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
                       Padding(padding: EdgeInsets.all(6), child: Text('Rate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
                       Padding(padding: EdgeInsets.all(6), child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
                     ],
                   ),
-                  const TableRow(
-                    children: [
-                      Padding(padding: EdgeInsets.all(6), child: Text('1. MAHACEF-200mg TABLET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('COAKZ001\n12/27', style: TextStyle(fontSize: 10))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('6', style: TextStyle(fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('₹9.44', style: TextStyle(fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('₹56.63', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                  const TableRow(
-                    children: [
-                      Padding(padding: EdgeInsets.all(6), child: Text('2. HIFENAC-P TABLET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('K2601285\n04/28', style: TextStyle(fontSize: 10))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('6', style: TextStyle(fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('₹7.46', style: TextStyle(fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('₹44.74', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                    ],
-                  ),
+                  if (dynamicBill != null && dynamicBill.items.isNotEmpty)
+                    ...dynamicBill.items.asMap().entries.map((entry) {
+                      final idx = entry.key + 1;
+                      final it = entry.value;
+                      return TableRow(
+                        children: [
+                          Padding(padding: const EdgeInsets.all(6), child: Text('$idx. ${it.description}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+                          Padding(padding: const EdgeInsets.all(6), child: Text(it.itemCode, style: const TextStyle(fontSize: 10))),
+                          Padding(padding: const EdgeInsets.all(6), child: Text('${it.quantity}', style: const TextStyle(fontSize: 11))),
+                          Padding(padding: const EdgeInsets.all(6), child: Text('₹${it.unitPrice.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11))),
+                          Padding(padding: const EdgeInsets.all(6), child: Text('₹${it.totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                        ],
+                      );
+                    })
+                  else ...[
+                    const TableRow(
+                      children: [
+                        Padding(padding: EdgeInsets.all(6), child: Text('1. MAHACEF-200mg TABLET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('COAKZ001\n12/27', style: TextStyle(fontSize: 10))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('6', style: TextStyle(fontSize: 11))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('₹9.44', style: TextStyle(fontSize: 11))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('₹56.63', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                      ],
+                    ),
+                    const TableRow(
+                      children: [
+                        Padding(padding: EdgeInsets.all(6), child: Text('2. HIFENAC-P TABLET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('K2601285\n04/28', style: TextStyle(fontSize: 10))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('6', style: TextStyle(fontSize: 11))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('₹7.46', style: TextStyle(fontSize: 11))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('₹44.74', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                      ],
+                    ),
+                  ],
                 ],
               ),
               const Divider(height: 20),
@@ -1115,13 +1153,11 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                   width: 240,
                   child: Column(
                     children: [
-                      _buildBillTotalRow('Gross Amount', '₹101.37'),
-                      _buildBillTotalRow('Discount', '₹0.00'),
-                      _buildBillTotalRow('CGST (2.5%)', '₹2.54'),
-                      _buildBillTotalRow('SGST (2.5%)', '₹2.54'),
-                      _buildBillTotalRow('Total GST', '₹5.07'),
+                      _buildBillTotalRow('Gross Amount', '₹${dynamicBill != null ? dynamicBill.subtotal.toStringAsFixed(2) : "101.37"}'),
+                      _buildBillTotalRow('Discount', '₹${dynamicBill != null ? dynamicBill.discountAmount.toStringAsFixed(2) : "0.00"}'),
+                      _buildBillTotalRow('CGST / SGST', '₹${dynamicBill != null ? (dynamicBill.totalTaxAmount).toStringAsFixed(2) : "5.07"}'),
                       const Divider(),
-                      _buildBillTotalRow('Net Cash Total', '₹106.50', isBold: true),
+                      _buildBillTotalRow('Net Cash Total', '₹${dynamicBill != null ? dynamicBill.totalAmount.toStringAsFixed(2) : "106.50"}', isBold: true),
                     ],
                   ),
                 ),

@@ -158,7 +158,7 @@ class UnauthorizedScreen extends StatelessWidget {
                     builder: (ctx) => AlertDialog(
                       title: const Text('Hospital Access Desk'),
                       content: const Text(
-                        'To request role privilege elevation, contact the OPD System Administrator at admin@opdconnect.com or extension #4001.',
+                        'To request role privilege elevation, contact the OPD System Administrator at admin@smvmch.ac.in or extension #4001.',
                       ),
                       actions: [
                         TextButton(

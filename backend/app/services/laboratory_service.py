@@ -255,6 +255,62 @@ LABORATORY_CATALOGUE: List[Dict[str, Any]] = [
         "parameters": ["VDRL / RPR Flocculation Screening"],
         "default_unit": "Titre",
     },
+
+    # --- Radiology & Diagnostic Scans ---
+    {
+        "test_name": "Brain MRI Scan with Contrast",
+        "category": "RADIOLOGY",
+        "specimen_type": "Diagnostic Imaging (1.5T MRI Scanner)",
+        "tube_color": "#4338CA",
+        "is_sensitive": False,
+        "parameters": ["T1-Weighted Sequence", "T2-Weighted Sequence", "FLAIR Sequence", "DWI Sequence", "Contrast Enhancement Assessment"],
+        "default_unit": "Radiological Finding",
+    },
+    {
+        "test_name": "MRI Lumbar Spine / Knee Joint",
+        "category": "RADIOLOGY",
+        "specimen_type": "Diagnostic Imaging (1.5T MRI Scanner)",
+        "tube_color": "#4338CA",
+        "is_sensitive": False,
+        "parameters": ["Sagittal T1/T2", "Axial Sequences", "Intervertebral Disc Status", "Spinal Canal / Neural Foramina"],
+        "default_unit": "Radiological Finding",
+    },
+    {
+        "test_name": "CT Scan Brain / Chest HRCT",
+        "category": "RADIOLOGY",
+        "specimen_type": "Diagnostic Imaging (128-Slice CT Scanner)",
+        "tube_color": "#6366F1",
+        "is_sensitive": False,
+        "parameters": ["Axial Slices", "Parenchymal Window", "Mediastinal / Bone Window"],
+        "default_unit": "Radiological Finding",
+    },
+    {
+        "test_name": "Ultrasound Whole Abdomen (USG)",
+        "category": "RADIOLOGY",
+        "specimen_type": "Ultrasonography (3.5 MHz Curvilinear Probe)",
+        "tube_color": "#0284C7",
+        "is_sensitive": False,
+        "parameters": ["Liver & Gallbladder", "Spleen & Pancreas", "Kidneys (B/L) & Urinary Bladder"],
+        "default_unit": "Echotexture Finding",
+    },
+    {
+        "test_name": "Chest X-Ray PA View",
+        "category": "RADIOLOGY",
+        "specimen_type": "Digital Radiography (PA Projection)",
+        "tube_color": "#0EA5E9",
+        "is_sensitive": False,
+        "parameters": ["Lung Fields & Bronchovascular Markings", "Cardiothoracic Ratio", "Costophrenic & Cardiophrenic Angles", "Bony Thorax"],
+        "default_unit": "Radiographic Impression",
+    },
+    {
+        "test_name": "12-Lead Electrocardiogram (ECG)",
+        "category": "CARDIOLOGY",
+        "specimen_type": "Electrophysiology (12-Lead Recording)",
+        "tube_color": "#E11D48",
+        "is_sensitive": False,
+        "parameters": ["Heart Rate & Rhythm", "PR & QRS Interval", "ST-Segment & T-Wave Morphology", "Axis Deviation"],
+        "default_unit": "ms / mV",
+    },
 ]
 
 SENSITIVE_TEST_NAMES = {"HIV", "VDRL"}

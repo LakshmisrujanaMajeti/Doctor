@@ -11,6 +11,10 @@ import '../widgets/specimen_action_dialogs.dart';
 import '../widgets/result_entry_dialog.dart';
 import '../widgets/verification_dialog.dart';
 import 'laboratory_report_screen.dart';
+import '../../billing/repositories/billing_repository.dart';
+import '../../billing/providers/billing_provider.dart';
+import '../../patient_portal/providers/patient_portal_provider.dart';
+import '../../admin_portal/providers/admin_portal_provider.dart';
 
 class LaboratoryWorkspaceView extends ConsumerStatefulWidget {
   const LaboratoryWorkspaceView({super.key});
@@ -162,6 +166,254 @@ class _LaboratoryWorkspaceViewState extends ConsumerState<LaboratoryWorkspaceVie
             ),
             actions: [
               TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  final Set<String> _billedOrderIds = {};
+
+  double _getTestTariff(String testName) {
+    final lower = testName.toLowerCase();
+    if (lower.contains('mri') && lower.contains('contrast')) return 4500.0;
+    if (lower.contains('mri')) return 3500.0;
+    if (lower.contains('ct scan') || lower.contains('hrct') || lower.contains('ct brain')) return 2500.0;
+    if (lower.contains('ultrasound') || lower.contains('usg')) return 900.0;
+    if (lower.contains('x-ray') || lower.contains('xray')) return 300.0;
+    if (lower.contains('ecg')) return 250.0;
+    if (lower.contains('lft') || lower.contains('liver')) return 650.0;
+    if (lower.contains('kft') || lower.contains('renal') || lower.contains('kidney')) return 550.0;
+    if (lower.contains('lipid')) return 500.0;
+    if (lower.contains('tsh') || lower.contains('thyroid')) return 350.0;
+    if (lower.contains('glucose') || lower.contains('hba1c')) return 300.0;
+    if (lower.contains('urine')) return 150.0;
+    if (lower.contains('cbc') || lower.contains('blood')) return 250.0;
+    return 450.0;
+  }
+
+  Future<void> _openLabBillingDialog(BuildContext context, LabOrderModel order) async {
+    final tariff = _getTestTariff(order.testName);
+    String selectedPaymentMethod = 'CASH';
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final isScan = order.testName.toLowerCase().contains('mri') ||
+              order.testName.toLowerCase().contains('ct') ||
+              order.testName.toLowerCase().contains('scan') ||
+              order.testName.toLowerCase().contains('x-ray') ||
+              order.testName.toLowerCase().contains('usg');
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isScan ? Icons.document_scanner_rounded : Icons.biotech_rounded,
+                    color: Colors.indigo.shade700,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isScan ? 'Bill Radiology / Imaging Scan' : 'Bill Laboratory Investigation',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Direct Hospital Invoicing & Instant Receipt Generation',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Patient Name:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text(order.patientName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('UHID / Order #:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text('${order.uhid} • ${order.orderNumber}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Investigation:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Expanded(
+                              child: Text(
+                                order.testName,
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryBlue),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Official Hospital Tariff:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            Text(
+                              '₹${tariff.toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.green),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Payment Mode:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: ['CASH', 'UPI', 'CARD'].map((m) {
+                      final isSel = selectedPaymentMethod == m;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: InkWell(
+                            onTap: isSubmitting ? null : () => setDialogState(() => selectedPaymentMethod = m),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSel ? Colors.indigo.shade700 : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: isSel ? Colors.indigo.shade700 : Colors.grey.shade300),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  m,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSel ? Colors.white : null,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                icon: isSubmitting
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_circle_rounded, size: 16),
+                label: Text(isSubmitting ? 'Invoicing...' : 'Bill & Collect ₹${tariff.toStringAsFixed(0)}'),
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        setDialogState(() => isSubmitting = true);
+                        try {
+                          final billingRepo = ref.read(billingRepositoryProvider);
+                          await billingRepo.createBill({
+                            'patient_id': order.patientId,
+                            'patient_name': order.patientName,
+                            'patient_uhid': order.uhid,
+                            'visit_id': order.visitId,
+                            'visit_number': order.visitId,
+                            'department_name': isScan ? 'Radiology & Imaging' : 'Laboratory Diagnostic',
+                            'discount_type': 'NONE',
+                            'discount_rate': 0.0,
+                            'discount_amount': 0.0,
+                            'paid_amount': tariff,
+                            'payment_status': 'PAID',
+                            'payment_method': selectedPaymentMethod,
+                            'notes': 'Billed directly in ${isScan ? "Radiology / Imaging" : "Laboratory"} Portal for Order #${order.orderNumber}',
+                            'items': [
+                              {
+                                'item_type': 'LAB',
+                                'item_code': 'DIAG-${order.orderNumber}',
+                                'description': '${order.testName} (${order.orderNumber})',
+                                'quantity': 1,
+                                'unit_price': tariff,
+                                'tax_rate_percent': 0.0,
+                              }
+                            ],
+                          });
+
+                          setState(() {
+                            _billedOrderIds.add(order.id);
+                            _billedOrderIds.add(order.orderNumber);
+                          });
+
+                          ref.invalidate(billsListProvider);
+                          ref.invalidate(patientBillsProvider);
+                          ref.invalidate(adminDashboardSummaryProvider);
+
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Official Hospital Bill generated and marked PAID for ${order.testName} (₹${tariff.toStringAsFixed(0)}). Updated in Patient Portal & Admin Revenue!'),
+                                backgroundColor: Colors.green.shade700,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          setDialogState(() => isSubmitting = false);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to generate bill: $e'), backgroundColor: Colors.red),
+                            );
+                          }
+                        }
+                      },
+              ),
             ],
           );
         },
@@ -447,6 +699,12 @@ class _LaboratoryWorkspaceViewState extends ConsumerState<LaboratoryWorkspaceVie
         statusColor = Colors.grey;
     }
 
+    final isBilled = _billedOrderIds.contains(order.id) ||
+        _billedOrderIds.contains(order.orderNumber) ||
+        BillingRepository.cachedBills.any((b) =>
+            (b.patientUhid.toUpperCase() == order.uhid.toUpperCase() || b.patientId == order.patientId) &&
+            b.items.any((it) => it.description.contains(order.orderNumber) || it.description.contains(order.testName)));
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -644,6 +902,43 @@ class _LaboratoryWorkspaceViewState extends ConsumerState<LaboratoryWorkspaceVie
                     );
                   },
                 ),
+
+                // Direct Lab / Scan Billing Action
+                if (isBilled) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.green.shade600),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle_rounded, size: 14, color: Colors.green.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          'BILLED & PAID (₹${_getTestTariff(order.testName).toStringAsFixed(0)})',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: Colors.indigo.shade700,
+                      foregroundColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.receipt_long_rounded, size: 15),
+                    label: Text(
+                      'Bill Scan/Test (₹${_getTestTariff(order.testName).toStringAsFixed(0)})',
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                    ),
+                    onPressed: () => _openLabBillingDialog(context, order),
+                  ),
+                ],
 
                 // If ORDERED -> Collect
                 if (order.specimenStatus == 'ORDERED') ...[

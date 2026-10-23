@@ -133,14 +133,15 @@ def seed_database():
             departments[code] = dept
 
         # 3. Staff Users
+
         # Admin
-        admin_user = db.query(User).filter((User.email == "admin@opdconnect.com") | (User.phone == "+1555000001")).first()
+        admin_user = db.query(User).filter((User.email == "admin@smvmch.ac.in") | (User.phone == "+1555000001")).first()
         if not admin_user:
             admin_user = User(
-                email="admin@opdconnect.com",
+                email="admin@smvmch.ac.in",
                 full_name="Admin Administrator",
                 phone="+1555000001",
-                hashed_password=get_password_hash("Admin@123456"),
+                hashed_password=get_password_hash("Admin@123"),
                 role_id=roles["admin"].id,
                 is_active=True,
                 is_verified=True,
@@ -148,19 +149,19 @@ def seed_database():
             db.add(admin_user)
             db.flush()
         else:
-            admin_user.email = "admin@opdconnect.com"
-            admin_user.hashed_password = get_password_hash("Admin@123456")
+            admin_user.email = "admin@smvmch.ac.in"
+            admin_user.hashed_password = get_password_hash("Admin@123")
             admin_user.is_active = True
             db.flush()
 
         # Doctor User
-        doc_user = db.query(User).filter((User.email == "dr.chen@opdconnect.com") | (User.phone == "+1555000002")).first()
+        doc_user = db.query(User).filter((User.email == "doctor@smvmch.ac.in") | (User.phone == "+1555000002")).first()
         if not doc_user:
             doc_user = User(
-                email="dr.chen@opdconnect.com",
+                email="doctor@smvmch.ac.in",
                 full_name="Dr. Sarah Chen, MD",
                 phone="+1555000002",
-                hashed_password=get_password_hash("Doctor@123456"),
+                hashed_password=get_password_hash("Doctor@123"),
                 role_id=roles["doctor"].id,
                 is_active=True,
                 is_verified=True,
@@ -168,8 +169,8 @@ def seed_database():
             db.add(doc_user)
             db.flush()
         else:
-            doc_user.email = "dr.chen@opdconnect.com"
-            doc_user.hashed_password = get_password_hash("Doctor@123456")
+            doc_user.email = "doctor@smvmch.ac.in"
+            doc_user.hashed_password = get_password_hash("Doctor@123")
             doc_user.is_active = True
             db.flush()
 
@@ -190,13 +191,13 @@ def seed_database():
             db.flush()
 
         # Receptionist
-        rec_user = db.query(User).filter((User.email == "receptionist@opdconnect.com") | (User.phone == "+1555000003")).first()
+        rec_user = db.query(User).filter((User.email == "reception@smvmch.ac.in") | (User.email == "receptionist@smvmch.ac.in") | (User.phone == "+1555000003")).first()
         if not rec_user:
             rec_user = User(
-                email="receptionist@opdconnect.com",
-                full_name="Alice Adams",
+                email="reception@smvmch.ac.in",
+                full_name="Alice Adams (Reception Desk)",
                 phone="+1555000003",
-                hashed_password=get_password_hash("Reception@123456"),
+                hashed_password=get_password_hash("Reception@123"),
                 role_id=roles["receptionist"].id,
                 is_active=True,
                 is_verified=True,
@@ -204,19 +205,19 @@ def seed_database():
             db.add(rec_user)
             db.flush()
         else:
-            rec_user.email = "receptionist@opdconnect.com"
-            rec_user.hashed_password = get_password_hash("Reception@123456")
+            rec_user.email = "reception@smvmch.ac.in"
+            rec_user.hashed_password = get_password_hash("Reception@123")
             rec_user.is_active = True
             db.flush()
 
         # Laboratory Staff
-        lab_user = db.query(User).filter((User.email == "lab@opdconnect.com") | (User.phone == "+1555000004")).first()
+        lab_user = db.query(User).filter((User.email == "lab@smvmch.ac.in") | (User.phone == "+1555000004")).first()
         if not lab_user:
             lab_user = User(
-                email="lab@opdconnect.com",
+                email="lab@smvmch.ac.in",
                 full_name="Marcus Vance (Lab Tech)",
                 phone="+1555000004",
-                hashed_password=get_password_hash("Lab@123456"),
+                hashed_password=get_password_hash("Lab@123"),
                 role_id=roles["lab_tech"].id,
                 is_active=True,
                 is_verified=True,
@@ -224,19 +225,19 @@ def seed_database():
             db.add(lab_user)
             db.flush()
         else:
-            lab_user.email = "lab@opdconnect.com"
-            lab_user.hashed_password = get_password_hash("Lab@123456")
+            lab_user.email = "lab@smvmch.ac.in"
+            lab_user.hashed_password = get_password_hash("Lab@123")
             lab_user.is_active = True
             db.flush()
 
         # Pharmacist
-        pharm_user = db.query(User).filter((User.email == "pharmacist@opdconnect.com") | (User.phone == "+1555000005")).first()
+        pharm_user = db.query(User).filter((User.email == "pharmacy@smvmch.ac.in") | (User.phone == "+1555000005")).first()
         if not pharm_user:
             pharm_user = User(
-                email="pharmacist@opdconnect.com",
+                email="pharmacy@smvmch.ac.in",
                 full_name="Elena Rostova (Pharmacist)",
                 phone="+1555000005",
-                hashed_password=get_password_hash("Pharmacy@123456"),
+                hashed_password=get_password_hash("Pharmacy@123"),
                 role_id=roles["pharmacist"].id,
                 is_active=True,
                 is_verified=True,
@@ -244,13 +245,13 @@ def seed_database():
             db.add(pharm_user)
             db.flush()
         else:
-            pharm_user.email = "pharmacist@opdconnect.com"
-            pharm_user.hashed_password = get_password_hash("Pharmacy@123456")
+            pharm_user.email = "pharmacy@smvmch.ac.in"
+            pharm_user.hashed_password = get_password_hash("Pharmacy@123")
             pharm_user.is_active = True
             db.flush()
 
         # Nurse User
-        nurse_user = db.query(User).filter((User.email == "nurse@smvmch.ac.in") | (User.email == "nurse@opdconnect.com") | (User.phone == "+1555000006")).first()
+        nurse_user = db.query(User).filter((User.email == "nurse@smvmch.ac.in") | (User.phone == "+1555000006")).first()
         if not nurse_user:
             nurse_user = User(
                 email="nurse@smvmch.ac.in",
@@ -265,7 +266,7 @@ def seed_database():
             db.flush()
 
         # Billing Cashier User
-        billing_user = db.query(User).filter((User.email == "billing@smvmch.ac.in") | (User.email == "billing@opdconnect.com") | (User.phone == "+1555000007")).first()
+        billing_user = db.query(User).filter((User.email == "billing@smvmch.ac.in") | (User.phone == "+1555000007")).first()
         if not billing_user:
             billing_user = User(
                 email="billing@smvmch.ac.in",
@@ -443,18 +444,22 @@ def seed_database():
                 db.add(movement)
 
         # 5. Doctor Dr. Arunraj (SMVMCH Dental & Oral Surgery Specialist from document)
-        doc_arun_user = db.query(User).filter(User.email == "dr.arunraj@opdconnect.com").first()
+        doc_arun_user = db.query(User).filter(User.email == "dental@smvmch.ac.in").first()
         if not doc_arun_user:
             doc_arun_user = User(
-                email="dr.arunraj@opdconnect.com",
+                email="dental@smvmch.ac.in",
                 full_name="Dr. M. Arunraj, MDS",
-                phone="+1555000020",
-                hashed_password=get_password_hash("Doctor@123456"),
+                phone="+1555000042",
+                hashed_password=get_password_hash("Doctor@123"),
                 role_id=roles["doctor"].id,
                 is_active=True,
                 is_verified=True,
             )
             db.add(doc_arun_user)
+            db.flush()
+        else:
+            doc_arun_user.email = "dental@smvmch.ac.in"
+            doc_arun_user.hashed_password = get_password_hash("Doctor@123")
             db.flush()
 
         doctor_arun = db.query(Doctor).filter(Doctor.user_id == doc_arun_user.id).first()
