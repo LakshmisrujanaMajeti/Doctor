@@ -512,19 +512,21 @@ class _DispensePrescriptionDialogState extends ConsumerState<DispensePrescriptio
 
               const SizedBox(height: 16),
               // Actions
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
                 children: [
                   OutlinedButton(
                     onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
-                  const SizedBox(width: 12),
                   ElevatedButton.icon(
                     icon: _isSubmitting
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.receipt_long_rounded, size: 18),
-                    label: Text(_isSubmitting ? 'Billing & Dispensing...' : 'Bill & Dispense Medicines (₹${_estimatedTotal.toStringAsFixed(2)})'),
+                    label: Text(_isSubmitting ? 'Dispensing...' : 'Complete Dispensing'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,

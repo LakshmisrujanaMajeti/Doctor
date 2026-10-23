@@ -630,144 +630,307 @@ class _PharmacyWorkspaceViewState extends ConsumerState<PharmacyWorkspaceView>
                             : (med.isLowStock ? Colors.orange.shade400 : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: med.isExpired
-                                ? Colors.red.shade100
-                                : (med.isLowStock ? Colors.orange.shade100 : AppColors.primaryBlue.withValues(alpha: 0.1)),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            med.isExpired ? Icons.cancel_outlined : Icons.medication,
-                            color: med.isExpired
-                                ? Colors.red.shade800
-                                : (med.isLowStock ? Colors.orange.shade800 : AppColors.primaryBlue),
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isNarrow = constraints.maxWidth < 650;
+
+                        if (isNarrow) {
+                          // Mobile Layout: 3 clean tiers
+                          return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Wrap(
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 8,
-                                runSpacing: 4,
+                              // Tier 1: Pill Icon + Medicine Name + Code badge + 3 dots menu
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    med.name,
-                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                                    softWrap: true,
-                                  ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                      borderRadius: BorderRadius.circular(6),
+                                      color: med.isExpired
+                                          ? Colors.red.shade100
+                                          : (med.isLowStock ? Colors.orange.shade100 : AppColors.primaryBlue.withValues(alpha: 0.1)),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
-                                    child: Text(
-                                      med.medicineCode,
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                                    child: Icon(
+                                      med.isExpired ? Icons.cancel_outlined : Icons.medication,
+                                      color: med.isExpired
+                                          ? Colors.red.shade800
+                                          : (med.isLowStock ? Colors.orange.shade800 : AppColors.primaryBlue),
+                                      size: 20,
                                     ),
                                   ),
-                                  if (med.genericName.isNotEmpty) ...[
-                                    Text(
-                                      '(${med.genericName})',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontStyle: FontStyle.italic,
-                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                                      ),
-                                      softWrap: true,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            Text(
+                                              med.name,
+                                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                                              softWrap: true,
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                med.medicineCode,
+                                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (med.genericName.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '(${med.genericName})',
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontStyle: FontStyle.italic,
+                                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                            ),
+                                            softWrap: true,
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                  ],
+                                  ),
+                                  PopupMenuButton<String>(
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(Icons.more_vert, size: 20),
+                                    onSelected: (val) {
+                                      if (val == 'adjust') {
+                                        _openStockAdjustment(med);
+                                      }
+                                    },
+                                    itemBuilder: (_) => [
+                                      const PopupMenuItem(value: 'adjust', child: Text('Adjust Stock')),
+                                    ],
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 8),
+
+                              // Tier 2: Dosage, strength, batch, expiry
                               Text(
                                 '${med.dosageForm} • ${med.strength} • Batch: ${med.batchNumber} • Expiry: ${med.expiryDate}',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                   color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                                 ),
                                 softWrap: true,
                               ),
-                            ],
-                          ),
-                        ),
+                              const SizedBox(height: 8),
+                              const Divider(height: 1),
+                              const SizedBox(height: 8),
 
-                        // Stock & Price Block
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                              // Tier 3: Stock Units & Status Tag on left, Price on right
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Wrap(
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    spacing: 6,
+                                    runSpacing: 2,
+                                    children: [
+                                      Text(
+                                        '${med.availableQuantity} units',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          color: med.isLowStock ? Colors.orange.shade700 : null,
+                                        ),
+                                      ),
+                                      if (med.isLowStock) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            'LOW',
+                                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.orange.shade900),
+                                          ),
+                                        ),
+                                      ],
+                                      if (med.isExpired) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            'EXPIRED',
+                                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.red.shade900),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  Text(
+                                    '₹${med.unitPrice.toStringAsFixed(2)} [SYNTHETIC] • ${med.taxClassification}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+
+                        // Desktop layout: Wide row
+                        return Row(
                           children: [
-                            Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
-                              runSpacing: 2,
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: med.isExpired
+                                    ? Colors.red.shade100
+                                    : (med.isLowStock ? Colors.orange.shade100 : AppColors.primaryBlue.withValues(alpha: 0.1)),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                med.isExpired ? Icons.cancel_outlined : Icons.medication,
+                                color: med.isExpired
+                                    ? Colors.red.shade800
+                                    : (med.isLowStock ? Colors.orange.shade800 : AppColors.primaryBlue),
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: [
+                                      Text(
+                                        med.name,
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                        softWrap: true,
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          med.medicineCode,
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                                        ),
+                                      ),
+                                      if (med.genericName.isNotEmpty) ...[
+                                        Text(
+                                          '(${med.genericName})',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontStyle: FontStyle.italic,
+                                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                          ),
+                                          softWrap: true,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${med.dosageForm} • ${med.strength} • Batch: ${med.batchNumber} • Expiry: ${med.expiryDate}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                    ),
+                                    softWrap: true,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Stock & Price Block
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text(
-                                  '${med.availableQuantity} units',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: med.isLowStock ? Colors.orange.shade700 : null,
-                                  ),
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 6,
+                                  runSpacing: 2,
+                                  children: [
+                                    Text(
+                                      '${med.availableQuantity} units',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        color: med.isLowStock ? Colors.orange.shade700 : null,
+                                      ),
+                                    ),
+                                    if (med.isLowStock) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.shade100,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'LOW',
+                                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.orange.shade900),
+                                        ),
+                                      ),
+                                    ],
+                                    if (med.isExpired) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.shade100,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'EXPIRED',
+                                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.red.shade900),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                                if (med.isLowStock) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'LOW',
-                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.orange.shade900),
-                                    ),
+                                Text(
+                                  '₹${med.unitPrice.toStringAsFixed(2)} [SYNTHETIC] • ${med.taxClassification}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                                   ),
-                                ],
-                                if (med.isExpired) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'EXPIRED',
-                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.red.shade900),
-                                    ),
-                                  ),
-                                ],
+                                  softWrap: true,
+                                ),
                               ],
                             ),
-                            Text(
-                              '₹${med.unitPrice.toStringAsFixed(2)} [SYNTHETIC] • ${med.taxClassification}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                              ),
-                              softWrap: true,
+                            const SizedBox(width: 14),
+                            PopupMenuButton<String>(
+                              onSelected: (val) {
+                                if (val == 'adjust') {
+                                  _openStockAdjustment(med);
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(value: 'adjust', child: Text('Adjust Stock')),
+                              ],
                             ),
                           ],
-                        ),
-
-                        const SizedBox(width: 14),
-                        PopupMenuButton<String>(
-                          onSelected: (val) {
-                            if (val == 'adjust') {
-                              _openStockAdjustment(med);
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(value: 'adjust', child: Text('Adjust Stock')),
-                          ],
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   );
                 },

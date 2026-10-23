@@ -493,4 +493,61 @@ void main() {
     expect(find.text('Secure Server-side Reconciliation Policy'), findsOneWidget);
     expect(find.text('Initiate Online Order'), findsOneWidget);
   });
+
+  testWidgets('Billing Workspace View renders properly on mobile viewport (390x844)', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          billingRepositoryProvider.overrideWithValue(MockBillingRepository()),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: BillingWorkspaceView(),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify mobile layout elements render without crashing or overflowing
+    expect(find.text('Total Invoiced'), findsOneWidget);
+    expect(find.text('Outstanding Balance'), findsOneWidget);
+    expect(find.text('INV-2026-0001'), findsOneWidget);
+    expect(find.text('Satya Narayan (UHID-2026-0001)'), findsOneWidget);
+    expect(find.text('Print Receipt'), findsOneWidget);
+  });
+
+  testWidgets('Printable Invoice Screen renders properly on mobile viewport (390x844)', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          billingRepositoryProvider.overrideWithValue(MockBillingRepository()),
+        ],
+        child: const MaterialApp(
+          home: PrintableInvoiceScreen(billId: 'bill-test-1'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sri Manakula Vinayagar Medical College & Hospital'), findsOneWidget);
+    expect(find.text('INV-2026-0001'), findsOneWidget);
+    expect(find.text('General OPD Consultation'), findsOneWidget);
+    expect(find.text('CGST Amount:'), findsOneWidget);
+    expect(find.text('TOTAL NET AMOUNT:'), findsOneWidget);
+    expect(find.text('Digitally Verified OPD Connect+ System Record'), findsOneWidget);
+  });
 }

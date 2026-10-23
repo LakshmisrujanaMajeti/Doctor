@@ -129,79 +129,157 @@ class _BillingWorkspaceViewState extends ConsumerState<BillingWorkspaceView> {
               color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
             ),
           ),
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 10,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              // Search field
-              SizedBox(
-                width: 320,
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search invoice #, patient, UHID...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              filterNotifier.setSearch('');
-                            },
-                          )
-                        : null,
-                    isDense: true,
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
+          child: LayoutBuilder(
+            builder: (context, toolbarConstraints) {
+              final isNarrow = toolbarConstraints.maxWidth < 720;
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search invoice #, patient, UHID...',
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 18),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        filterNotifier.setSearch('');
+                                      },
+                                    )
+                                  : null,
+                              isDense: true,
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            onChanged: (val) => filterNotifier.setSearch(val),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: 'Refresh Invoices',
+                          icon: const Icon(Icons.refresh, size: 20),
+                          onPressed: () {
+                            ref.invalidate(billsListProvider);
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: _statusFilters.map((st) {
+                          final isSelected = filter.status == st;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: FilterChip(
+                              label: Text(st == 'All' ? 'All Invoices' : st),
+                              selected: isSelected,
+                              onSelected: (_) => filterNotifier.setStatus(st),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('+ New Bill'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onPressed: _openCreateBill,
+                    ),
+                  ],
+                );
+              }
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Search field
+                  SizedBox(
+                    width: 320,
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search invoice #, patient, UHID...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  filterNotifier.setSearch('');
+                                },
+                              )
+                            : null,
+                        isDense: true,
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (val) => filterNotifier.setSearch(val),
                     ),
                   ),
-                  onChanged: (val) => filterNotifier.setSearch(val),
-                ),
-              ),
 
-              // Status Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _statusFilters.map((st) {
-                    final isSelected = filter.status == st;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: FilterChip(
-                        label: Text(st == 'All' ? 'All Invoices' : st),
-                        selected: isSelected,
-                        onSelected: (_) => filterNotifier.setStatus(st),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-
-              // Actions
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('+ New Bill'),
-                    onPressed: _openCreateBill,
+                  // Status Filter Chips
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _statusFilters.map((st) {
+                        final isSelected = filter.status == st;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: Text(st == 'All' ? 'All Invoices' : st),
+                            selected: isSelected,
+                            onSelected: (_) => filterNotifier.setStatus(st),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Refresh Invoices',
-                    icon: const Icon(Icons.refresh, size: 20),
-                    onPressed: () {
-                      ref.invalidate(billsListProvider);
-                    },
+
+                  // Actions
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('+ New Bill'),
+                        onPressed: _openCreateBill,
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Refresh Invoices',
+                        icon: const Icon(Icons.refresh, size: 20),
+                        onPressed: () {
+                          ref.invalidate(billsListProvider);
+                        },
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 16),
@@ -255,80 +333,187 @@ class _BillingWorkspaceViewState extends ConsumerState<BillingWorkspaceView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Top Row: Invoice #, Status, Patient, Actions
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              bill.invoiceNumber,
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primaryBlue),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildStatusBadge(bill.paymentStatus),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
+                      // Top Area: Responsive Layout for Mobile and Desktop
+                      LayoutBuilder(
+                        builder: (context, cardConstraints) {
+                          final isNarrow = cardConstraints.maxWidth < 680;
+
+                          if (isNarrow) {
+                            return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Mobile Header: Invoice # & Status badge on left, actions menu on right
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            bill.invoiceNumber,
+                                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primaryBlue),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _buildStatusBadge(bill.paymentStatus),
+                                      ],
+                                    ),
+                                    PopupMenuButton<String>(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(Icons.more_vert, size: 20),
+                                      onSelected: (val) {
+                                        if (val == 'refund') {
+                                          _openRefundDialog(bill);
+                                        } else if (val == 'cancel') {
+                                          _cancelBill(bill);
+                                        }
+                                      },
+                                      itemBuilder: (_) => [
+                                        if (bill.paidAmount > 0)
+                                          const PopupMenuItem(value: 'refund', child: Text('Process Refund')),
+                                        if (bill.status != 'CANCELLED' && bill.paidAmount == 0)
+                                          const PopupMenuItem(value: 'cancel', child: Text('Cancel Bill', style: TextStyle(color: Colors.red))),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Full width patient name and visit details
                                 Text(
                                   '${bill.patientName} (${bill.patientUhid})',
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                                  softWrap: true,
                                 ),
+                                const SizedBox(height: 3),
                                 Text(
                                   'Visit: ${bill.visitNumber} • Dept: ${bill.departmentName} • ${bill.billedAt.split("T").first}',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: 12,
                                     color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                                   ),
+                                  softWrap: true,
                                 ),
-                              ],
-                            ),
-                          ),
+                                const SizedBox(height: 12),
 
-                          // Action Buttons
-                          Row(
-                            children: [
-                              OutlinedButton.icon(
-                                icon: const Icon(Icons.print_outlined, size: 16),
-                                label: const Text('Print Receipt'),
-                                onPressed: () {
-                                  context.push('/billing/invoice/${bill.id}');
-                                },
-                              ),
-                              if (bill.outstandingBalance > 0 && bill.status != 'CANCELLED') ...[
-                                const SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  icon: const Icon(Icons.payment, size: 16),
-                                  label: const Text('Pay'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                                  onPressed: () => _openPaymentDialog(bill),
+                                // Action buttons row on mobile
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Icons.print_outlined, size: 16),
+                                        label: const Text('Print Receipt'),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 9),
+                                        ),
+                                        onPressed: () {
+                                          context.push('/billing/invoice/${bill.id}');
+                                        },
+                                      ),
+                                    ),
+                                    if (bill.outstandingBalance > 0 && bill.status != 'CANCELLED') ...[
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          icon: const Icon(Icons.payment, size: 16),
+                                          label: const Text('Pay'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green.shade700,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 9),
+                                          ),
+                                          onPressed: () => _openPaymentDialog(bill),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ],
-                              const SizedBox(width: 4),
-                              PopupMenuButton<String>(
-                                onSelected: (val) {
-                                  if (val == 'refund') {
-                                    _openRefundDialog(bill);
-                                  } else if (val == 'cancel') {
-                                    _cancelBill(bill);
-                                  }
-                                },
-                                itemBuilder: (_) => [
-                                  if (bill.paidAmount > 0)
-                                    const PopupMenuItem(value: 'refund', child: Text('Process Refund')),
-                                  if (bill.status != 'CANCELLED' && bill.paidAmount == 0)
-                                    const PopupMenuItem(value: 'cancel', child: Text('Cancel Bill', style: TextStyle(color: Colors.red))),
+                            );
+                          }
+
+                          // Desktop Wide Row: Invoice #, Status, Patient, Actions
+                          return Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  bill.invoiceNumber,
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.primaryBlue),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _buildStatusBadge(bill.paymentStatus),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${bill.patientName} (${bill.patientUhid})',
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                                    ),
+                                    Text(
+                                      'Visit: ${bill.visitNumber} • Dept: ${bill.departmentName} • ${bill.billedAt.split("T").first}',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  OutlinedButton.icon(
+                                    icon: const Icon(Icons.print_outlined, size: 16),
+                                    label: const Text('Print Receipt'),
+                                    onPressed: () {
+                                      context.push('/billing/invoice/${bill.id}');
+                                    },
+                                  ),
+                                  if (bill.outstandingBalance > 0 && bill.status != 'CANCELLED') ...[
+                                    const SizedBox(width: 8),
+                                    ElevatedButton.icon(
+                                      icon: const Icon(Icons.payment, size: 16),
+                                      label: const Text('Pay'),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
+                                      onPressed: () => _openPaymentDialog(bill),
+                                    ),
+                                  ],
+                                  const SizedBox(width: 4),
+                                  PopupMenuButton<String>(
+                                    onSelected: (val) {
+                                      if (val == 'refund') {
+                                        _openRefundDialog(bill);
+                                      } else if (val == 'cancel') {
+                                        _cancelBill(bill);
+                                      }
+                                    },
+                                    itemBuilder: (_) => [
+                                      if (bill.paidAmount > 0)
+                                        const PopupMenuItem(value: 'refund', child: Text('Process Refund')),
+                                      if (bill.status != 'CANCELLED' && bill.paidAmount == 0)
+                                        const PopupMenuItem(value: 'cancel', child: Text('Cancel Bill', style: TextStyle(color: Colors.red))),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ],
-                          ),
-                        ],
+                          );
+                        },
                       ),
                       const Divider(height: 20),
 
@@ -432,15 +617,16 @@ class _BillingWorkspaceViewState extends ConsumerState<BillingWorkspaceView> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 800;
+        final isVerySmall = constraints.maxWidth < 480;
+        final isCompact = constraints.maxWidth < 820;
 
         return GridView.count(
           crossAxisCount: isCompact ? 2 : 4,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: isCompact ? 2.2 : 2.2,
+          childAspectRatio: isVerySmall ? 1.85 : (isCompact ? 2.1 : 2.3),
           children: [
             _buildStatCard(
               title: 'Total Invoiced',
