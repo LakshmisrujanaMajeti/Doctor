@@ -626,7 +626,50 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
               }
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+
+          // Application Version Banner in Patient Portal Profile Section
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.verified_rounded, size: 14, color: AppColors.primaryTeal),
+                const SizedBox(width: 6),
+                const Text(
+                  'Application Version: ',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  'v1.2.0 • Enterprise Production Build',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.25)),
+                  ),
+                  child: const Text(
+                    'PRODUCTION READY',
+                    style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
 
           // Profile Switcher Bar with horizontal scroll so it never clips or overflows
           SingleChildScrollView(

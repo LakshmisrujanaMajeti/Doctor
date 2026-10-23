@@ -27,27 +27,64 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  // 0 = Hospital Staff (Email & Password), 1 = Patient Portal (Mobile # / UHID)
+  // 0 = Hospital Staff, 1 = Patient Portal
   int _selectedTab = 0;
 
-  // Staff Form
+  // 0 = Sign In, 1 = Sign Up
+  int _staffAuthMode = 0;
+  int _patientAuthMode = 0;
+
+  // Staff Sign In Form
   final _staffFormKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = true;
 
-  // Patient Form
+  // Staff Sign Up Form
+  final _staffSignUpFormKey = GlobalKey<FormState>();
+  final _staffSignUpNameController = TextEditingController();
+  final _staffSignUpEmailController = TextEditingController();
+  final _staffSignUpPhoneController = TextEditingController();
+  final _staffSignUpPasswordController = TextEditingController();
+  final _staffSignUpConfirmPasswordController = TextEditingController();
+  String _staffSignUpRole = 'doctor';
+  bool _isStaffSignUpLoading = false;
+  String? _staffSignUpError;
+
+  // Patient Sign In Form
   final _patientIdentifierController = TextEditingController();
   bool _isPatientLoading = false;
   String? _patientErrorMessage;
+
+  // Patient Sign Up Form
+  final _patientSignUpFormKey = GlobalKey<FormState>();
+  final _patientSignUpNameController = TextEditingController();
+  final _patientSignUpPhoneController = TextEditingController();
+  final _patientSignUpAgeController = TextEditingController();
+  final _patientSignUpAddressController = TextEditingController();
+  String _patientSignUpGender = 'MALE';
+  bool _isPatientSignUpLoading = false;
+  String? _patientSignUpError;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _staffSignUpNameController.dispose();
+    _staffSignUpEmailController.dispose();
+    _staffSignUpPhoneController.dispose();
+    _staffSignUpPasswordController.dispose();
+    _staffSignUpConfirmPasswordController.dispose();
+
     _patientIdentifierController.dispose();
+    _patientSignUpNameController.dispose();
+    _patientSignUpPhoneController.dispose();
+    _patientSignUpAgeController.dispose();
+    _patientSignUpAddressController.dispose();
     super.dispose();
   }
+
+  // --- STAFF AUTH HANDLERS ---
 
   Future<void> _handleStaffLogin() async {
     if (!_staffFormKey.currentState!.validate()) return;
@@ -71,6 +108,83 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     }
   }
+
+  Future<void> _handleStaffSignUp() async {
+    if (!_staffSignUpFormKey.currentState!.validate()) return;
+
+    if (_staffSignUpPasswordController.text != _staffSignUpConfirmPasswordController.text) {
+      setState(() => _staffSignUpError = 'Passwords do not match. Please re-enter your password.');
+      return;
+    }
+
+    setState(() {
+      _isStaffSignUpLoading = true;
+      _staffSignUpError = null;
+    });
+
+    final fullName = _staffSignUpNameController.text.trim();
+    final email = _staffSignUpEmailController.text.trim().toLowerCase();
+    final phone = _staffSignUpPhoneController.text.trim();
+    final password = _staffSignUpPasswordController.text;
+
+    try {
+      final success = await ref.read(authProvider.notifier).registerStaff(
+        fullName: fullName,
+        email: email,
+        password: password,
+        roleName: _staffSignUpRole,
+        phone: phone.isNotEmpty ? phone : null,
+        roleMetadata: {
+          'department': _getDepartmentForRole(_staffSignUpRole),
+        },
+      );
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.hospitalGreen,
+            content: Text('Staff Account Created! Welcome, $fullName.'),
+          ),
+        );
+        context.goNamed(RouteNames.dashboard);
+      } else if (mounted) {
+        setState(() {
+          _staffSignUpError = ref.read(authProvider).errorMessage ?? 'Staff registration failed. Please try again.';
+          _isStaffSignUpLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _staffSignUpError = e.toString().replaceAll('Exception: ', '');
+          _isStaffSignUpLoading = false;
+        });
+      }
+    }
+  }
+
+  String _getDepartmentForRole(String role) {
+    switch (role) {
+      case 'doctor':
+        return 'General Medicine';
+      case 'nurse':
+        return 'Outpatient Nursing & Triage';
+      case 'receptionist':
+        return 'Central OPD Reception';
+      case 'pharmacist':
+        return 'Central Pharmacy';
+      case 'lab_tech':
+        return 'Clinical Pathology & Biochemistry';
+      case 'billing':
+        return 'Billing & Accounts';
+      case 'admin':
+        return 'Hospital Administration';
+      default:
+        return 'General Hospital Services';
+    }
+  }
+
+  // --- PATIENT AUTH HANDLERS ---
 
   Future<void> _handlePatientLogin() async {
     final rawId = _patientIdentifierController.text.trim();
@@ -228,7 +342,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         setState(() {
           _isPatientLoading = false;
-          _patientErrorMessage = 'No registered patient found matching "$rawId".\nNew patients must be registered at the Front Desk / Reception upon arrival.';
+          _patientErrorMessage = 'No registered patient found matching "$rawId".\nSwitch to "Sign Up" above to register online instantly or visit Front Desk.';
+        });
+      }
+    }
+  }
+
+  Future<void> _handlePatientSignUp() async {
+    if (!_patientSignUpFormKey.currentState!.validate()) return;
+
+    final phoneDigits = _patientSignUpPhoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (phoneDigits.length != 10) {
+      setState(() => _patientSignUpError = 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    setState(() {
+      _isPatientSignUpLoading = true;
+      _patientSignUpError = null;
+    });
+
+    final fullName = _patientSignUpNameController.text.trim();
+    final age = int.tryParse(_patientSignUpAgeController.text.trim()) ?? 30;
+    final address = _patientSignUpAddressController.text.trim().isNotEmpty
+        ? _patientSignUpAddressController.text.trim()
+        : 'Puducherry';
+
+    try {
+      final success = await ref.read(authProvider.notifier).registerPatient(
+        fullName: fullName,
+        phone: phoneDigits,
+        gender: _patientSignUpGender,
+        ageYears: age,
+        address: address,
+      );
+
+      if (success && mounted) {
+        DioClient.clearCache();
+        ref.invalidate(patientProfileProvider);
+        ref.invalidate(selectedPortalPatientIdProvider);
+        ref.invalidate(patientVisitsProvider);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.primaryTeal,
+            content: Text('Registration Successful! Welcome to SMVMCH, $fullName.'),
+          ),
+        );
+        context.goNamed(RouteNames.patientPortal);
+      } else if (mounted) {
+        setState(() {
+          _patientSignUpError = ref.read(authProvider).errorMessage ?? 'Patient registration failed. Please try again.';
+          _isPatientSignUpLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _patientSignUpError = e.toString().replaceAll('Exception: ', '');
+          _isPatientSignUpLoading = false;
         });
       }
     }
@@ -247,157 +419,150 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: isDark ? AppColors.darkBg : Colors.white,
+        backgroundColor: isDark ? AppColors.darkBg : const Color(0xFFF8FAFC),
         body: MedicalIllustratorBackground(
           variant: MedicalBackgroundVariant.auth,
           child: SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // SMVMCH Official Crest
-                      const Center(
-                        child: SmvmchHospitalLogo(
-                          size: 72,
-                          layout: LogoLayout.vertical,
-                          showTamilText: true,
+            // ScrollConfiguration with scrollbars: false eliminates the vertical gray line cutting across the screen on Web
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          width: 1.5,
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Center(
-                        child: Text(
-                          AppStrings.appName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.hospitalMaroon,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 18),
-
-                      // Role Switcher: Hospital Staff vs Patient Portal
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 26),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // SMVMCH Official Crest & Hospital Title
+                          const Center(
+                            child: SmvmchHospitalLogo(
+                              size: 68,
+                              layout: LogoLayout.vertical,
+                              showTamilText: true,
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => setState(() => _selectedTab = 0),
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _selectedTab == 0
-                                        ? AppColors.hospitalMaroon
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: _selectedTab == 0
-                                        ? [
-                                            BoxShadow(
-                                              color: AppColors.hospitalMaroon.withOpacity(0.3),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.medical_services_rounded,
-                                        size: 17,
-                                        color: _selectedTab == 0
-                                            ? Colors.white
-                                            : (isDark ? Colors.grey[400] : Colors.grey[700]),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Hospital Staff',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: _selectedTab == 0
-                                              ? Colors.white
-                                              : (isDark ? Colors.grey[400] : Colors.grey[700]),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                          const SizedBox(height: 6),
+                          Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (_selectedTab == 0 ? AppColors.hospitalMaroon : AppColors.primaryTeal).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                AppStrings.appName,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: _selectedTab == 0 ? AppColors.hospitalMaroon : AppColors.primaryTeal,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
                             ),
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => setState(() => _selectedTab = 1),
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _selectedTab == 1
-                                        ? AppColors.primaryTeal
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: _selectedTab == 1
-                                        ? [
-                                            BoxShadow(
-                                              color: AppColors.primaryTeal.withOpacity(0.3),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.person_rounded,
-                                        size: 17,
-                                        color: _selectedTab == 1
-                                            ? Colors.white
-                                            : (isDark ? Colors.grey[400] : Colors.grey[700]),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Patient Portal',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: _selectedTab == 1
-                                              ? Colors.white
-                                              : (isDark ? Colors.grey[400] : Colors.grey[700]),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Role Switcher: Hospital Staff vs Patient Portal (with smooth hover effects)
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _HoverableTabButton(
+                                    label: 'Hospital Staff',
+                                    icon: Icons.medical_services_rounded,
+                                    isSelected: _selectedTab == 0,
+                                    activeColor: AppColors.hospitalMaroon,
+                                    onTap: () => setState(() => _selectedTab = 0),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _HoverableTabButton(
+                                    label: 'Patient Portal',
+                                    icon: Icons.person_rounded,
+                                    isSelected: _selectedTab == 1,
+                                    activeColor: AppColors.primaryTeal,
+                                    onTap: () => setState(() => _selectedTab = 1),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
 
-                      // Tab View Rendering
-                      if (_selectedTab == 0)
-                        _buildStaffLoginForm(authState, isDark)
-                      else
-                        _buildPatientLoginForm(isDark),
-                    ],
+                          // Sub-Tab Switcher: [ Sign In ] vs [ Sign Up ]
+                          _AuthModeSwitcher(
+                            currentMode: _selectedTab == 0 ? _staffAuthMode : _patientAuthMode,
+                            themeColor: _selectedTab == 0 ? AppColors.hospitalMaroon : AppColors.primaryTeal,
+                            onModeChanged: (mode) {
+                              setState(() {
+                                if (_selectedTab == 0) {
+                                  _staffAuthMode = mode;
+                                } else {
+                                  _patientAuthMode = mode;
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 18),
+
+                          // AnimatedSize & AnimatedSwitcher for buttery smooth form transitions
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 320),
+                            curve: Curves.easeInOutCubic,
+                            alignment: Alignment.topCenter,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 280),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0.04, 0.0),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: KeyedSubtree(
+                                key: ValueKey('tab_${_selectedTab}_mode_${_selectedTab == 0 ? _staffAuthMode : _patientAuthMode}'),
+                                child: _buildActiveForm(authState, isDark),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -408,7 +573,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  // 1. HOSPITAL STAFF LOGIN (EMAIL + PASSWORD ONLY)
+  Widget _buildActiveForm(AuthState authState, bool isDark) {
+    if (_selectedTab == 0) {
+      return _staffAuthMode == 0
+          ? _buildStaffLoginForm(authState, isDark)
+          : _buildStaffSignUpForm(authState, isDark);
+    } else {
+      return _patientAuthMode == 0
+          ? _buildPatientLoginForm(isDark)
+          : _buildPatientSignUpForm(isDark);
+    }
+  }
+
+  // =========================================================================
+  // 1. HOSPITAL STAFF: SIGN IN
+  // =========================================================================
   Widget _buildStaffLoginForm(AuthState authState, bool isDark) {
     return Form(
       key: _staffFormKey,
@@ -454,7 +633,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               return InputSanitizer.validateEmail(v.trim());
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Password Field
           OpdTextField(
@@ -466,7 +645,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             enablePasswordToggle: true,
             validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : null,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
           // Remember Me & Forgot Password
           Row(
@@ -497,21 +676,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Sign In Button
-          OpdButton(
+          // Sign In Action Button (with hover effect)
+          _HoverableActionButton(
             label: 'Sign In as Staff',
-            isLoading: authState.isLoading,
             icon: Icons.login_rounded,
+            isLoading: authState.isLoading,
+            color: AppColors.hospitalMaroon,
             onPressed: _handleStaffLogin,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Informational note
+          // Switch to Sign Up link
           Center(
-            child: Text(
-              'Patients: switch to the "Patient Portal" tab above to log in.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11.5, color: isDark ? Colors.grey[500] : Colors.grey[600]),
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  'Need new hospital credentials? ',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                ),
+                InkWell(
+                  onTap: () => setState(() => _staffAuthMode = 1),
+                  child: const Text(
+                    'Sign Up Here',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.hospitalMaroon),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -519,7 +710,173 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  // 2. PATIENT LOGIN (REGISTERED MOBILE NUMBER OR UHID ONLY - NO PASSWORD)
+  // =========================================================================
+  // 2. HOSPITAL STAFF: SIGN UP
+  // =========================================================================
+  Widget _buildStaffSignUpForm(AuthState authState, bool isDark) {
+    return Form(
+      key: _staffSignUpFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person_add_alt_1_rounded, color: AppColors.hospitalMaroon, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Staff Account Registration',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Create your verified clinical or operational SMVMCH staff account.',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Error Banner
+          if (_staffSignUpError != null)
+            ErrorBannerWidget(
+              message: _staffSignUpError!,
+              onDismiss: () => setState(() => _staffSignUpError = null),
+            ),
+
+          // Full Name
+          OpdTextField(
+            label: 'Full Name & Designation',
+            hint: 'e.g. Dr. Rajesh Kumar or Nurse Kavitha',
+            controller: _staffSignUpNameController,
+            prefixIcon: Icons.badge_rounded,
+            validator: (v) => (v == null || v.trim().length < 2) ? 'Please enter your full name' : null,
+          ),
+          const SizedBox(height: 12),
+
+          // Staff Email
+          OpdTextField(
+            label: 'Institutional Email Address',
+            hint: 'name@smvmch.ac.in',
+            controller: _staffSignUpEmailController,
+            prefixIcon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Staff email is required';
+              return InputSanitizer.validateEmail(v.trim());
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Role / Department Dropdown
+          DropdownButtonFormField<String>(
+            value: _staffSignUpRole,
+            decoration: InputDecoration(
+              labelText: 'Hospital Role & Department',
+              prefixIcon: const Icon(Icons.work_outline_rounded, color: AppColors.hospitalMaroon),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            ),
+            dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            items: const [
+              DropdownMenuItem(value: 'doctor', child: Text('Doctor (Consultant Physician)')),
+              DropdownMenuItem(value: 'nurse', child: Text('Nurse (Triage & Vitals)')),
+              DropdownMenuItem(value: 'receptionist', child: Text('Receptionist (Front Desk & Registration)')),
+              DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist (Dispensary)')),
+              DropdownMenuItem(value: 'lab_tech', child: Text('Lab Technician (Pathology)')),
+              DropdownMenuItem(value: 'billing', child: Text('Billing Officer (Cash Counter)')),
+              DropdownMenuItem(value: 'admin', child: Text('Hospital Administrator')),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() => _staffSignUpRole = v);
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Phone Number
+          OpdTextField(
+            label: 'Contact Mobile Number',
+            hint: '9876543210',
+            controller: _staffSignUpPhoneController,
+            prefixIcon: Icons.phone_android_rounded,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            validator: (v) {
+              if (v != null && v.isNotEmpty && v.length != 10) {
+                return 'Please enter a 10-digit mobile number';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Password
+          OpdTextField(
+            label: 'Account Password',
+            hint: 'At least 6 characters',
+            controller: _staffSignUpPasswordController,
+            prefixIcon: Icons.lock_outline_rounded,
+            obscureText: true,
+            enablePasswordToggle: true,
+            validator: (v) => (v == null || v.length < 6) ? 'Password must be at least 6 characters' : null,
+          ),
+          const SizedBox(height: 12),
+
+          // Confirm Password
+          OpdTextField(
+            label: 'Confirm Password',
+            hint: 'Re-enter your password',
+            controller: _staffSignUpConfirmPasswordController,
+            prefixIcon: Icons.lock_clock_outlined,
+            obscureText: true,
+            enablePasswordToggle: true,
+            validator: (v) => (v == null || v.isEmpty) ? 'Please confirm your password' : null,
+          ),
+          const SizedBox(height: 18),
+
+          // Sign Up Action Button
+          _HoverableActionButton(
+            label: 'Create Staff Account',
+            icon: Icons.how_to_reg_rounded,
+            isLoading: _isStaffSignUpLoading,
+            color: AppColors.hospitalMaroon,
+            onPressed: _handleStaffSignUp,
+          ),
+          const SizedBox(height: 14),
+
+          // Switch to Sign In link
+          Center(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  'Already have credentials? ',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                ),
+                InkWell(
+                  onTap: () => setState(() => _staffAuthMode = 0),
+                  child: const Text(
+                    'Sign In Here',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.hospitalMaroon),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
+  // 3. PATIENT PORTAL: SIGN IN
+  // =========================================================================
   Widget _buildPatientLoginForm(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -579,6 +936,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             hintText: 'e.g. 9876543210 or UHID-2026-00001',
             prefixIcon: const Icon(Icons.phone_android_rounded, color: AppColors.primaryTeal),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
             suffixIcon: _patientIdentifierController.text.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear),
@@ -591,7 +950,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Front Desk Registration Guidance Box
+        // Information Box
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -602,12 +961,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
-                  const Icon(Icons.local_hospital_rounded, color: AppColors.primaryTeal, size: 18),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Hospital Registration Policy',
+                  Icon(Icons.local_hospital_rounded, color: AppColors.primaryTeal, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Instant Patient Digital Access',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -618,7 +977,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                '• New Patients: Registration is completed exclusively at the Hospital Front Desk / Reception upon arrival.\n• Once registered, your unique UHID and mobile number grant instant access to your records anytime.',
+                '• Registered Patients: Enter your 10-digit mobile number or unique UHID for instant access to tokens, OPD booklet & bills.\n• First-Time Patients: Switch to "Sign Up" above to register online immediately.',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.4,
@@ -630,28 +989,503 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: 18),
 
-        // Patient Login Button
-        ElevatedButton.icon(
+        // Patient Login Button (with hover effect)
+        _HoverableActionButton(
+          label: 'Log In to Patient Portal',
+          icon: Icons.login_rounded,
+          isLoading: _isPatientLoading,
+          color: AppColors.primaryTeal,
+          onPressed: _handlePatientLogin,
+        ),
+        const SizedBox(height: 14),
+
+        // Switch to Sign Up link
+        Center(
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'New patient at SMVMCH? ',
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+              ),
+              InkWell(
+                onTap: () => setState(() => _patientAuthMode = 1),
+                child: const Text(
+                  'Sign Up & Get UHID',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primaryTeal),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // =========================================================================
+  // 4. PATIENT PORTAL: SIGN UP (NEW PATIENT SELF-REGISTRATION)
+  // =========================================================================
+  Widget _buildPatientSignUpForm(bool isDark) {
+    return Form(
+      key: _patientSignUpFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person_add_rounded, color: AppColors.primaryTeal, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'New Patient Registration',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Register online to generate your unique SMVMCH UHID and access medical records.',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Error Banner
+          if (_patientSignUpError != null)
+            ErrorBannerWidget(
+              message: _patientSignUpError!,
+              onDismiss: () => setState(() => _patientSignUpError = null),
+            ),
+
+          // Full Name
+          OpdTextField(
+            label: 'Patient Full Name',
+            hint: 'e.g. Ramesh Kumar',
+            controller: _patientSignUpNameController,
+            prefixIcon: Icons.person_outline_rounded,
+            validator: (v) => (v == null || v.trim().length < 2) ? 'Please enter patient full name' : null,
+          ),
+          const SizedBox(height: 12),
+
+          // 10-Digit Mobile Number
+          OpdTextField(
+            label: 'Mobile Phone Number',
+            hint: '9876543210 (10 digits)',
+            controller: _patientSignUpPhoneController,
+            prefixIcon: Icons.phone_android_rounded,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Mobile number is required';
+              if (v.trim().length != 10) return 'Please enter a valid 10-digit mobile number';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Gender & Age Row
+          Row(
+            children: [
+              // Gender Dropdown
+              Expanded(
+                flex: 3,
+                child: DropdownButtonFormField<String>(
+                  value: _patientSignUpGender,
+                  decoration: InputDecoration(
+                    labelText: 'Gender',
+                    prefixIcon: const Icon(Icons.wc_rounded, color: AppColors.primaryTeal),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  ),
+                  dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  items: const [
+                    DropdownMenuItem(value: 'MALE', child: Text('Male')),
+                    DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
+                    DropdownMenuItem(value: 'OTHER', child: Text('Other')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => _patientSignUpGender = v);
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // Age Field
+              Expanded(
+                flex: 2,
+                child: OpdTextField(
+                  label: 'Age (Years)',
+                  hint: 'e.g. 35',
+                  controller: _patientSignUpAgeController,
+                  prefixIcon: Icons.cake_outlined,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(3),
+                  ],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Age required';
+                    final n = int.tryParse(v.trim());
+                    if (n == null || n < 1 || n > 120) return 'Invalid age';
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Address / City Field (Optional)
+          OpdTextField(
+            label: 'Address / Area (Optional)',
+            hint: 'e.g. Madagadipet, Puducherry',
+            controller: _patientSignUpAddressController,
+            prefixIcon: Icons.location_on_outlined,
+          ),
+          const SizedBox(height: 18),
+
+          // Register Action Button
+          _HoverableActionButton(
+            label: 'Register & Enter Patient Portal',
+            icon: Icons.how_to_reg_rounded,
+            isLoading: _isPatientSignUpLoading,
+            color: AppColors.primaryTeal,
+            onPressed: _handlePatientSignUp,
+          ),
+          const SizedBox(height: 14),
+
+          // Switch to Sign In link
+          Center(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  'Already have a UHID or registered phone? ',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+                ),
+                InkWell(
+                  onTap: () => setState(() => _patientAuthMode = 0),
+                  child: const Text(
+                    'Sign In Here',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primaryTeal),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// REUSABLE HOVERABLE ROLE TAB BUTTON
+// =========================================================================
+class _HoverableTabButton extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  const _HoverableTabButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  @override
+  State<_HoverableTabButton> createState() => _HoverableTabButtonState();
+}
+
+class _HoverableTabButtonState extends State<_HoverableTabButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final bgColor = widget.isSelected
+        ? widget.activeColor
+        : (_isHovered
+            ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0))
+            : Colors.transparent);
+
+    final fgColor = widget.isSelected
+        ? Colors.white
+        : (_isHovered
+            ? (isDark ? Colors.white : Colors.black87)
+            : (isDark ? Colors.grey[400] : Colors.grey[700]));
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: widget.isSelected
+                ? [
+                    BoxShadow(
+                      color: widget.activeColor.withOpacity(0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : (_isHovered
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(widget.icon, size: 17, color: fgColor),
+              const SizedBox(width: 8),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: fgColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// REUSABLE SUB-TAB MODE SWITCHER: [ SIGN IN ] vs [ SIGN UP ]
+// =========================================================================
+class _AuthModeSwitcher extends StatelessWidget {
+  final int currentMode; // 0 = Sign In, 1 = Sign Up
+  final Color themeColor;
+  final ValueChanged<int> onModeChanged;
+
+  const _AuthModeSwitcher({
+    required this.currentMode,
+    required this.themeColor,
+    required this.onModeChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _SubTabPill(
+              label: 'Sign In',
+              icon: Icons.login_rounded,
+              isSelected: currentMode == 0,
+              themeColor: themeColor,
+              onTap: () => onModeChanged(0),
+            ),
+          ),
+          Expanded(
+            child: _SubTabPill(
+              label: 'Sign Up',
+              icon: Icons.person_add_alt_1_rounded,
+              isSelected: currentMode == 1,
+              themeColor: themeColor,
+              onTap: () => onModeChanged(1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubTabPill extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final Color themeColor;
+  final VoidCallback onTap;
+
+  const _SubTabPill({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.themeColor,
+    required this.onTap,
+  });
+
+  @override
+  State<_SubTabPill> createState() => _SubTabPillState();
+}
+
+class _SubTabPillState extends State<_SubTabPill> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final bgColor = widget.isSelected
+        ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+        : (_isHovered
+            ? (isDark ? const Color(0xFF1E293B).withOpacity(0.5) : Colors.white.withOpacity(0.5))
+            : Colors.transparent);
+
+    final fgColor = widget.isSelected
+        ? widget.themeColor
+        : (_isHovered
+            ? (isDark ? Colors.white : Colors.black87)
+            : (isDark ? Colors.grey[400] : Colors.grey[600]));
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: widget.isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(widget.icon, size: 15, color: fgColor),
+              const SizedBox(width: 6),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: fgColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// REUSABLE HOVERABLE ACTION BUTTON
+// =========================================================================
+class _HoverableActionButton extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final bool isLoading;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const _HoverableActionButton({
+    required this.label,
+    required this.icon,
+    required this.isLoading,
+    required this.color,
+    required this.onPressed,
+  });
+
+  @override
+  State<_HoverableActionButton> createState() => _HoverableActionButtonState();
+}
+
+class _HoverableActionButtonState extends State<_HoverableActionButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: widget.isLoading ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: _isHovered && !widget.isLoading
+              ? [
+                  BoxShadow(
+                    color: widget.color.withOpacity(0.4),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: widget.color.withOpacity(0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryTeal,
+            backgroundColor: widget.color,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 0,
           ),
-          icon: _isPatientLoading
+          icon: widget.isLoading
               ? const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
-              : const Icon(Icons.login_rounded),
+              : Icon(widget.icon, size: 19),
           label: Text(
-            _isPatientLoading ? 'Verifying Patient Records...' : 'Log In to Patient Portal',
+            widget.isLoading ? 'Processing...' : widget.label,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
-          onPressed: _isPatientLoading ? null : _handlePatientLogin,
+          onPressed: widget.isLoading ? null : widget.onPressed,
         ),
-      ],
+      ),
     );
   }
 }

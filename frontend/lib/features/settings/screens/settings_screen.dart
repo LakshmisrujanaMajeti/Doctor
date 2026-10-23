@@ -276,21 +276,76 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: Text('Sri Manakula Vinayagar Medical College and Hospital (SMVMCH), Puducherry', style: TextStyle(fontSize: 12)),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.info_outline_rounded, color: Colors.grey),
-                  title: const Text('Application Version', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('v1.2.0 (Enterprise Production Build)', style: TextStyle(fontSize: 12)),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('PRODUCTION READY',
-                        style: TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 10)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.hospitalMaroon.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.info_outline_rounded, color: AppColors.hospitalMaroon, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Application Version',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'v1.2.0 • Enterprise Production Build',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.28)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'PRODUCTION READY',
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 10,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

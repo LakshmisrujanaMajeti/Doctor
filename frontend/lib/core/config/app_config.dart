@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 class AppConfig {
   static const String appName = 'SMVMCH OPD Connect';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.2.0';
 
   // Supabase Configuration provided by project
   static const String supabaseUrl = String.fromEnvironment(
