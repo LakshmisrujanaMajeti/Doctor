@@ -47,7 +47,7 @@ def get_current_user(
 
         if not user:
             from app.models.user import Role
-            user = db.query(User).join(User.role).filter(Role.name.in_(["admin", "doctor", "receptionist"])).first()
+            user = db.query(User).join(User.role).filter(Role.name.in_(["admin", "doctor", "receptionist", "billing"])).first()
 
         if user:
             return user
@@ -131,12 +131,16 @@ def require_roles(allowed_roles: List[str]) -> Callable:
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         user_role = (current_user.role.name if current_user.role else "").lower()
 
-        # Normalize role aliases (e.g. lab_tech <-> laboratory)
+        # Normalize role aliases (e.g. lab_tech <-> laboratory, billing <-> receptionist)
         user_roles_set = {user_role}
         if user_role == "lab_tech":
             user_roles_set.add("laboratory")
         elif user_role == "laboratory":
             user_roles_set.add("lab_tech")
+        elif user_role == "billing":
+            user_roles_set.add("receptionist")
+        elif user_role == "receptionist":
+            user_roles_set.add("billing")
 
         allowed_set = {r.lower() for r in allowed_roles}
 
@@ -157,7 +161,19 @@ def verify_patient_access(patient_id: str, current_user: User, db: Session) -> N
     """Enforce patient privacy: patients may access only their own records and authorized linked dependents."""
     user_role = (current_user.role.name if current_user.role else "").lower()
     if user_role == "patient":
-        if current_user.patient_id != patient_id:
+        if current_user.patient_id != patient_id and current_user.id != patient_id:
+            target_pat = db.query(Patient).filter(
+                or_(
+                    Patient.id == patient_id,
+                    Patient.uhid == patient_id,
+                )
+            ).first()
+            if target_pat and current_user.phone and target_pat.phone:
+                u_digits = "".join(c for c in current_user.phone if c.isdigit())
+                p_digits = "".join(c for c in target_pat.phone if c.isdigit())
+                if u_digits and p_digits and (u_digits.endswith(p_digits[-10:]) or p_digits.endswith(u_digits[-10:])):
+                    return
+
             # Check if target patient is a dependent of current user
             is_dependent = (
                 db.query(Patient)

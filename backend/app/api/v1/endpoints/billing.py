@@ -32,11 +32,11 @@ def get_services_catalogue(
     )
 
 
-@router.post("", status_code=201, summary="Generate Itemized Bill (Receptionist/Pharmacist/Admin)")
+@router.post("", status_code=201, summary="Generate Itemized Bill (Billing/Receptionist/Pharmacist/Admin)")
 def create_bill(
     payload: BillCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["receptionist", "pharmacist", "admin"])),
+    current_user: User = Depends(require_roles(["receptionist", "pharmacist", "admin", "billing"])),
 ):
     bill = BillingService.create_bill(db, payload, current_user=current_user)
     serialized = BillingService.serialize_bill(bill)
@@ -109,7 +109,7 @@ def record_payment(
     bill_id: str,
     payload: PaymentCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["receptionist", "pharmacist", "admin", "patient"])),
+    current_user: User = Depends(require_roles(["receptionist", "pharmacist", "admin", "patient", "billing"])),
 ):
     payment = BillingService.record_payment(db, bill_id, payload, current_user=current_user)
     bill_data = BillingService.get_bill_by_id(db, bill_id)
@@ -150,7 +150,7 @@ def process_refund(
     bill_id: str,
     payload: PaymentRefundRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "receptionist"])),
+    current_user: User = Depends(require_roles(["admin", "receptionist", "billing"])),
 ):
     refund_tx = BillingService.process_refund(db, bill_id, payload, current_user=current_user)
     bill_data = BillingService.get_bill_by_id(db, bill_id)
@@ -164,12 +164,12 @@ def process_refund(
     )
 
 
-@router.post("/{bill_id}/cancel", summary="Cancel Invoice (Admin/Receptionist Only)")
+@router.post("/{bill_id}/cancel", summary="Cancel Invoice (Admin/Receptionist/Billing Only)")
 def cancel_bill(
     bill_id: str,
     payload: BillCancellationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "receptionist"])),
+    current_user: User = Depends(require_roles(["admin", "receptionist", "billing"])),
 ):
     bill = BillingService.cancel_bill(db, bill_id, reason=payload.reason, current_user=current_user)
     bill_data = BillingService.serialize_bill(bill)

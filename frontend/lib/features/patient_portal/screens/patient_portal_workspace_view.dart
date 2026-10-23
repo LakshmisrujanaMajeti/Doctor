@@ -243,9 +243,11 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                   onPressed: () async {
                     try {
                       final selectedPatientId = ref.read(selectedPortalPatientIdProvider);
+                      final profile = ref.read(patientProfileProvider).asData?.value;
+                      final effectivePatientId = selectedPatientId ?? profile?.patient.id;
                       final repo = ref.read(patientPortalRepositoryProvider);
                       final result = await repo.bookAppointmentSlot(
-                        patientId: selectedPatientId,
+                        patientId: effectivePatientId,
                         departmentId: selectedDept,
                         slotDate: isoDate,
                         slotTime: selectedSlot,

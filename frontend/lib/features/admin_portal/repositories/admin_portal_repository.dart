@@ -9,8 +9,10 @@ import '../models/admin_portal_models.dart';
 import '../../patient_portal/models/patient_portal_models.dart';
 import '../../patients/repositories/patient_repository.dart';
 import '../../visits/repositories/visit_repository.dart';
+import 'dart:math';
 import '../../doctors/models/doctor_model.dart';
 import '../../doctors/repositories/doctor_repository.dart';
+import '../../billing/repositories/billing_repository.dart';
 
 class AdminPortalRepository {
   final DioClient _dioClient;
@@ -52,6 +54,23 @@ class AdminPortalRepository {
   }
 
   Future<AdminDashboardMetricsModel> getDashboardSummary() async {
+    await BillingRepository.loadCacheIfNeeded();
+    final cachedBills = BillingRepository.cachedBills;
+    double localSumPaid = 0.0;
+    int localPendingCount = 0;
+    double localPendingAmt = 0.0;
+    final localRevByMethod = <String, double>{};
+    for (final b in cachedBills) {
+      if (b.paidAmount > 0) {
+        localSumPaid += b.paidAmount;
+        final m = b.payments.isNotEmpty ? b.payments.first.paymentMethod : 'CASH';
+        localRevByMethod[m] = (localRevByMethod[m] ?? 0.0) + b.paidAmount;
+      } else {
+        localPendingCount += 1;
+        localPendingAmt += b.outstandingBalance;
+      }
+    }
+
     if (DioClient.isHostReachable) {
       try {
         final response = await _dioClient.dio.get(ApiEndpoints.adminDashboardSummary);
@@ -61,6 +80,15 @@ class AdminPortalRepository {
           if (count > 0) {
             metrics = metrics.copyWith(totalPatientsRegistered: count);
           }
+        }
+        if (localSumPaid > metrics.revenueToday) {
+          metrics = metrics.copyWith(
+            revenueToday: localSumPaid,
+            revenueMonth: max(metrics.revenueMonth, localSumPaid),
+            revenueByMethod: metrics.revenueByMethod.isEmpty ? localRevByMethod : metrics.revenueByMethod,
+            pendingBillsCount: metrics.pendingBillsCount > 0 ? metrics.pendingBillsCount : localPendingCount,
+            pendingBillsAmount: metrics.pendingBillsAmount > 0 ? metrics.pendingBillsAmount : localPendingAmt,
+          );
         }
         return metrics;
       } catch (_) {}
@@ -95,11 +123,11 @@ class AdminPortalRepository {
       queueBreakdown: qBreakdown,
       activeClinicsCount: 1,
       activeDoctorsCount: _localUsers.where((u) => u.roleName == 'doctor').length,
-      revenueToday: 0.0,
-      revenueMonth: 0.0,
-      pendingBillsCount: 0,
-      pendingBillsAmount: 0.0,
-      revenueByMethod: {},
+      revenueToday: localSumPaid,
+      revenueMonth: localSumPaid,
+      pendingBillsCount: localPendingCount,
+      pendingBillsAmount: localPendingAmt,
+      revenueByMethod: localRevByMethod,
       lowStockItemsCount: 0,
       expiringSoonItemsCount: 0,
       totalMedicinesInFormulary: 0,

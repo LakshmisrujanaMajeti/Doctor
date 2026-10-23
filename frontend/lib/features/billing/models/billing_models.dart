@@ -74,12 +74,16 @@ class BillItemModel {
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'item_type': itemType,
         'item_code': itemCode,
         'description': description,
         'quantity': quantity,
         'unit_price': unitPrice,
         'tax_rate_percent': taxRatePercent,
+        'subtotal': subtotal,
+        'tax_amount': taxAmount,
+        'total_amount': totalAmount,
       };
 }
 
@@ -131,6 +135,22 @@ class PaymentTransactionModel {
       createdAt: json['created_at'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'receipt_number': receiptNumber,
+        'payment_method': paymentMethod,
+        'amount': amount,
+        'payment_status': paymentStatus,
+        'gateway_order_id': gatewayOrderId,
+        'gateway_payment_id': gatewayPaymentId,
+        'idempotency_key': idempotencyKey,
+        'is_online': isOnline,
+        'verified_at': verifiedAt,
+        'refund_amount': refundAmount,
+        'refund_reason': refundReason,
+        'created_at': createdAt,
+      };
 }
 
 class BillModel {
@@ -228,4 +248,35 @@ class BillModel {
       payments: rawPayments.map((p) => PaymentTransactionModel.fromJson(p as Map<String, dynamic>)).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'invoice_number': invoiceNumber,
+        'patient_id': patientId,
+        'patient_name': patientName,
+        'patient_uhid': patientUhid,
+        'visit_id': visitId,
+        'visit_number': visitNumber,
+        'department_name': departmentName,
+        'subtotal': subtotal,
+        'discount_type': discountType,
+        'discount_rate': discountRate,
+        'discount_amount': discountAmount,
+        'discount_reason': discountReason,
+        'taxable_amount': taxableAmount,
+        'cgst_amount': cgstAmount,
+        'sgst_amount': sgstAmount,
+        'igst_amount': igstAmount,
+        'total_tax_amount': totalTaxAmount,
+        'total_amount': totalAmount,
+        'paid_amount': paidAmount,
+        'outstanding_balance': outstandingBalance,
+        'payment_status': paymentStatus,
+        'status': status,
+        'is_synthetic_pricing': isSyntheticPricing,
+        'billed_at': billedAt,
+        'cancellation_reason': cancellationReason,
+        'items': items.map((i) => i.toJson()).toList(),
+        'payments': payments.map((p) => p.toJson()).toList(),
+      };
 }

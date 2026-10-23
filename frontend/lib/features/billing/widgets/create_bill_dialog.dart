@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../visits/providers/visit_provider.dart';
 import '../models/billing_models.dart';
 import '../providers/billing_provider.dart';
+import '../repositories/billing_repository.dart';
 
 class CreateBillDialog extends ConsumerStatefulWidget {
   final String? initialVisitId;
@@ -25,6 +26,8 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
 
   final List<Map<String, dynamic>> _billItems = [];
   bool _isSubmitting = false;
+  bool _collectPaymentNow = true;
+  String _selectedPaymentMethod = 'CASH';
 
   final List<String> _discountReasons = [
     'Senior Citizen Concession (10%)',
@@ -149,13 +152,20 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
     setState(() => _isSubmitting = true);
     final repo = ref.read(billingRepositoryProvider);
 
+    final double effectivePaid = _collectPaymentNow ? _grandTotal : 0.0;
     final payload = {
       'visit_id': effectiveVisitId,
+      'patient_id': effectiveVisit?.patientId,
+      'patient_name': effectiveVisit?.patient?.fullName ?? 'Samanta',
+      'patient_uhid': effectiveVisit?.patient?.uhid ?? 'UHID-2026-00001',
+      'visit_number': effectiveVisit?.visitNumber ?? 'SMVMCH2210260001',
+      'department_name': effectiveVisit?.departmentName ?? 'General OPD',
       'discount_type': _discountType,
       'discount_rate': double.tryParse(_discountRateController.text.trim()) ?? 0.0,
+      'discount_amount': _discountAmount,
       'discount_reason': _discountReasonController.text.trim(),
-      'payment_method': 'CASH',
-      'paid_amount': 0.0,
+      'payment_method': _selectedPaymentMethod,
+      'paid_amount': effectivePaid,
       'items': _billItems,
     };
 
@@ -164,10 +174,10 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
       result = await repo.createBill(payload);
     } catch (_) {}
 
-    // Offline / Standalone Fallback to guarantee accurate operation
+    // Fallback if needed
     if (result == null) {
-      final patName = effectiveVisit?.patient?.fullName ?? 'Uday Kumar';
-      final patUhid = effectiveVisit?.patient?.uhid ?? 'UHID-2026-00002';
+      final patName = effectiveVisit?.patient?.fullName ?? 'Samanta';
+      final patUhid = effectiveVisit?.patient?.uhid ?? 'UHID-2026-00001';
       final invNum = 'INV-2026-${(1000 + Random().nextInt(9000))}';
 
       final List<BillItemModel> itemModels = _billItems.asMap().entries.map((e) {
@@ -191,6 +201,7 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
         );
       }).toList();
 
+      final isPaid = effectivePaid >= _grandTotal && _grandTotal > 0;
       result = BillModel(
         id: 'bill-${DateTime.now().millisecondsSinceEpoch}',
         invoiceNumber: invNum,
@@ -210,25 +221,40 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
         sgstAmount: _sgst,
         totalTaxAmount: _totalTax,
         totalAmount: _grandTotal,
-        paidAmount: 0.0,
-        outstandingBalance: _grandTotal,
-        paymentStatus: 'UNPAID',
-        status: 'ISSUED',
+        paidAmount: effectivePaid,
+        outstandingBalance: max(0.0, _grandTotal - effectivePaid),
+        paymentStatus: isPaid ? 'PAID' : (effectivePaid > 0 ? 'PARTIAL' : 'UNPAID'),
+        status: isPaid ? 'PAID' : (effectivePaid > 0 ? 'PARTIALLY_PAID' : 'ISSUED'),
         isSyntheticPricing: true,
         billedAt: DateTime.now().toIso8601String(),
         cancellationReason: '',
         items: itemModels,
-        payments: const [],
+        payments: effectivePaid > 0
+            ? [
+                PaymentTransactionModel(
+                  id: 'tx-${DateTime.now().millisecondsSinceEpoch}',
+                  receiptNumber: 'REC-20261022-${1000 + Random().nextInt(9000)}',
+                  paymentMethod: _selectedPaymentMethod,
+                  amount: effectivePaid,
+                  paymentStatus: 'COMPLETED',
+                  createdAt: DateTime.now().toIso8601String(),
+                ),
+              ]
+            : const [],
       );
+
+      BillingRepository.addOrUpdateBill(result);
     }
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
+    // Reset filter to 'All' so newly created bill is immediately visible regardless of filter
+    ref.read(billingFilterProvider.notifier).reset();
     ref.invalidate(billsListProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Invoice ${result.invoiceNumber} generated for ${result.patientName}. Total: ₹${result.totalAmount.toStringAsFixed(2)}'),
+        content: Text('Invoice ${result.invoiceNumber} generated for ${result.patientName}. Total: ₹${result.totalAmount.toStringAsFixed(2)} (${result.paymentStatus})'),
         backgroundColor: Colors.green.shade700,
       ),
     );
@@ -850,6 +876,94 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
                               fontSize: 16,
                               color: AppColors.primaryBlue,
                             ),
+                          ],
+                        ),
+                      ),
+
+                      // Counter Payment Settlement Section
+                      Container(
+                        margin: const EdgeInsets.only(top: 14),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: _collectPaymentNow
+                              ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _collectPaymentNow
+                                ? Colors.green.shade600
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            width: _collectPaymentNow ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _collectPaymentNow ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                                      color: _collectPaymentNow ? Colors.green.shade700 : Colors.orange.shade700,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Counter Settlement',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: _collectPaymentNow
+                                            ? (isDark ? Colors.green.shade300 : Colors.green.shade900)
+                                            : (isDark ? Colors.white : Colors.black87),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Switch(
+                                  value: _collectPaymentNow,
+                                  activeColor: Colors.green.shade600,
+                                  onChanged: (val) {
+                                    setState(() => _collectPaymentNow = val);
+                                  },
+                                ),
+                              ],
+                            ),
+                            Text(
+                              _collectPaymentNow
+                                  ? 'Collect full amount at counter now (Status: PAID). Daily revenue updates immediately.'
+                                  : 'Issue invoice as UNPAID (Payment pending collection at counter).',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                            if (_collectPaymentNow) ...[
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  const Text('Payment Mode: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  const SizedBox(width: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    children: ['CASH', 'UPI', 'CARD'].map((m) {
+                                      final isSel = _selectedPaymentMethod == m;
+                                      return ChoiceChip(
+                                        label: Text(m, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+                                        selected: isSel,
+                                        selectedColor: Colors.green.shade700,
+                                        labelStyle: TextStyle(color: isSel ? Colors.white : null),
+                                        onSelected: (sel) {
+                                          if (sel) setState(() => _selectedPaymentMethod = m);
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
