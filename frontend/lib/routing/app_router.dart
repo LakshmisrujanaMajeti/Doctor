@@ -91,6 +91,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return role == 'patient' ? '/patient/portal' : '/dashboard';
       }
 
+      // 4b. Direct /welcome directly to /login
+      if (path == '/welcome') {
+        return '/login';
+      }
+
       // 5. Allow public / system utility routes without authentication
       const publicRoutes = [
         '/splash',
@@ -224,7 +229,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         name: RouteNames.welcome,
         path: '/welcome',
-        builder: (context, state) => const WelcomeScreen(),
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         name: RouteNames.login,
