@@ -208,7 +208,7 @@ class BillingRepository {
       id: 'bill-${DateTime.now().millisecondsSinceEpoch}',
       invoiceNumber: invNum,
       patientId: payload['patient_id'] as String? ?? 'pat-fallback',
-      patientName: payload['patient_name'] as String? ?? 'Samanta',
+      patientName: payload['patient_name'] as String? ?? 'Lakshmi Srujana Majeti',
       patientUhid: payload['patient_uhid'] as String? ?? 'UHID-2026-00001',
       visitId: payload['visit_id'] as String? ?? 'vis-fallback',
       visitNumber: payload['visit_number'] as String? ?? 'SMVMCH2210260001',

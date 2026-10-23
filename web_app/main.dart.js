@@ -121455,139 +121455,153 @@ s.L$=0
 this.am()},
 mz(a){return this.avT(a)},
 a2e(){return this.mz(null)},
-avT(c2){var s=0,r=A.p(t.H),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1
-var $async$mz=A.q(function(c3,c4){if(c3===1){o.push(c4)
-s=p}for(;;)switch(s){case 0:b6={}
-b7=n.w.a.a
-b8=J.bG_(b7)
-if(J.aS(b8)===0){n.v(new A.b7c(n))
+avT(c8){var s=0,r=A.p(t.H),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7
+var $async$mz=A.q(function(c9,d0){if(c9===1){o.push(d0)
+s=p}for(;;)switch(s){case 0:c2={}
+c3=n.w.a.a
+c4=J.bG_(c3)
+if(J.aS(c4)===0){n.v(new A.b7c(n))
 s=1
 break}n.v(new A.b7d(n))
-b6.a=null
-b7=b6.b=b8.toUpperCase()
+c2.a=null
+c3=c2.b=c4.toUpperCase()
 a3=A.bD("^\\d{1,5}$",!0,!1)
-if(a3.b.test(b8))b7=b6.b="UHID-2026-"+J.bFQ(b8,5,"0")
+if(a3.b.test(c4))c3=c2.b="UHID-2026-"+J.bFQ(c4,5,"0")
 p=4
 s=7
 return A.f(A.rf(),$async$mz)
-case 7:m=c4
+case 7:m=d0
 s=8
 return A.f(A.nK(),$async$mz)
-case 8:l=c4
+case 8:l=d0
 k=m!=null?B.aa.da(0,m,null):[]
 j=l!=null?B.aa.da(0,l,null):[]
-i=B.b.C(b8.toLowerCase())
-h=b7.toLowerCase()
-g=J.I4(k,new A.b7e(h,i,b8),new A.b7f())
+i=B.b.C(c4.toLowerCase())
+h=c3.toLowerCase()
+g=J.I4(k,new A.b7e(h,i,c4),new A.b7f())
 if(g!=null){f=t.P.a(g)
 e=J.I4(j,new A.b7g(f),new A.b7h())
-b7=J.w(f,"uhid")
-b7=A.j(b7==null?"pat":b7)
+c3=J.w(f,"uhid")
+c3=A.j(c3==null?"pat":c3)
 a3=e
 if(a3==null)a3=A.A(["status","CONSULTATION_READY","doctor_name","Attending Physician","department_name","General Medicine","room_number","Room 101","patients_ahead",0,"visit_date",new A.bg(Date.now(),0,!1).ec()],t.N,t.K)
-b6.a=A.A(["access_token","patient-token-"+b7,"token_type","bearer","expires_in",86400,"patient",f,"active_visit",a3],t.N,t.z)}p=2
+c2.a=A.A(["access_token","patient-token-"+c3,"token_type","bearer","expires_in",86400,"patient",f,"active_visit",a3],t.N,t.z)}p=2
 s=6
 break
 case 4:p=3
-b9=o.pop()
+c5=o.pop()
 s=6
 break
 case 3:s=2
 break
-case 6:s=b6.a==null?9:10
+case 6:s=c2.a==null?9:10
 break
 case 9:p=12
-b7=$.id().b
-b7===$&&A.b()
-d=b7
+c3=$.id().b
+c3===$&&A.b()
+d=c3
 s=15
-return A.f(d.fg("patients").uO(0,"*, opd_visits(*)").VR("uhid.eq."+b6.b+",uhid.eq."+A.j(b8)+",phone.eq."+A.j(b8)+",hospital_reg_num.eq."+A.j(b8)+",uhid.ilike.%"+A.j(b8)+"%").Vf(1).hI(0,B.Wk),$async$mz)
-case 15:c=c4
+return A.f(d.fg("patients").uO(0,"*, opd_visits(*)").VR("uhid.eq."+c2.b+",uhid.eq."+A.j(c4)+",phone.eq."+A.j(c4)+",hospital_reg_num.eq."+A.j(c4)+",uhid.ilike.%"+A.j(c4)+"%").Vf(1).hI(0,B.Wk),$async$mz)
+case 15:c=d0
 if(J.cB(c)){b=J.jE(c)
 a5=t.g.a(J.w(b,"opd_visits"))
 a=a5==null?[]:a5
 a0=J.cB(a)?J.jE(a):null
-b7=J.w(b,"uhid")
-b7=A.j(b7==null?"pat":b7)
+c3=J.w(b,"uhid")
+c3=A.j(c3==null?"pat":c3)
 a3=a0
 if(a3==null)a3=A.A(["status","REGISTERED","doctor_name","Attending Physician","department_name","General Medicine","room_number","Room 101","patients_ahead",0,"visit_date",new A.bg(Date.now(),0,!1).ec()],t.N,t.K)
-b6.a=A.A(["access_token","patient-token-"+b7,"token_type","bearer","expires_in",86400,"patient",b,"active_visit",a3],t.N,t.z)}p=2
+c2.a=A.A(["access_token","patient-token-"+c3,"token_type","bearer","expires_in",86400,"patient",b,"active_visit",a3],t.N,t.z)}p=2
 s=14
 break
 case 12:p=11
-c0=o.pop()
+c6=o.pop()
 s=14
 break
 case 11:s=2
 break
-case 14:case 10:s=b6.a==null?16:17
+case 14:case 10:s=c2.a==null?16:17
 break
 case 16:p=19
 a1=n.ga5().aw(0,$.hS(),t.c)
-b7=a1.a
-b7===$&&A.b()
-a3=b6.b
-a3=a3.length!==0?a3:b8
+c3=a1.a
+c3===$&&A.b()
+a3=c2.b
+a3=a3.length!==0?a3:c4
 a6=t.N
 s=22
-return A.f(b7.cz("/patient-portal/quick-access",A.A(["identifier",a3],a6,a6),t.z).hI(0,B.x),$async$mz)
-case 22:a2=c4
-if(t.f.b(a2.a)&&J.d(J.w(a2.a,"status"),"success"))b6.a=t.P.a(J.w(a2.a,"data"))
+return A.f(c3.cz("/patient-portal/quick-access",A.A(["identifier",a3],a6,a6),t.z).hI(0,B.x),$async$mz)
+case 22:a2=d0
+if(t.f.b(a2.a)&&J.d(J.w(a2.a,"status"),"success"))c2.a=t.P.a(J.w(a2.a,"data"))
 p=2
 s=21
 break
 case 19:p=18
-c1=o.pop()
+c7=o.pop()
 s=21
 break
 case 18:s=2
 break
-case 21:case 17:if(b6.a==null){b7=t.N
+case 21:case 17:if(c2.a==null){c3=t.N
 a3=t.K
-a7=B.c.j4(A.a([A.A(["uhid","UHID-2026-00001","full_name","Srujana","phone","8374477999","gender","FEMALE","age_years",22,"city","Puducherry","blood_group","O+"],b7,a3),A.A(["uhid","UHID-2026-00002","full_name","Uday Kumar","phone","9347989890","gender","MALE","age_years",23,"city","Puducherry","blood_group","A+"],b7,a3),A.A(["uhid","UHID-2026-00003","full_name","Ravi","phone","9876543211","gender","MALE","age_years",25,"city","Puducherry","blood_group","O+"],b7,a3),A.A(["uhid","UHID-2026-00004","full_name","Pavan","phone","9876543222","gender","MALE","age_years",25,"city","Puducherry","blood_group","O+"],b7,a3),A.A(["uhid","UHID-2026-00005","full_name","Sheela","phone","9999999999","gender","FEMALE","age_years",25,"city","Puducherry","blood_group","A-"],b7,a3),A.A(["uhid","UHID-2026-00006","full_name","Samanta","phone","1234567890","gender","FEMALE","age_years",79,"city","Puducherry","blood_group","B+"],b7,a3),A.A(["uhid","UHID-2026-00007","full_name","Teja","phone","9848022338","gender","MALE","age_years",25,"city","Puducherry","blood_group","AB+"],b7,a3)],t.Mq),new A.b7i(b6,b8),new A.b7j())
+a7=B.c.j4(A.a([A.A(["uhid","UHID-2026-00001","full_name","Lakshmi Srujana Majeti","phone","8374477999","gender","FEMALE","age_years",22,"city","Puducherry","blood_group","O+","parent_spouse_name","Majeti Satyanarayana","parent_spouse_relation","D/o","email","srujana@smvmch.ac.in"],c3,a3),A.A(["uhid","UHID-2026-00002","full_name","Uday Kumar","phone","9347989890","gender","MALE","age_years",23,"city","Puducherry","blood_group","A+","parent_spouse_name","S. Kumar","parent_spouse_relation","S/o","email","uday.kumar@gmail.com"],c3,a3),A.A(["uhid","UHID-2026-00003","full_name","Ravi Shankar","phone","9876543211","gender","MALE","age_years",25,"city","Puducherry","blood_group","O+","parent_spouse_name","Prasad","parent_spouse_relation","S/o","email","ravi@gmail.com"],c3,a3),A.A(["uhid","UHID-2026-00004","full_name","Pavan Surya","phone","9876543222","gender","MALE","age_years",25,"city","Puducherry","blood_group","O+","parent_spouse_name","Venkatesh","parent_spouse_relation","S/o","email","pavan@gmail.com"],c3,a3),A.A(["uhid","UHID-2026-00005","full_name","Sheela","phone","9999999999","gender","FEMALE","age_years",25,"city","Puducherry","blood_group","A-","parent_spouse_name","David","parent_spouse_relation","D/o","email","sheela@gmail.com"],c3,a3),A.A(["uhid","UHID-2026-00006","full_name","Samanta","phone","1234567890","gender","FEMALE","age_years",79,"city","Puducherry","blood_group","B+","parent_spouse_name","Subramaniam","parent_spouse_relation","W/o","email","samanta@gmail.com"],c3,a3),A.A(["uhid","UHID-2026-00007","full_name","Teja","phone","9848022338","gender","MALE","age_years",25,"city","Puducherry","blood_group","AB+","parent_spouse_name","Narayana","parent_spouse_relation","S/o","email","teja@gmail.com"],c3,a3),A.A(["uhid","UHID-2026-00008","full_name","Swaroop","phone","9988776655","gender","MALE","age_years",23,"city","Puducherry","blood_group","B-","parent_spouse_name","Akhil","parent_spouse_relation","S/o","email","swaroop@gmail.com"],c3,a3),A.A(["uhid","UHID-2026-00009","full_name","Syam Peddiraju","phone","7337262831","gender","MALE","age_years",20,"city","Puducherry","blood_group","O+","parent_spouse_name","Peddiraju","parent_spouse_relation","S/o","email","syam@gmail.com"],c3,a3)],t.Mq),new A.b7i(c2,c4),new A.b7j())
 a6=J.a5(a7)
-if(a6.gbn(a7))b6.a=A.A(["access_token","patient-token-"+A.j(a6.h(a7,"uhid")),"token_type","bearer","expires_in",86400,"patient",A.A(["id","pat-"+A.j(a6.h(a7,"uhid")),"uhid",a6.h(a7,"uhid"),"hospital_reg_num","REG-2026-0000"+B.c.gae(J.bj(a6.h(a7,"uhid")).split("-")),"full_name",a6.h(a7,"full_name"),"gender",a6.h(a7,"gender"),"age_years",a6.h(a7,"age_years"),"phone",a6.h(a7,"phone"),"city",a6.h(a7,"city"),"blood_group",a6.h(a7,"blood_group"),"email","patient@smvmch.ac.in","address","SMVMCH OPD Ward"],b7,t.X),"active_visit",A.A(["status","CONSULTATION_READY","doctor_name","Attending Physician","department_name","General Medicine","room_number","Room 101","patients_ahead",0,"visit_date",new A.bg(Date.now(),0,!1).ec()],b7,a3)],b7,t.z)}b7=b6.a
-s=b7!=null?23:25
+if(a6.gbn(a7)){a8=A.j(a6.h(a7,"uhid"))
+a9=A.j(a6.h(a7,"uhid"))
+b0=a6.h(a7,"uhid")
+b1=B.c.gae(J.bj(a6.h(a7,"uhid")).split("-"))
+b2=a6.h(a7,"full_name")
+b3=a6.h(a7,"gender")
+b4=a6.h(a7,"age_years")
+b5=a6.h(a7,"phone")
+b6=a6.h(a7,"city")
+b7=a6.h(a7,"blood_group")
+b8=a6.h(a7,"parent_spouse_name")
+b9=a6.h(a7,"parent_spouse_relation")
+a6=a6.h(a7,"email")
+if(a6==null)a6="patient@smvmch.ac.in"
+c2.a=A.A(["access_token","patient-token-"+a8,"token_type","bearer","expires_in",86400,"patient",A.A(["id","pat-"+a9,"uhid",b0,"hospital_reg_num","REG-2026-0000"+b1,"full_name",b2,"gender",b3,"age_years",b4,"phone",b5,"city",b6,"blood_group",b7,"parent_spouse_name",b8,"parent_spouse_relation",b9,"email",a6,"address","SMVMCH OPD Ward"],c3,t.X),"active_visit",A.A(["status","CONSULTATION_READY","doctor_name","Attending Physician","department_name","General Medicine","room_number","Room 101","patients_ahead",0,"visit_date",new A.bg(Date.now(),0,!1).ec()],c3,a3)],c3,t.z)}}c3=c2.a
+s=c3!=null?23:25
 break
-case 23:a8=A.t(J.w(b7,"access_token"))
-a9=t.h.a(J.w(b6.a,"patient"))
-s=a8!=null&&a8.length!==0?26:27
+case 23:c0=A.t(J.w(c3,"access_token"))
+c1=t.h.a(J.w(c2.a,"patient"))
+s=c0!=null&&c0.length!==0?26:27
 break
 case 26:s=28
-return A.f(A.jM(a8,"patient-quick-refresh","patient"),$async$mz)
-case 28:s=a9!=null?29:30
+return A.f(A.jM(c0,"patient-quick-refresh","patient"),$async$mz)
+case 28:s=c1!=null?29:30
 break
-case 29:b7=J.a5(a9)
-a3=b7.h(a9,"id")
+case 29:c3=J.a5(c1)
+a3=c3.h(c1,"id")
 if(a3==null)a3="pat-quick"
-a6=b7.h(a9,"id")
+a6=c3.h(c1,"id")
 if(a6==null)a6="pat-quick"
-b0=b7.h(a9,"uhid")
-if(b0==null)b0="UHID-NEW"
-b1=b7.h(a9,"full_name")
-if(b1==null)b1="Patient"
-b2=b7.h(a9,"phone")
-if(b2==null)b2=""
-b3=b7.h(a9,"email")
-if(b3==null)b3="patient@smvmch.ac.in"
-b4=b7.h(a9,"gender")
-if(b4==null)b4="OTHER"
-b5=b7.h(a9,"age_years")
+a8=c3.h(c1,"uhid")
+if(a8==null)a8="UHID-NEW"
+a9=c3.h(c1,"full_name")
+if(a9==null)a9="Patient"
+b0=c3.h(c1,"phone")
+if(b0==null)b0=""
+b1=c3.h(c1,"email")
+if(b1==null)b1="patient@smvmch.ac.in"
+b2=c3.h(c1,"gender")
+if(b2==null)b2="OTHER"
+b3=c3.h(c1,"age_years")
 s=31
-return A.f(A.lF(A.A(["id",a3,"patient_id",a6,"uhid",b0,"full_name",b1,"phone",b2,"email",b3,"gender",b4,"age_years",b5==null?0:b5,"role_name","patient"],t.N,t.z)),$async$mz)
-case 31:a3=A.t(b7.h(a9,"id"))
+return A.f(A.lF(A.A(["id",a3,"patient_id",a6,"uhid",a8,"full_name",a9,"phone",b0,"email",b1,"gender",b2,"age_years",b3==null?0:b3,"role_name","patient"],t.N,t.z)),$async$mz)
+case 31:a3=A.t(c3.h(c1,"id"))
 if(a3==null)a3="pat-quick"
-a6=A.t(b7.h(a9,"email"))
+a6=A.t(c3.h(c1,"email"))
 if(a6==null)a6="patient@smvmch.ac.in"
-b0=A.t(b7.h(a9,"full_name"))
-if(b0==null)b0="Patient"
-b7=A.t(b7.h(a9,"phone"))
-if(b7==null)b7=""
-n.ga5().aw(0,$.ef().gcr(),t.MP).Y2(new A.kQ(a3,a6,b0,b7,"patient",null,null))
-case 30:case 27:n.v(new A.b7k(b6,n))
+a8=A.t(c3.h(c1,"full_name"))
+if(a8==null)a8="Patient"
+c3=A.t(c3.h(c1,"phone"))
+if(c3==null)c3=""
+n.ga5().aw(0,$.ef().gcr(),t.MP).Y2(new A.kQ(a3,a6,a8,c3,"patient",null,null))
+case 30:case 27:n.v(new A.b7k(c2,n))
 s=24
 break
-case 25:n.v(new A.b7l(n,b8))
+case 25:n.v(new A.b7l(n,c4))
 case 24:case 1:return A.n(q,r)
 case 2:return A.m(o.at(-1),r)}})
 return A.o($async$mz,r)},
@@ -122466,7 +122480,7 @@ f=Date.now()
 a=A.t(c7.h(0,"patient_id"))
 if(a==null)a="pat-fallback"
 a0=A.t(c7.h(0,"patient_name"))
-if(a0==null)a0="Samanta"
+if(a0==null)a0="Lakshmi Srujana Majeti"
 a6=A.t(c7.h(0,"patient_uhid"))
 if(a6==null)a6="UHID-2026-00001"
 a7=A.t(c7.h(0,"visit_id"))
@@ -123062,7 +123076,7 @@ g=j==null
 f=g?null:j.c
 if(g)e=null
 else{e=j.as
-e=e==null?null:e.e}if(e==null)e="Samanta"
+e=e==null?null:e.e}if(e==null)e="Lakshmi Srujana Majeti"
 if(g)d=null
 else{d=j.as
 d=d==null?null:d.b}if(d==null)d="UHID-2026-00001"
@@ -123093,7 +123107,7 @@ break
 case 6:if(k==null){if(g)a4=null
 else{f=j.as
 f=f==null?null:f.e
-a4=f}if(a4==null)a4="Samanta"
+a4=f}if(a4==null)a4="Lakshmi Srujana Majeti"
 if(g)a5=null
 else{f=j.as
 f=f==null?null:f.b

@@ -5,7 +5,16 @@ Seed initial synthetic data for OPD Connect+ development:
 - Default Staff (Dr. Sarah Chen, Receptionist Alice)
 - Initial Demo Patients and Visits
 """
+import os
+import sys
+from pathlib import Path
 from datetime import datetime, date
+
+# Ensure backend root is in sys.path
+backend_dir = Path(__file__).resolve().parent.parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, engine, Base
 from app.core.security import get_password_hash
@@ -468,8 +477,363 @@ def seed_database():
                 consultation_fee="500.00",
                 is_available=True,
             )
+        # 6. Canonical Verified Patients & Patient Portals
+        canonical_patients = [
+            {
+                "id": "9791dc19-e67c-4921-8f9b-d1c6c8d12408",
+                "uhid": "UHID-2026-00001",
+                "hospital_reg_num": "REG-2026-00001",
+                "full_name": "Lakshmi Srujana Majeti",
+                "parent_spouse_name": "Majeti Satyanarayana",
+                "parent_spouse_relation": "D/o",
+                "gender": "FEMALE",
+                "age_years": 22,
+                "phone": "8374477999",
+                "email": "srujana@smvmch.ac.in",
+                "address": "Flat 402, Sri Krishna Heights, Kalitheerthalkuppam",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "605107",
+                "blood_group": "O+",
+            },
+            {
+                "id": "746b2fb8-cc53-4e2f-aa85-0388067b1022",
+                "uhid": "UHID-2026-00002",
+                "hospital_reg_num": "REG-2026-00002",
+                "full_name": "Uday Kumar",
+                "parent_spouse_name": "S. Kumar",
+                "parent_spouse_relation": "S/o",
+                "gender": "MALE",
+                "age_years": 23,
+                "phone": "9347989890",
+                "email": "uday.kumar@gmail.com",
+                "address": "12 Anna Nagar",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "605001",
+                "blood_group": "A+",
+            },
+            {
+                "id": "f5c22d18-d291-4992-adbc-01351ac5c40f",
+                "uhid": "UHID-2026-00003",
+                "hospital_reg_num": "REG-2026-00003",
+                "full_name": "Ravi Shankar",
+                "parent_spouse_name": "Prasad",
+                "parent_spouse_relation": "S/o",
+                "gender": "MALE",
+                "age_years": 25,
+                "phone": "9876543211",
+                "email": "ravi@gmail.com",
+                "address": "Main Bazaar",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "605001",
+                "blood_group": "O+",
+            },
+            {
+                "id": "b45c7957-b64f-4fd8-b9ef-705bf68da328",
+                "uhid": "UHID-2026-00004",
+                "hospital_reg_num": "REG-2026-00004",
+                "full_name": "Pavan Surya",
+                "parent_spouse_name": "Venkatesh",
+                "parent_spouse_relation": "S/o",
+                "gender": "MALE",
+                "age_years": 25,
+                "phone": "9876543222",
+                "email": "pavan@gmail.com",
+                "address": "Beach Road",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "605001",
+                "blood_group": "O+",
+            },
+            {
+                "id": "pat-sheela-00005",
+                "uhid": "UHID-2026-00005",
+                "hospital_reg_num": "REG-2026-00005",
+                "full_name": "Sheela",
+                "parent_spouse_name": "David",
+                "parent_spouse_relation": "D/o",
+                "gender": "FEMALE",
+                "age_years": 25,
+                "phone": "9999999999",
+                "email": "sheela@gmail.com",
+                "address": "Moon Land",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "605001",
+                "blood_group": "A-",
+            },
+            {
+                "id": "pat-samanta-00006",
+                "uhid": "UHID-2026-00006",
+                "hospital_reg_num": "REG-2026-00006",
+                "full_name": "Samanta",
+                "parent_spouse_name": "Subramaniam",
+                "parent_spouse_relation": "W/o",
+                "gender": "FEMALE",
+                "age_years": 79,
+                "phone": "1234567890",
+                "email": "samanta@gmail.com",
+                "address": "Heritage Town",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "605001",
+                "blood_group": "B+",
+            },
+            {
+                "id": "pat-teja-00007",
+                "uhid": "UHID-2026-00007",
+                "hospital_reg_num": "REG-2026-00007",
+                "full_name": "Teja",
+                "parent_spouse_name": "Narayana",
+                "parent_spouse_relation": "S/o",
+                "gender": "MALE",
+                "age_years": 25,
+                "phone": "9848022338",
+                "email": "teja@gmail.com",
+                "address": "Villupuram Road",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "605107",
+                "blood_group": "AB+",
+            },
+            {
+                "id": "57cdc8e1-bbe5-4386-a47f-436bd078d80d",
+                "uhid": "UHID-2026-00008",
+                "hospital_reg_num": "REG-2026-00008",
+                "full_name": "Swaroop",
+                "parent_spouse_name": "Akhil",
+                "parent_spouse_relation": "S/o",
+                "gender": "MALE",
+                "age_years": 23,
+                "phone": "9988776655",
+                "email": "swaroop@gmail.com",
+                "address": "Vicity",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "552630",
+                "blood_group": "B-",
+            },
+            {
+                "id": "pat-1792739937154",
+                "uhid": "UHID-2026-00009",
+                "hospital_reg_num": "REG-2026-00009",
+                "full_name": "Syam Peddiraju",
+                "parent_spouse_name": "Peddiraju",
+                "parent_spouse_relation": "S/o",
+                "gender": "MALE",
+                "age_years": 20,
+                "phone": "7337262831",
+                "email": "syam@gmail.com",
+                "address": "Puducherry",
+                "city": "Puducherry",
+                "state": "Puducherry",
+                "postal_code": "605001",
+                "blood_group": "O+",
+            },
+        ]
+
+        patient_role = roles.get("patient")
+        for cp in canonical_patients:
+            pat = db.query(Patient).filter(Patient.id == cp["id"]).first()
+            if not pat:
+                pat = db.query(Patient).filter(Patient.uhid == cp["uhid"]).first()
+            if not pat:
+                pat = Patient(
+                    id=cp["id"],
+                    uhid=cp["uhid"],
+                    hospital_reg_num=cp["hospital_reg_num"],
+                    full_name=cp["full_name"],
+                    parent_spouse_name=cp["parent_spouse_name"],
+                    parent_spouse_relation=cp["parent_spouse_relation"],
+                    gender=cp["gender"],
+                    age_years=cp["age_years"],
+                    phone=cp["phone"],
+                    email=cp["email"],
+                    address=cp["address"],
+                    city=cp["city"],
+                    state=cp["state"],
+                    postal_code=cp["postal_code"],
+                    blood_group=cp["blood_group"],
+                    barcode_value=f"BAR-{cp['uhid']}",
+                    qr_code_data=f"OPDCONNECT+{cp['uhid']}+{cp['hospital_reg_num']}",
+                )
+                db.add(pat)
+                db.flush()
+            else:
+                pat.uhid = cp["uhid"]
+                pat.hospital_reg_num = cp["hospital_reg_num"]
+                pat.full_name = cp["full_name"]
+                pat.parent_spouse_name = cp["parent_spouse_name"]
+                pat.parent_spouse_relation = cp["parent_spouse_relation"]
+                pat.gender = cp["gender"]
+                pat.age_years = cp["age_years"]
+                pat.phone = cp["phone"]
+                pat.email = cp["email"]
+                pat.address = cp["address"]
+                pat.city = cp["city"]
+                pat.state = cp["state"]
+                pat.postal_code = cp["postal_code"]
+                pat.blood_group = cp["blood_group"]
+                db.flush()
+
+            # Ensure linked patient user account
+            pat_user = db.query(User).filter((User.patient_id == pat.id) | (User.phone == cp["phone"])).first()
+            if pat_user:
+                pat_user.full_name = cp["full_name"]
+                pat_user.phone = cp["phone"]
+                pat_user.patient_id = pat.id
+                pat_user.is_active = True
+                pat_user.is_verified = True
+                db.flush()
+            elif patient_role:
+                pat_email = f"patient_{cp['uhid'].lower().replace('-', '_')}@opdconnect.local"
+                pat_user = User(
+                    email=pat_email,
+                    phone=cp["phone"],
+                    full_name=cp["full_name"],
+                    hashed_password=get_password_hash("Patient@123"),
+                    role_id=patient_role.id,
+                    patient_id=pat.id,
+                    is_active=True,
+                    is_verified=True,
+                )
+                db.add(pat_user)
+                db.flush()
+
+        # 7. Initial Clinical Consultation & Prescription for Lakshmi Srujana Majeti
+        srujana_pat = db.query(Patient).filter(Patient.uhid == "UHID-2026-00001").first()
+        gen_med_dept = db.query(Department).filter(Department.code == "MED").first()
+        gen_med_doc = db.query(Doctor).first()
+        nurse_u = db.query(User).filter(User.email == "nurse@smvmch.ac.in").first()
+
+        if srujana_pat and gen_med_doc and gen_med_dept:
+            vis_srujana = db.query(OPDVisit).filter(OPDVisit.patient_id == srujana_pat.id).first()
+            if not vis_srujana:
+                vis_srujana = OPDVisit(
+                    id="1e7ab4f3-e305-450d-888b-01a77b6023f5",
+                    visit_number="SMVMCH2210260002",
+                    patient_id=srujana_pat.id,
+                    doctor_id=gen_med_doc.id,
+                    department_id=gen_med_dept.id,
+                    visit_date=datetime.now(),
+                    queue_token=2,
+                    triage_priority="NORMAL",
+                    status="COMPLETED",
+                    consultation_fee=500.0,
+                    payment_status="PAID",
+                    notes="Consultation completed. Patient advised rest and symptomatic treatment.",
+                )
+                db.add(vis_srujana)
+                db.flush()
+            else:
+                vis_srujana.status = "COMPLETED"
+                vis_srujana.payment_status = "PAID"
+                db.flush()
+
+            # Vitals
+            vit_srujana = db.query(VitalSigns).filter(VitalSigns.visit_id == vis_srujana.id).first()
+            if not vit_srujana:
+                vit_srujana = VitalSigns(
+                    id="vit-srujana-00001",
+                    visit_id=vis_srujana.id,
+                    recorded_by_user_id=nurse_u.id if nurse_u else None,
+                    systolic_bp=118,
+                    diastolic_bp=76,
+                    pulse_rate=74,
+                    temperature_f=98.4,
+                    spo2_percent=99.0,
+                    respiratory_rate=16,
+                    weight_kg=54.0,
+                    height_cm=162.0,
+                    bmi=20.6,
+                    blood_glucose_mg_dl=95.0,
+                    recorded_at=datetime.now(),
+                    notes="Normal vitals, afebrile at triage",
+                )
+                db.add(vit_srujana)
+                db.flush()
+
+            # Clinical record
+            cr_srujana = db.query(ClinicalRecord).filter(ClinicalRecord.visit_id == vis_srujana.id).first()
+            if not cr_srujana:
+                cr_srujana = ClinicalRecord(
+                    id="cr-srujana-00001",
+                    visit_id=vis_srujana.id,
+                    patient_id=srujana_pat.id,
+                    doctor_id=gen_med_doc.id,
+                    presenting_complaint="Mild fever and seasonal allergic rhinitis for 2 days",
+                    history_of_present_illness="Patient reports low grade intermittent fever, mild headache and sneezing since 2 days. No breathing difficulty, cough, or nausea.",
+                    allergies="No known drug allergies (NKDA)",
+                    past_medical_history="None significant",
+                    smoking_history="Non-smoker",
+                    alcohol_history="None",
+                    general_examination="Conscious, oriented, afebrile, well-hydrated. Throat: Mild pharyngeal congestion. Chest: Clear.",
+                    respiratory_examination="Normal vesicular breath sounds, bilateral air entry equal, no added sounds.",
+                    cardiovascular_examination="S1, S2 heard. Regular rate and rhythm, no murmurs.",
+                    gastrointestinal_examination="Soft, non-tender, no organomegaly, normal bowel sounds.",
+                    cns_examination="Grossly intact, cranial nerves normal, no neurological deficit.",
+                    provisional_diagnosis="Acute Upper Respiratory Tract Infection (URTI) with Seasonal Rhinitis",
+                    final_diagnosis="Acute Viral Rhinitis",
+                    icd10_code="J00",
+                    care_plan="Adequate hydration, warm saline gargle, rest, symptomatic antipyretic medication.",
+                    dietary_advice="Light, nutritious, warm home-cooked meals. Plenty of fluids.",
+                    status="FINALIZED",
+                    version=1,
+                    created_by_user_id=gen_med_doc.user_id,
+                    updated_by_user_id=gen_med_doc.user_id,
+                    signed_by_user_id=gen_med_doc.user_id,
+                    signed_at=datetime.now(),
+                )
+                db.add(cr_srujana)
+                db.flush()
+
+            # Prescription
+            pr_srujana = db.query(Prescription).filter(Prescription.visit_id == vis_srujana.id).first()
+            if not pr_srujana:
+                pr_srujana = Prescription(
+                    id="pr-srujana-00001",
+                    visit_id=vis_srujana.id,
+                    patient_id=srujana_pat.id,
+                    doctor_id=gen_med_doc.id,
+                    status="SIGNED",
+                    version=1,
+                    notes="Standard OPD symptomatic care regimen",
+                    signed_by_user_id=gen_med_doc.user_id,
+                    signed_at=datetime.now(),
+                    is_ocr_extracted=False,
+                    is_verified_by_clinician=True,
+                    allergy_warning_acknowledged=True,
+                )
+                db.add(pr_srujana)
+                db.flush()
+
+                meds_list = [
+                    ("item-pr-srujana-1", pr_srujana.id, "Paracetamol", "Tablet", "650 mg", "Oral", "TDS (Thrice Daily)", 3, 9, "After Meals", "Take SOS if body temperature > 99°F"),
+                    ("item-pr-srujana-2", pr_srujana.id, "Cetirizine", "Tablet", "10 mg", "Oral", "OD (Once Daily at Night)", 5, 5, "Bedtime", "For allergic rhinitis and nasal relief"),
+                    ("item-pr-srujana-3", pr_srujana.id, "Pantoprazole", "Tablet", "40 mg", "Oral", "OD (Once Daily Morning)", 3, 3, "Before Breakfast", "Take on empty stomach for gastric protection"),
+                ]
+                for mid, pid, mname, mform, dos, route, freq, dur, qty, timing, inst in meds_list:
+                    item = PrescriptionItem(
+                        id=mid,
+                        prescription_id=pid,
+                        medicine_name=mname,
+                        form=mform,
+                        dosage=dos,
+                        route=route,
+                        frequency=freq,
+                        duration_days=dur,
+                        quantity=qty,
+                        timing=timing,
+                        instructions=inst,
+                        is_dispensed=True,
+                    )
+                    db.add(item)
+                db.flush()
+
         db.commit()
-        print("Database initialized with SMVMCH master configuration, staff accounts, departments, and formulary catalogue.")
+        print("Database initialized with SMVMCH master configuration, staff accounts, departments, formulary catalogue, canonical patients, and consultation records.")
 
     except Exception as e:
         db.rollback()

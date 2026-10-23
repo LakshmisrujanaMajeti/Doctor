@@ -156,7 +156,7 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
     final payload = {
       'visit_id': effectiveVisitId,
       'patient_id': effectiveVisit?.patientId,
-      'patient_name': effectiveVisit?.patient?.fullName ?? 'Samanta',
+      'patient_name': effectiveVisit?.patient?.fullName ?? 'Lakshmi Srujana Majeti',
       'patient_uhid': effectiveVisit?.patient?.uhid ?? 'UHID-2026-00001',
       'visit_number': effectiveVisit?.visitNumber ?? 'SMVMCH2210260001',
       'department_name': effectiveVisit?.departmentName ?? 'General OPD',
@@ -176,7 +176,7 @@ class _CreateBillDialogState extends ConsumerState<CreateBillDialog> {
 
     // Fallback if needed
     if (result == null) {
-      final patName = effectiveVisit?.patient?.fullName ?? 'Samanta';
+      final patName = effectiveVisit?.patient?.fullName ?? 'Lakshmi Srujana Majeti';
       final patUhid = effectiveVisit?.patient?.uhid ?? 'UHID-2026-00001';
       final invNum = 'INV-2026-${(1000 + Random().nextInt(9000))}';
 

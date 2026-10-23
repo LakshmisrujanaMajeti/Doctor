@@ -227,10 +227,14 @@ class BillingService:
             if not p:
                 p = Patient(
                     uhid="UHID-2026-00001",
-                    hospital_reg_num="REG-2026-0001",
-                    full_name="Samanta",
-                    phone="1234567890",
+                    hospital_reg_num="REG-2026-00001",
+                    full_name="Lakshmi Srujana Majeti",
+                    phone="8374477999",
                     gender="FEMALE",
+                    age_years=22,
+                    parent_spouse_name="Majeti Satyanarayana",
+                    parent_spouse_relation="D/o",
+                    blood_group="O+",
                 )
                 db.add(p)
                 db.flush()
