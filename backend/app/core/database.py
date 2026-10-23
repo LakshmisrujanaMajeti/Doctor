@@ -7,27 +7,29 @@ from app.core.logging import logger
 connect_args = {}
 engine_kwargs = {}
 
-if settings.DATABASE_URL.startswith("sqlite"):
+db_url = settings.effective_database_url
+
+if db_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 else:
     engine_kwargs.update({
         "pool_size": 10,
         "max_overflow": 20,
         "pool_pre_ping": True,
-        "pool_recycle": 3600,
+        "pool_recycle": 300,  # 5-minute recycle for Neon DB serverless idle suspend
     })
 
 try:
     engine = create_engine(
-        settings.DATABASE_URL,
+        db_url,
         connect_args=connect_args,
         **engine_kwargs
     )
 except Exception as e:
-    logger.error(f"Failed to create database engine for URL: {settings.DATABASE_URL}. Error: {e}")
-    # Fallback to local SQLite if remote PostgreSQL is unreachable during local initial setup
-    logger.warning("Falling back to local SQLite engine (./opd_connect_fallback.db)")
-    fallback_url = "sqlite:///./opd_connect_fallback.db"
+    logger.error(f"Failed to create database engine for URL: {db_url}. Error: {e}")
+    # Fallback to local SQLite if remote PostgreSQL is unreachable during network disruptions
+    logger.warning("Falling back to local SQLite engine (./opd_connect.db)")
+    fallback_url = "sqlite:///./opd_connect.db"
     engine = create_engine(fallback_url, connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

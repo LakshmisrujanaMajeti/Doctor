@@ -1,5 +1,5 @@
 import os
-from typing import List, Union
+from typing import List, Union, Optional
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -30,6 +30,36 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "sqlite:///./opd_connect.db"
+    NEON_DATABASE_URL: Optional[str] = None
+    POSTGRES_URL: Optional[str] = None
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_database_url(cls, v: Optional[str]) -> str:
+        neon = os.getenv("NEON_DATABASE_URL") or os.getenv("POSTGRES_URL")
+        url = neon or v or "sqlite:///./opd_connect.db"
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        if ("neon.tech" in url or "supabase.co" in url) and "sslmode=" not in url:
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}sslmode=require"
+        return url
+
+    @property
+    def effective_database_url(self) -> str:
+        url = (
+            self.NEON_DATABASE_URL
+            or os.getenv("NEON_DATABASE_URL")
+            or self.POSTGRES_URL
+            or os.getenv("POSTGRES_URL")
+            or self.DATABASE_URL
+        )
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        if ("neon.tech" in url or "supabase.co" in url) and "sslmode=" not in url:
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}sslmode=require"
+        return url
 
     # Supabase Settings
     SUPABASE_URL: str = "https://xxwidqatsxzsrulaxxal.supabase.co"

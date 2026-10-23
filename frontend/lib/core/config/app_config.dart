@@ -50,9 +50,8 @@ class AppConfig {
     return 'http://localhost:8000/api/v1';
   }
 
-  /// Robust mobile network timeouts: prevents premature connection aborts on physical mobile devices
-  /// over Wi-Fi and 4G networks while maintaining responsive error handling.
-  static const Duration connectTimeout = Duration(milliseconds: 15000);
-  static const Duration receiveTimeout = Duration(milliseconds: 25000);
-  static const Duration sendTimeout = Duration(milliseconds: 15000);
+  /// Ultra-fast responsive network timeouts: eliminates mobile hanging while ensuring robust connection
+  static const Duration connectTimeout = Duration(milliseconds: 3500);
+  static const Duration receiveTimeout = Duration(milliseconds: 5000);
+  static const Duration sendTimeout = Duration(milliseconds: 3500);
 }

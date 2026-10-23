@@ -19,7 +19,7 @@ from app.models.visit import OPDVisit
 from app.models.doctor import Doctor
 from app.models.department import Department
 from app.models.audit import AuditLog
-from app.models.user import User, Role, Permission
+from app.models.user import User, Role, Permission, RefreshTokenSession
 from app.models.billing import Bill, BillItem, PaymentTransaction
 from app.models.pharmacy import MedicineInventory
 from app.models.laboratory import LabOrder
@@ -55,32 +55,79 @@ def get_admin_stats(
     db: Session = Depends(get_db),
 ):
     today_start = datetime.combine(date.today(), datetime.min.time())
+    
+    # Patient Footfall & Visits
     total_patients = db.query(func.count(Patient.id)).scalar() or 0
-    total_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.visit_date >= today_start).scalar() or 0
+    today_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.visit_date >= today_start).scalar() or 0
+    total_visits = db.query(func.count(OPDVisit.id)).scalar() or 0
+    effective_visits = today_visits if today_visits > 0 else total_visits
+
     active_doctors = db.query(func.count(Doctor.id)).filter(Doctor.is_available == True).scalar() or 0
     departments = db.query(func.count(Department.id)).filter(Department.is_active == True).scalar() or 0
-    waiting = db.query(func.count(OPDVisit.id)).filter(
+
+    # Queue breakdowns (both today and overall)
+    waiting_today = db.query(func.count(OPDVisit.id)).filter(
         OPDVisit.visit_date >= today_start,
         OPDVisit.status.in_(["WAITING", "REGISTERED"])
     ).scalar() or 0
-    triaged = db.query(func.count(OPDVisit.id)).filter(
+    waiting_all = db.query(func.count(OPDVisit.id)).filter(
+        OPDVisit.status.in_(["WAITING", "REGISTERED"])
+    ).scalar() or 0
+    waiting = waiting_today if today_visits > 0 else waiting_all
+
+    triaged_today = db.query(func.count(OPDVisit.id)).filter(
         OPDVisit.visit_date >= today_start,
         OPDVisit.status == "TRIAGED"
     ).scalar() or 0
-    completed = db.query(func.count(OPDVisit.id)).filter(
+    triaged_all = db.query(func.count(OPDVisit.id)).filter(
+        OPDVisit.status == "TRIAGED"
+    ).scalar() or 0
+    triaged = triaged_today if today_visits > 0 else triaged_all
+
+    completed_today = db.query(func.count(OPDVisit.id)).filter(
         OPDVisit.visit_date >= today_start,
         OPDVisit.status == "COMPLETED"
     ).scalar() or 0
+    completed_all = db.query(func.count(OPDVisit.id)).filter(
+        OPDVisit.status == "COMPLETED"
+    ).scalar() or 0
+    completed = completed_today if today_visits > 0 else completed_all
+
+    # Sign-up & Sign-in live tracking
+    total_staff = db.query(func.count(User.id)).scalar() or 0
+    total_signups = total_patients + total_staff
+    
+    signins_today = db.query(func.count(RefreshTokenSession.id)).filter(RefreshTokenSession.created_at >= today_start).scalar() or 0
+    active_sessions = db.query(func.count(RefreshTokenSession.id)).filter(
+        RefreshTokenSession.is_revoked == False,
+        RefreshTokenSession.expires_at > datetime.utcnow()
+    ).scalar() or 0
+    total_signins = db.query(func.count(RefreshTokenSession.id)).scalar() or 0
 
     return success_response(
         data={
             "total_patients": total_patients,
-            "total_visits": total_visits,
+            "total_visits": effective_visits,
             "active_doctors": active_doctors,
             "departments": departments,
             "waiting": waiting,
             "triaged": triaged,
             "completed": completed,
+            "queue_breakdown": {
+                "waiting": waiting,
+                "triaged": triaged,
+                "completed": completed,
+                "WAITING": waiting,
+                "TRIAGED": triaged,
+                "TRIAGE": triaged,
+                "COMPLETED": completed,
+            },
+            "total_signups": total_signups,
+            "patient_signups": total_patients,
+            "staff_signups": total_staff,
+            "total_signins_today": signins_today,
+            "total_signins": total_signins,
+            "active_sessions": active_sessions,
         },
         message="Live operational stats retrieved successfully"
     )
@@ -218,43 +265,15 @@ def get_operational_dashboard_summary(
         staff_by_role=staff_by_role,
         inactive_accounts_count=inactive_accounts,
         locked_accounts_count=locked_accounts,
+        total_signups=total_registered + total_staff,
+        total_signins_today=db.query(func.count(RefreshTokenSession.id)).filter(RefreshTokenSession.created_at >= today_start).scalar() or 0,
+        active_sessions=db.query(func.count(RefreshTokenSession.id)).filter(
+            RefreshTokenSession.is_revoked == False,
+            RefreshTokenSession.expires_at > datetime.utcnow()
+        ).scalar() or 0,
     )
 
     return success_response(data=metrics.model_dump(), message="Operational dashboard summaries retrieved")
-
-
-@router.get("/stats", summary="OPD Hospital Statistics & Metrics (Legacy/Summary)")
-def get_dashboard_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"])),
-):
-    total_patients = db.query(func.count(Patient.id)).scalar() or 0
-    total_visits = db.query(func.count(OPDVisit.id)).scalar() or 0
-    active_doctors = db.query(func.count(Doctor.id)).filter(Doctor.is_available == True).scalar() or 0
-    departments = db.query(func.count(Department.id)).filter(Department.is_active == True).scalar() or 0
-
-    registered_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.status == "REGISTERED").scalar() or 0
-    triaged_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.status == "TRIAGED").scalar() or 0
-    completed_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.status == "COMPLETED").scalar() or 0
-
-    return success_response(
-        data={
-            "total_patients": total_patients,
-            "total_visits": total_visits,
-            "active_doctors": active_doctors,
-            "departments": departments,
-            "queue_breakdown": {
-                "waiting": registered_visits,
-                "triaged": triaged_visits,
-                "completed": completed_visits,
-                "WAITING": registered_visits,
-                "TRIAGED": triaged_visits,
-                "TRIAGE": triaged_visits,
-                "COMPLETED": completed_visits,
-            }
-        },
-        message="Hospital OPD statistics retrieved"
-    )
 
 
 # ==========================================

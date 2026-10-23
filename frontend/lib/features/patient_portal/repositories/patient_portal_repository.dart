@@ -14,7 +14,7 @@ class PatientPortalRepository {
     try {
       final response = await _dioClient.dio
           .get(ApiEndpoints.patientPortalProfile)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(milliseconds: 2500));
       if (response.data is Map && response.data['data'] != null) {
         return PatientPortalProfile.fromJson(response.data['data'] as Map<String, dynamic>);
       }
@@ -139,7 +139,7 @@ class PatientPortalRepository {
     try {
       final response = await _dioClient.dio
           .get(ApiEndpoints.patientPortalDependents)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(milliseconds: 2500));
       final list = (response.data['data'] as List?) ?? [];
       return list.map((d) => DependentProfile.fromJson(d as Map<String, dynamic>)).toList();
     } catch (_) {
@@ -170,7 +170,7 @@ class PatientPortalRepository {
     try {
       final response = await _dioClient.dio
           .get(ApiEndpoints.patientPortalVisits, queryParameters: {'patient_id': targetId})
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(milliseconds: 2500));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) return list.cast<Map<String, dynamic>>();
     } catch (_) {}
@@ -196,7 +196,7 @@ class PatientPortalRepository {
     try {
       final response = await _dioClient.dio
           .get(ApiEndpoints.patientPortalAppointments, queryParameters: {'patient_id': targetId})
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(milliseconds: 2500));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) {
         return list.map((a) => UpcomingAppointment.fromJson(a as Map<String, dynamic>)).toList();
@@ -236,7 +236,7 @@ class PatientPortalRepository {
     try {
       final response = await _dioClient.dio
           .get(ApiEndpoints.patientPortalPrescriptions, queryParameters: {'patient_id': targetId})
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(milliseconds: 2500));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) {
         return list.map((p) => PatientPrescriptionSummaryItem.fromJson(p as Map<String, dynamic>)).toList();
@@ -253,7 +253,7 @@ class PatientPortalRepository {
     try {
       final response = await _dioClient.dio
           .get(ApiEndpoints.patientPortalLabReports, queryParameters: {'patient_id': targetId})
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(milliseconds: 2500));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) {
         return list.map((r) => PatientLabReportSummary.fromJson(r as Map<String, dynamic>)).toList();
@@ -270,7 +270,7 @@ class PatientPortalRepository {
     try {
       final response = await _dioClient.dio
           .get(ApiEndpoints.patientPortalDocuments, queryParameters: {'patient_id': targetId})
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(milliseconds: 2500));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) return list.cast<Map<String, dynamic>>();
     } catch (_) {}
@@ -285,7 +285,7 @@ class PatientPortalRepository {
     try {
       final response = await _dioClient.dio
           .get(ApiEndpoints.patientPortalBills, queryParameters: {'patient_id': targetId})
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(milliseconds: 2500));
       final list = (response.data['data'] as List?) ?? [];
       if (list.isNotEmpty) {
         return list.map((b) => PatientBillSummary.fromJson(b as Map<String, dynamic>)).toList();

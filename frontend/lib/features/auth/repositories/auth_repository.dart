@@ -286,7 +286,7 @@ class AuthRepository {
       final response = await _dioClient.dio.post(
         ApiEndpoints.login,
         data: {'identifier': cleanId, 'password': cleanPass},
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(milliseconds: 2500));
 
       if (response.data['status'] == 'success') {
         final data = response.data['data'];
@@ -312,7 +312,7 @@ class AuthRepository {
         final res = await Supabase.instance.client.auth.signInWithPassword(
           email: resolvedEmail,
           password: cleanPass,
-        ).timeout(const Duration(seconds: 10));
+        ).timeout(const Duration(milliseconds: 2500));
         final supaUser = res.user;
         if (supaUser != null) {
           final meta = supaUser.userMetadata ?? {};

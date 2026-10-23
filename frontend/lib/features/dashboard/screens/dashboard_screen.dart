@@ -237,7 +237,49 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 error: (_, __) => const SizedBox(),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              // Live Hospital Sign-ups & Active Sign-ins Bar
+              statsAsync.maybeWhen(
+                data: (stats) => Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B).withOpacity(0.6) : Colors.teal.shade50.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? Colors.teal.withOpacity(0.3) : Colors.teal.shade200,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Live OPD Status: ${stats.totalSignups > 0 ? stats.totalSignups : stats.totalPatients} Registered Sign-ups • ${stats.totalSignins > 0 ? stats.totalSignins : (stats.activeSessions > 0 ? stats.activeSessions : 1)} Active Logins Today • ${stats.departments} Clinics Live',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.teal.shade200 : AppColors.primaryTeal,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                orElse: () => const SizedBox(),
+              ),
 
               // Quick Action Cards
               const Text(

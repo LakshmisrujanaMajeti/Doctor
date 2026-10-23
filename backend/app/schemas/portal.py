@@ -197,6 +197,11 @@ class AdminDashboardMetrics(BaseSchema):
     inactive_accounts_count: int
     locked_accounts_count: int
 
+    # Live Access & Audit Metrics
+    total_signups: int = 0
+    total_signins_today: int = 0
+    active_sessions: int = 0
+
 
 class UserRoleUpdateRequest(BaseSchema):
     role_name: str

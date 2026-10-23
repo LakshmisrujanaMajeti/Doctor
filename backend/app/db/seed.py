@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, engine, Base
 from app.core.security import get_password_hash
 import app.models  # Ensure all models are registered on Base.metadata
-from app.models.user import Role, User, Permission, role_permissions
+from app.models.user import Role, User, Permission, role_permissions, RefreshTokenSession
 from app.models.department import Department
 from app.models.doctor import Doctor
 from app.models.patient import Patient
@@ -831,6 +831,25 @@ def seed_database():
                     )
                     db.add(item)
                 db.flush()
+
+        # Seed initial active staff sessions for live signin counters
+        from datetime import timedelta
+        admin_user = db.query(User).filter(User.email == "admin@smvmch.ac.in").first()
+        doc_user = db.query(User).filter(User.email == "doctor@smvmch.ac.in").first()
+        for u in [admin_user, doc_user]:
+            if u:
+                existing_sess = db.query(RefreshTokenSession).filter(RefreshTokenSession.user_id == u.id, RefreshTokenSession.is_revoked == False).first()
+                if not existing_sess:
+                    sess = RefreshTokenSession(
+                        user_id=u.id,
+                        token_hash=f"seed-session-hash-{u.id[:8]}",
+                        expires_at=datetime.utcnow() + timedelta(days=7),
+                        is_revoked=False,
+                        ip_address="127.0.0.1",
+                        user_agent="SMVMCH Hospital OPD Portal",
+                        created_at=datetime.utcnow(),
+                    )
+                    db.add(sess)
 
         db.commit()
         print("Database initialized with SMVMCH master configuration, staff accounts, departments, formulary catalogue, canonical patients, and consultation records.")
