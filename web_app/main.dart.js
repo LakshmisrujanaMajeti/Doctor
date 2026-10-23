@@ -128116,7 +128116,7 @@ return new A.f4(o,A.a([new A.ad(B.ki,l,o),new A.ad(B.ki,s,o),new A.ad(B.ki,r,o),
 $S:323}
 A.Ld.prototype={
 a0(){var s=t.s
-return new A.Rt(new A.al(B.C,$.ag()),A.a(["All","Biochemistry","Haematology","Microbiology"],s),A.a(["All Orders","To Collect","In-Lab Processing","To Verify","Completed","Rejected"],s),A.b8(t.N),null,null)}}
+return new A.Rt(new A.al(B.C,$.ag()),A.a(["All","Biochemistry","Haematology","Microbiology","Radiology"],s),A.a(["All Orders","To Collect","In-Lab Processing","To Verify","Completed","Rejected"],s),A.b8(t.N),null,null)}}
 A.Rt.prototype={
 aj(){var s,r=this
 r.aA()

@@ -28,7 +28,7 @@ class _LaboratoryWorkspaceViewState extends ConsumerState<LaboratoryWorkspaceVie
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
-  final List<String> _departments = ['All', 'Biochemistry', 'Haematology', 'Microbiology'];
+  final List<String> _departments = ['All', 'Biochemistry', 'Haematology', 'Microbiology', 'Radiology'];
   String _selectedDepartment = 'All';
 
   final List<String> _tabLabels = [
