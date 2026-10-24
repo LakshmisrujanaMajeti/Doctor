@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/secure_storage_service.dart';
@@ -340,12 +341,19 @@ class PatientPortalRepository {
     required String slotDate,
     required String slotTime,
     String? chiefComplaint,
+    String? idempotencyKey,
   }) async {
     final targetId = await _resolveTargetPatientId(patientId);
 
     try {
+      final headers = <String, dynamic>{
+        if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+          'X-Idempotency-Key': idempotencyKey,
+      };
+
       final response = await _dioClient.dio.post(
-        '/patient-portal/book-slot',
+        ApiEndpoints.patientPortalBookSlot,
+        options: Options(headers: headers),
         data: {
           if (targetId != null) 'patient_id': targetId,
           'department_id': departmentId,
@@ -354,7 +362,8 @@ class PatientPortalRepository {
           'slot_time': slotTime,
           if (chiefComplaint != null && chiefComplaint.isNotEmpty) 'chief_complaint': chiefComplaint,
         },
-      );
+      ).timeout(const Duration(seconds: 8));
+
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'] as Map<String, dynamic>;
         await _saveLocalVisitFallback(data, targetId, departmentId, slotDate, slotTime, chiefComplaint);
@@ -362,7 +371,37 @@ class PatientPortalRepository {
       }
     } catch (_) {}
 
-    // Resilient offline fallback: generates guaranteed appointment token and stores it locally
+    // Resilient offline fallback: check if active visit already exists locally first
+    try {
+      final raw = await SecureStorageService.getVisitsJson();
+      if (raw != null && raw.isNotEmpty) {
+        final List<dynamic> localList = jsonDecode(raw);
+        for (final item in localList) {
+          final pid = item['patient_id']?.toString();
+          final sDate = item['slot_date']?.toString();
+          final vDate = item['visit_date']?.toString();
+          final status = item['status']?.toString();
+          if ((pid == targetId || pid == 'pat-sheela') &&
+              (status == 'REGISTERED' || status == 'WAITING') &&
+              (sDate == slotDate || (vDate != null && vDate.startsWith(slotDate)))) {
+            return {
+              'visit_id': item['id'] ?? 'vis-${DateTime.now().millisecondsSinceEpoch}',
+              'visit_number': item['visit_number'] ?? 'SMVMCH-EXISTING',
+              'queue_token': item['queue_token'] ?? 1,
+              'department_name': item['department_name'] ?? departmentId,
+              'doctor_name': item['doctor_name'] ?? 'Attending Consultant',
+              'slot_date': slotDate,
+              'slot_time': slotTime,
+              'status': item['status'] ?? 'REGISTERED',
+              'token_display': '#${item['queue_token'] ?? 1}',
+              'is_duplicate': true,
+            };
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Generate local appointment token safely
     final userMap = await SecureStorageService.getUserData();
     final patientName = userMap?['full_name']?.toString() ?? 'Sheela';
     final tokenNum = (DateTime.now().millisecondsSinceEpoch % 80) + 1;
@@ -401,10 +440,26 @@ class PatientPortalRepository {
         } catch (_) {}
       }
 
+      // Check if already present locally to avoid duplicate visits
+      final effectivePid = patientId ?? data['patient_id']?.toString();
+      final duplicateIndex = list.indexWhere((v) {
+        final pid = v['patient_id']?.toString();
+        final sDate = v['slot_date']?.toString();
+        final vDate = v['visit_date']?.toString();
+        final status = v['status']?.toString();
+        return (pid != null && pid == effectivePid) &&
+            (status == 'REGISTERED' || status == 'WAITING') &&
+            ((sDate != null && sDate == slotDate) || (vDate != null && vDate.startsWith(slotDate)));
+      });
+
+      if (duplicateIndex >= 0) {
+        return; // Prevent duplicate insertion
+      }
+
       final newVisit = {
         'id': data['visit_id'] ?? 'vis-${DateTime.now().millisecondsSinceEpoch}',
         'visit_number': data['visit_number'] ?? 'SMVMCH-VISIT',
-        'patient_id': patientId ?? data['patient_id'] ?? 'pat-1',
+        'patient_id': effectivePid ?? 'pat-1',
         'doctor_name': data['doctor_name'] ?? 'Attending Consultant',
         'department_name': data['department_name'] ?? departmentId,
         'visit_date': '$slotDate $slotTime',

@@ -64,7 +64,21 @@ def receive_stock(
 ):
     inv = PharmacyService.receive_stock(db, payload, performed_by_user_id=current_user.id)
     return success_response(
-        data={"id": inv.id, "medicine_code": inv.medicine_code, "available_quantity": inv.available_quantity},
+        data={
+            "id": inv.id,
+            "medicine_code": inv.medicine_code,
+            "name": inv.name,
+            "generic_name": inv.generic_name,
+            "strength": inv.strength,
+            "dosage_form": inv.dosage_form,
+            "batch_number": inv.batch_number,
+            "expiry_date": str(inv.expiry_date),
+            "available_quantity": inv.available_quantity,
+            "unit_price": inv.unit_price,
+            "tax_classification": inv.tax_classification,
+            "supplier_name": inv.supplier_name,
+            "is_active": inv.is_active,
+        },
         message=f"Received {payload.quantity} units of {inv.name} (Batch: {inv.batch_number})",
         status_code=201,
     )

@@ -664,7 +664,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           ),
           NavigationDestination(
             icon: Icon(Icons.admin_panel_settings_rounded),
-            label: 'Admin Portal',
+            label: 'Admin',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_alt_rounded),
@@ -1043,7 +1043,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             icon: Icons.domain_rounded,
             color: const Color(0xFF8B5CF6),
             subtitle: 'Operational',
-            onTap: () => _showActiveClinicsDialog(context),
+            onTap: () => context.push('/admin/portal?tab=departments'),
           ),
           StatMetricCard(
             title: 'Doctor Roster',
@@ -1051,7 +1051,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             icon: Icons.badge_outlined,
             color: AppColors.statusCompleted,
             subtitle: 'Consulting',
-            onTap: () => _showDoctorRosterDialog(context),
+            onTap: () => context.push('/admin/portal?tab=doctors'),
           ),
         ]);
 
@@ -1335,35 +1335,35 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           'desc': 'Operations, metrics & system governance',
           'icon': Icons.admin_panel_settings_rounded,
           'color': AppColors.primaryBlue,
-          'onTap': () => context.push('/admin/portal'),
+          'onTap': () => context.push('/admin/portal?tab=0'),
         },
         {
           'title': 'Add & Manage Staff',
           'desc': 'Doctors, Lab, Reception & Pharmacy roster',
           'icon': Icons.person_add_rounded,
           'color': const Color(0xFF8B5CF6),
-          'onTap': () => context.push('/admin/portal?tab=1'),
+          'onTap': () => context.push('/admin/portal?tab=doctors'),
         },
         {
           'title': 'Operational & Billing Reports',
           'desc': 'De-identified CSV exports & statistics',
           'icon': Icons.analytics_rounded,
           'color': AppColors.accentTeal,
-          'onTap': () => context.push('/admin/portal'),
+          'onTap': () => context.push('/admin/portal?tab=reports'),
         },
         {
           'title': 'Compliance Audit Explorer',
           'desc': 'Security event logs & sensitive changes',
           'icon': Icons.security_rounded,
           'color': Colors.amber.shade800,
-          'onTap': () => context.push('/admin/portal'),
+          'onTap': () => context.push('/admin/portal?tab=audit'),
         },
         {
           'title': 'Catalogues & Formulary',
           'desc': 'Medication stock, tariffs & tests',
           'icon': Icons.inventory_rounded,
           'color': Colors.teal.shade700,
-          'onTap': () => context.push('/admin/portal'),
+          'onTap': () => context.push('/admin/portal?tab=catalogues'),
         },
         {
           'title': 'Hospital Billing Counter',

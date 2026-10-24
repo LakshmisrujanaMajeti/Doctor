@@ -480,7 +480,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: RouteNames.adminPortal,
         path: '/admin/portal',
         builder: (context, state) {
-          final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
+          final tabStr = state.uri.queryParameters['tab']?.toLowerCase() ?? '';
+          int tab = 0;
+          if (tabStr == 'staff' || tabStr == 'doctors' || tabStr == '1') {
+            tab = 1;
+          } else if (tabStr == 'patients' || tabStr == '2') {
+            tab = 2;
+          } else if (tabStr == 'departments' || tabStr == 'tariffs' || tabStr == 'clinics' || tabStr == '3') {
+            tab = 3;
+          } else if (tabStr == 'catalogues' || tabStr == 'medicines' || tabStr == 'formulary' || tabStr == '4') {
+            tab = 4;
+          } else if (tabStr == 'reports' || tabStr == 'billing_reports' || tabStr == '5') {
+            tab = 5;
+          } else if (tabStr == 'audit' || tabStr == 'compliance' || tabStr == '6') {
+            tab = 6;
+          } else if (tabStr == 'support' || tabStr == 'helpdesk' || tabStr == '7') {
+            tab = 7;
+          } else if (tabStr == 'config' || tabStr == 'backup' || tabStr == '8') {
+            tab = 8;
+          } else {
+            tab = int.tryParse(tabStr) ?? 0;
+          }
           return HospitalAdminWorkspaceView(initialTabIndex: tab);
         },
       ),

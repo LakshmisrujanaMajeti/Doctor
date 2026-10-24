@@ -34,8 +34,10 @@ class DioClient {
   static final Map<String, _CacheEntry> _cache = {};
   static DateTime? _hostUnreachableUntil;
 
-  static bool get isHostReachable =>
-      _hostUnreachableUntil == null || DateTime.now().isAfter(_hostUnreachableUntil!);
+  static bool get isHostReachable {
+    final unreach = _hostUnreachableUntil;
+    return unreach == null || DateTime.now().isAfter(unreach);
+  }
 
   static void markHostUnreachable() {
     _hostUnreachableUntil = DateTime.now().add(const Duration(seconds: 15));
@@ -239,9 +241,10 @@ class DioClient {
 
   Future<bool> attemptTokenRefresh() async {
     // If a refresh is already in flight, wait for its completion rather than initiating a concurrent request
-    if (_refreshCompleter != null && !_refreshCompleter!.isCompleted) {
+    final existingCompleter = _refreshCompleter;
+    if (existingCompleter != null && !existingCompleter.isCompleted) {
       debugPrint('⚡ [DIO REFRESH] Concurrent 401 detected; awaiting existing refresh operation...');
-      return await _refreshCompleter!.future;
+      return await existingCompleter.future;
     }
 
     final completer = Completer<bool>();

@@ -30,7 +30,7 @@ def test_setup(db_session: Session):
     doc_role = db_session.query(Role).filter(Role.name == "doctor").first()
 
     # Department & Doctor
-    dept = db_session.query(Department).filter(Department.code == "GEN").first()
+    dept = db_session.query(Department).filter((Department.code == "GEN") | (Department.name == "General Medicine")).first()
     if not dept:
         dept = Department(name="General Medicine", code="GEN", is_active=True)
         db_session.add(dept)

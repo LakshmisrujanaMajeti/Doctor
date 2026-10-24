@@ -1,7 +1,8 @@
 from datetime import datetime, date
 import re
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, Body
+from fastapi import APIRouter, Depends, Query, Body, Header
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
@@ -9,6 +10,7 @@ from app.core.database import get_db
 from app.core.responses import success_response
 from app.core.dependencies import get_current_user, require_roles, verify_patient_access
 from app.core.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from app.core.idempotency import idempotency_manager
 from app.models.patient import Patient
 from app.models.visit import OPDVisit
 from app.models.clinical import ClinicalRecord
@@ -898,12 +900,23 @@ def get_available_slots(
 @router.post("/book-slot", status_code=201, summary="Book OPD Appointment Slot by Calendar Selection")
 def book_appointment_slot(
     payload: BookSlotRequest,
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     from app.models.department import Department
     from app.models.doctor import Doctor
     from app.services.visit_service import VisitService
+
+    if x_idempotency_key:
+        can_proceed, cached_resp, status_code = idempotency_manager.acquire(
+            key=x_idempotency_key,
+            user_id=str(current_user.id),
+            endpoint="/api/v1/patient-portal/book-slot",
+            payload=payload.model_dump(),
+        )
+        if not can_proceed and cached_resp is not None:
+            return JSONResponse(content=cached_resp, status_code=status_code)
 
     user_role = (current_user.role.name if current_user.role else "").lower()
     patient = None
@@ -964,45 +977,89 @@ def book_appointment_slot(
     except Exception:
         slot_d = date.today()
 
-    visit_num = VisitService.generate_visit_number(db)
-    queue_tok = VisitService.get_next_queue_token(db, doctor.id, slot_d)
-
-    visit_datetime = datetime.combine(slot_d, datetime.utcnow().time())
-
-    visit = OPDVisit(
-        visit_number=visit_num,
-        patient_id=patient.id,
-        doctor_id=doctor.id,
-        department_id=dept.id,
-        visit_date=visit_datetime,
-        queue_token=queue_tok,
-        triage_priority="NORMAL",
-        status="REGISTERED",
-        consultation_fee=doctor.consultation_fee or 500.0,
-        payment_status="UNPAID",
-        notes=f"Slot: {payload.slot_time} • Complaint: {payload.chief_complaint or 'OPD Consultation'}",
+    # Data Integrity & Concurrency Guard: Check if patient already has an active booking on this date
+    existing_visit = (
+        db.query(OPDVisit)
+        .filter(
+            OPDVisit.patient_id == patient.id,
+            OPDVisit.status.in_(["REGISTERED", "WAITING", "IN_CONSULTATION"]),
+            func.date(OPDVisit.visit_date) == slot_d,
+        )
+        .order_by(OPDVisit.created_at.desc())
+        .first()
     )
-    db.add(visit)
-    db.commit()
-    db.refresh(visit)
 
-    AuditService.log_event(
-        db=db,
-        action="BOOK_APPOINTMENT_SLOT",
-        entity_type="OPDVisit",
-        actor_user_id=current_user.id,
-        entity_id=visit.id,
-        details={
-            "visit_number": visit.visit_number,
-            "slot_time": payload.slot_time,
+    if existing_visit:
+        doc_name = (
+            existing_visit.doctor.user.full_name
+            if (existing_visit.doctor and existing_visit.doctor.user)
+            else (doctor.user.full_name if doctor.user else "Consultant")
+        )
+        existing_data = {
+            "visit_id": existing_visit.id,
+            "visit_number": existing_visit.visit_number,
+            "queue_token": existing_visit.queue_token,
+            "department_name": existing_visit.department.name if existing_visit.department else dept.name,
+            "doctor_name": doc_name,
             "slot_date": payload.slot_date,
-            "queue_token": visit.queue_token,
-            "department": dept.name,
-        },
-    )
+            "slot_time": payload.slot_time,
+            "status": existing_visit.status,
+            "token_display": f"#{existing_visit.queue_token}",
+            "is_duplicate": True,
+        }
+        msg = f"Existing appointment active for {payload.slot_date} (Token #{existing_visit.queue_token}). Duplicate prevented."
+        if x_idempotency_key:
+            idempotency_manager.store_result(
+                key=x_idempotency_key,
+                user_id=str(current_user.id),
+                response_data={"status": "success", "data": existing_data, "message": msg, "error": None},
+                status_code=200,
+            )
+        return success_response(
+            data=existing_data,
+            message=msg,
+            status_code=200,
+        )
 
-    return success_response(
-        data={
+    try:
+        visit_num = VisitService.generate_visit_number(db)
+        queue_tok = VisitService.get_next_queue_token(db, doctor.id, slot_d)
+
+        visit_datetime = datetime.combine(slot_d, datetime.utcnow().time())
+
+        visit = OPDVisit(
+            visit_number=visit_num,
+            patient_id=patient.id,
+            doctor_id=doctor.id,
+            department_id=dept.id,
+            visit_date=visit_datetime,
+            queue_token=queue_tok,
+            triage_priority="NORMAL",
+            status="REGISTERED",
+            consultation_fee=doctor.consultation_fee or 500.0,
+            payment_status="UNPAID",
+            notes=f"Slot: {payload.slot_time} • Complaint: {payload.chief_complaint or 'OPD Consultation'}",
+        )
+        db.add(visit)
+        db.commit()
+        db.refresh(visit)
+
+        AuditService.log_event(
+            db=db,
+            action="BOOK_APPOINTMENT_SLOT",
+            entity_type="OPDVisit",
+            actor_user_id=current_user.id,
+            entity_id=visit.id,
+            details={
+                "visit_number": visit.visit_number,
+                "slot_time": payload.slot_time,
+                "slot_date": payload.slot_date,
+                "queue_token": visit.queue_token,
+                "department": dept.name,
+            },
+        )
+
+        resp_data = {
             "visit_id": visit.id,
             "visit_number": visit.visit_number,
             "queue_token": visit.queue_token,
@@ -1012,7 +1069,22 @@ def book_appointment_slot(
             "slot_time": payload.slot_time,
             "status": visit.status,
             "token_display": f"#{visit.queue_token}",
-        },
-        message="Appointment slot booked successfully and department token generated!",
-        status_code=201,
-    )
+        }
+        msg = "Appointment slot booked successfully and department token generated!"
+        if x_idempotency_key:
+            idempotency_manager.store_result(
+                key=x_idempotency_key,
+                user_id=str(current_user.id),
+                response_data={"status": "success", "data": resp_data, "message": msg, "error": None},
+                status_code=201,
+            )
+
+        return success_response(
+            data=resp_data,
+            message=msg,
+            status_code=201,
+        )
+    except Exception:
+        if x_idempotency_key:
+            idempotency_manager.mark_failed(key=x_idempotency_key, user_id=str(current_user.id))
+        raise

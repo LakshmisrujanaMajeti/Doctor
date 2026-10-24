@@ -99,6 +99,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     String selectedDept = 'General Medicine';
     String selectedSlot = '10:00 AM - 10:30 AM';
     final complaintCtrl = TextEditingController();
+    bool isBooking = false;
 
     final departments = [
       'General Medicine',
@@ -237,46 +238,74 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: isBooking ? null : () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, foregroundColor: Colors.white),
-                  onPressed: () async {
-                    try {
-                      final selectedPatientId = ref.read(selectedPortalPatientIdProvider);
-                      final profile = ref.read(patientProfileProvider).asData?.value;
-                      final effectivePatientId = selectedPatientId ?? profile?.patient.id;
-                      final repo = ref.read(patientPortalRepositoryProvider);
-                      final result = await repo.bookAppointmentSlot(
-                        patientId: effectivePatientId,
-                        departmentId: selectedDept,
-                        slotDate: isoDate,
-                        slotTime: selectedSlot,
-                        chiefComplaint: complaintCtrl.text.trim().isEmpty ? null : complaintCtrl.text.trim(),
-                      );
+                  onPressed: isBooking
+                      ? null
+                      : () async {
+                          setDialogState(() => isBooking = true);
+                          try {
+                            final selectedPatientId = ref.read(selectedPortalPatientIdProvider);
+                            final profile = ref.read(patientProfileProvider).asData?.value;
+                            final effectivePatientId = selectedPatientId ?? profile?.patient.id;
+                            final repo = ref.read(patientPortalRepositoryProvider);
+                            final idempotencyKey =
+                                'book_${effectivePatientId ?? 'portal'}_${isoDate}_${selectedSlot.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')}';
 
-                      ref.invalidate(patientAppointmentsProvider);
-                      ref.invalidate(patientProfileProvider);
+                            final result = await repo.bookAppointmentSlot(
+                              patientId: effectivePatientId,
+                              departmentId: selectedDept,
+                              slotDate: isoDate,
+                              slotTime: selectedSlot,
+                              chiefComplaint: complaintCtrl.text.trim().isEmpty ? null : complaintCtrl.text.trim(),
+                              idempotencyKey: idempotencyKey,
+                            );
 
-                      if (context.mounted) {
-                        Navigator.pop(ctx);
-                        final tokenDisp = result['token_display'] ?? '#${result['queue_token']}';
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Appointment booked for $dateStr at $selectedSlot! Token: $tokenDisp generated.'),
-                            backgroundColor: Colors.green,
-                            duration: const Duration(seconds: 4),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Booking failed: $e'), backgroundColor: Colors.red),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Confirm & Book Slot'),
+                            ref.invalidate(patientAppointmentsProvider);
+                            ref.invalidate(patientProfileProvider);
+
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                            }
+                            if (context.mounted) {
+                              final tokenDisp = result['token_display'] ?? '#${result['queue_token'] ?? 1}';
+                              final isDup = result['is_duplicate'] == true;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(isDup
+                                      ? 'Appointment already confirmed for $dateStr at $selectedSlot! Active Token: $tokenDisp.'
+                                      : 'Appointment booked for $dateStr at $selectedSlot! Token: $tokenDisp generated.'),
+                                  backgroundColor: isDup ? Colors.blue.shade700 : Colors.green.shade700,
+                                  duration: const Duration(seconds: 4),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Booking failed: $e'), backgroundColor: Colors.red),
+                              );
+                            }
+                          } finally {
+                            if (ctx.mounted) {
+                              setDialogState(() => isBooking = false);
+                            }
+                          }
+                        },
+                  child: isBooking
+                      ? const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                            SizedBox(width: 8),
+                            Text('Booking Slot...'),
+                          ],
+                        )
+                      : const Text('Confirm & Book Slot'),
                 ),
               ],
             );
@@ -424,17 +453,17 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     bool isDark,
   ) {
     final selectedId = ref.watch(selectedPortalPatientIdProvider);
-    final isViewingDependent = selectedId != null && selectedId != patient.id;
+    final isViewingDependent = selectedId != null && selectedId != patient.id && dependents.isNotEmpty;
     final activeDependent = isViewingDependent
         ? dependents.firstWhere((d) => d.id == selectedId, orElse: () => dependents.first)
         : null;
 
-    final displayName = isViewingDependent ? activeDependent!.fullName : patient.fullName;
-    final displayUhid = isViewingDependent ? activeDependent!.uhid : patient.uhid;
-    final displayAge = isViewingDependent
-        ? activeDependent!.ageDisplay
+    final displayName = (isViewingDependent && activeDependent != null) ? activeDependent.fullName : patient.fullName;
+    final displayUhid = (isViewingDependent && activeDependent != null) ? activeDependent.uhid : patient.uhid;
+    final displayAge = (isViewingDependent && activeDependent != null)
+        ? activeDependent.ageDisplay
         : (patient.ageYears != null ? '${patient.ageYears} Y' : 'N/A');
-    final displayGender = isViewingDependent ? activeDependent!.gender : patient.gender;
+    final displayGender = (isViewingDependent && activeDependent != null) ? activeDependent.gender : patient.gender;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -447,8 +476,47 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 560;
-              final infoRow = Row(
+              final tokenWidget = profile.hasActiveToken
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withValues(alpha: 0.12),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.confirmation_number_rounded, color: Color(0xFFB45309), size: 16),
+                          const SizedBox(width: 5),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Active Token: ${(profile.activeTokenNumber ?? '').startsWith('#') ? (profile.activeTokenNumber ?? '') : '#${profile.activeTokenNumber ?? ''}'}',
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFF92400E)),
+                              ),
+                              Text(
+                                profile.activeTokenQueueStatus ?? 'REGISTERED',
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )
+                  : null;
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
                     radius: 26,
@@ -463,28 +531,39 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 4,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              displayName,
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                              softWrap: true,
-                            ),
-                            if (isViewingDependent)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accentTeal.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'Dependent (${activeDependent?.relation ?? "Child"})',
-                                  style: const TextStyle(fontSize: 11, color: AppColors.accentTeal, fontWeight: FontWeight.bold),
-                                ),
+                            Expanded(
+                              child: Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                                    softWrap: true,
+                                  ),
+                                  if (isViewingDependent && activeDependent != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accentTeal.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'Dependent (${activeDependent.relation})',
+                                        style: const TextStyle(fontSize: 11, color: AppColors.accentTeal, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                ],
                               ),
+                            ),
+                            if (tokenWidget != null) ...[
+                              const SizedBox(width: 8),
+                              tokenWidget,
+                            ],
                           ],
                         ),
                         const SizedBox(height: 3),
@@ -570,60 +649,6 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                   ),
                 ],
               );
-
-              final tokenWidget = profile.hasActiveToken
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade100,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.amber.shade600),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.confirmation_number, color: Colors.amber, size: 20),
-                          const SizedBox(width: 6),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Active Token: ${profile.activeTokenNumber}',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
-                              ),
-                              Text(
-                                'Status: ${profile.activeTokenQueueStatus}',
-                                style: TextStyle(fontSize: 11, color: Colors.amber.shade800),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    )
-                  : null;
-
-              if (isNarrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    infoRow,
-                    if (tokenWidget != null) ...[
-                      const SizedBox(height: 10),
-                      tokenWidget,
-                    ],
-                  ],
-                );
-              } else {
-                return Row(
-                  children: [
-                    Expanded(child: infoRow),
-                    if (tokenWidget != null) ...[
-                      const SizedBox(width: 12),
-                      tokenWidget,
-                    ],
-                  ],
-                );
-              }
             },
           ),
           const SizedBox(height: 8),
@@ -716,14 +741,14 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
 
   Widget _buildIdCardTab(PatientModel patient, List<DependentProfile> dependents, bool isDark) {
     final selectedId = ref.watch(selectedPortalPatientIdProvider);
-    final isViewingDependent = selectedId != null && selectedId != patient.id;
+    final isViewingDependent = selectedId != null && selectedId != patient.id && dependents.isNotEmpty;
     final activeDependent = isViewingDependent
         ? dependents.firstWhere((d) => d.id == selectedId, orElse: () => dependents.first)
         : null;
 
-    final targetPatient = isViewingDependent
+    final targetPatient = (isViewingDependent && activeDependent != null)
         ? PatientModel(
-            id: activeDependent!.id,
+            id: activeDependent.id,
             uhid: activeDependent.uhid,
             fullName: activeDependent.fullName,
             gender: activeDependent.gender,
@@ -836,9 +861,12 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
               Text(
                 'Consultations & Reviews',
@@ -893,84 +921,126 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
               }
 
               return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: appts.length,
-          itemBuilder: (context, idx) {
-            final a = appts[idx];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryBlue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                itemCount: appts.length,
+                itemBuilder: (context, idx) {
+                  final a = appts[idx];
+                  return Card(
+                    elevation: 1.5,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                        width: 1.2,
                       ),
-                      child: const Icon(Icons.calendar_today, color: AppColors.primaryBlue, size: 24),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Wrap(
-                            alignment: WrapAlignment.spaceBetween,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              Text(
-                                'Scheduled Review: ${a.scheduledDate}',
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                                softWrap: true,
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade100,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  a.isCompleted ? 'Completed' : 'Upcoming Follow-up',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade800),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text('Clinician: ${a.doctorName} • ${a.departmentName}', style: const TextStyle(fontSize: 13), softWrap: true),
-                          if (a.followUpReason != null) ...[
-                            const SizedBox(height: 4),
-                            Text('Reason: ${a.followUpReason}', style: const TextStyle(fontSize: 12, color: Colors.grey), softWrap: true),
-                          ],
-                          if (a.carePlan != null) ...[
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text('Doctor\'s Advice: ${a.carePlan}', style: const TextStyle(fontSize: 12), softWrap: true),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.2)),
                             ),
-                          ],
+                            child: const Icon(Icons.calendar_today_rounded, color: AppColors.primaryBlue, size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Wrap(
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    Text(
+                                      'Scheduled Review: ${a.scheduledDate}',
+                                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+                                      softWrap: true,
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: a.isCompleted ? Colors.blue.shade50 : Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: a.isCompleted ? Colors.blue.shade400 : Colors.green.shade400,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        a.isCompleted ? 'Completed' : 'Upcoming Follow-up',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: a.isCompleted ? Colors.blue.shade800 : Colors.green.shade800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Clinician: ${a.doctorName} • ${a.departmentName}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.grey.shade200 : Colors.grey.shade900,
+                                  ),
+                                  softWrap: true,
+                                ),
+                                if (a.followUpReason != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Reason: ${a.followUpReason}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                    ),
+                                    softWrap: true,
+                                  ),
+                                ],
+                                if (a.carePlan != null) ...[
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Doctor\'s Advice: ${a.carePlan}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark ? Colors.grey.shade300 : const Color(0xFF334155),
+                                      ),
+                                      softWrap: true,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    ),
-  ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
 ],
 );
 }

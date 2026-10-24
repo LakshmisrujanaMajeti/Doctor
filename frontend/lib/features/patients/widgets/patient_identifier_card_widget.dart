@@ -91,16 +91,16 @@ class PatientIdentifierCardWidget extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-          width: 1.5,
+          color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+          width: 1.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -269,11 +269,12 @@ class PatientIdentifierCardWidget extends StatelessWidget {
                             const SizedBox(height: 2),
                             Text(
                               patient.uhid,
-                              style: const TextStyle(
-                                fontSize: 13,
+                              style: TextStyle(
+                                fontSize: 14.5,
                                 fontWeight: FontWeight.w900,
-                                color: AppColors.primaryBlue,
+                                color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8),
                                 fontFamily: 'monospace',
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ],

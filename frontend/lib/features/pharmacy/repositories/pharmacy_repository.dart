@@ -59,13 +59,15 @@ class PharmacyRepository {
   }
 
   Future<MedicineInventoryItem?> receiveStock(Map<String, dynamic> payload) async {
-    final res = await _dioClient.dio.post(
-      ApiEndpoints.pharmacyInventoryReceive,
-      data: payload,
-    );
-    if (res.data['status'] == 'success' && res.data['data'] != null) {
-      return MedicineInventoryItem.fromJson(res.data['data'] as Map<String, dynamic>);
-    }
+    try {
+      final res = await _dioClient.dio.post(
+        ApiEndpoints.pharmacyInventoryReceive,
+        data: payload,
+      ).timeout(const Duration(seconds: 10));
+      if (res.data['status'] == 'success' && res.data['data'] != null) {
+        return MedicineInventoryItem.fromJson(res.data['data'] as Map<String, dynamic>);
+      }
+    } catch (_) {}
     return null;
   }
 

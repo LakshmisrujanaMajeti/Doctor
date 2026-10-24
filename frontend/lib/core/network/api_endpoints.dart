@@ -141,6 +141,7 @@ class ApiEndpoints {
   static const String patientPortalDocuments = '/patient-portal/documents';
   static const String patientPortalBills = '/patient-portal/bills';
   static const String patientPortalSupport = '/patient-portal/support';
+  static const String patientPortalBookSlot = '/patient-portal/book-slot';
 
   // Notifications
   static const String notifications = '/notifications';
