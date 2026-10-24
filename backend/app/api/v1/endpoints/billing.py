@@ -1,12 +1,14 @@
 from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Header
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.responses import success_response
 from app.core.dependencies import require_roles, get_current_user, verify_patient_access
 from app.core.exceptions import NotFoundException, BadRequestException
+from app.core.idempotency import idempotency_manager
 from app.models.user import User
 from app.models.billing import Bill
 from app.schemas.billing import (
@@ -35,16 +37,42 @@ def get_services_catalogue(
 @router.post("", status_code=201, summary="Generate Itemized Bill (Billing/Receptionist/Pharmacist/Admin)")
 def create_bill(
     payload: BillCreate,
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["receptionist", "pharmacist", "admin", "billing"])),
 ):
-    bill = BillingService.create_bill(db, payload, current_user=current_user)
-    serialized = BillingService.serialize_bill(bill)
-    return success_response(
-        data=serialized,
-        message=f"Invoice {bill.invoice_number} created successfully",
-        status_code=201,
+    can_proceed, cached_resp, status_code = idempotency_manager.acquire(
+        key=x_idempotency_key,
+        user_id=str(current_user.id),
+        endpoint="/api/v1/billing",
+        payload=payload.model_dump(),
     )
+    if not can_proceed and cached_resp is not None:
+        return JSONResponse(content=cached_resp, status_code=status_code)
+
+    try:
+        bill = BillingService.create_bill(db, payload, current_user=current_user)
+        serialized = BillingService.serialize_bill(bill)
+        resp_body = {
+            "status": "success",
+            "data": serialized,
+            "message": f"Invoice {bill.invoice_number} created successfully",
+            "error": None,
+        }
+        idempotency_manager.store_result(
+            key=x_idempotency_key,
+            user_id=str(current_user.id),
+            response_data=resp_body,
+            status_code=201,
+        )
+        return success_response(
+            data=serialized,
+            message=resp_body["message"],
+            status_code=201,
+        )
+    except Exception:
+        idempotency_manager.mark_failed(key=x_idempotency_key, user_id=str(current_user.id))
+        raise
 
 
 @router.get("", summary="List Invoices with Filters")
@@ -108,23 +136,51 @@ def get_bills_by_visit(
 def record_payment(
     bill_id: str,
     payload: PaymentCreateRequest,
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["receptionist", "pharmacist", "admin", "patient", "billing"])),
 ):
-    payment = BillingService.record_payment(db, bill_id, payload, current_user=current_user)
-    bill_data = BillingService.get_bill_by_id(db, bill_id)
-    return success_response(
-        data={
+    can_proceed, cached_resp, status_code = idempotency_manager.acquire(
+        key=x_idempotency_key,
+        user_id=str(current_user.id),
+        endpoint=f"/api/v1/billing/{bill_id}/payments",
+        payload=payload.model_dump(),
+    )
+    if not can_proceed and cached_resp is not None:
+        return JSONResponse(content=cached_resp, status_code=status_code)
+
+    try:
+        payment = BillingService.record_payment(db, bill_id, payload, current_user=current_user)
+        bill_data = BillingService.get_bill_by_id(db, bill_id)
+        resp_data = {
             "receipt_number": payment.receipt_number,
             "payment_status": payment.payment_status,
             "amount": float(payment.amount),
             "is_online": payment.is_online,
             "gateway_order_id": payment.gateway_order_id,
             "bill": bill_data,
-        },
-        message="Payment processed" if payment.payment_status == "COMPLETED" else "Online payment initiated",
-        status_code=201,
-    )
+        }
+        msg = "Payment processed" if payment.payment_status == "COMPLETED" else "Online payment initiated"
+        resp_body = {
+            "status": "success",
+            "data": resp_data,
+            "message": msg,
+            "error": None,
+        }
+        idempotency_manager.store_result(
+            key=x_idempotency_key,
+            user_id=str(current_user.id),
+            response_data=resp_body,
+            status_code=201,
+        )
+        return success_response(
+            data=resp_data,
+            message=msg,
+            status_code=201,
+        )
+    except Exception:
+        idempotency_manager.mark_failed(key=x_idempotency_key, user_id=str(current_user.id))
+        raise
 
 
 @router.post("/payments/callback", summary="Confirm Online Payment via Webhook/Callback")

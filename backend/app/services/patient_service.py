@@ -146,7 +146,7 @@ class PatientService:
             ).first()
             if existing_phone:
                 raise ConflictException(
-                    f"A patient with phone number '{patient_in.phone}' already exists (UHID: {existing_phone.uhid}, Name: {existing_phone.full_name}). Duplicate mobile numbers are strictly not allowed."
+                    f"Accidental duplicate prevented: A patient with phone number '{patient_in.phone}' already exists (UHID: {existing_phone.uhid}, Name: {existing_phone.full_name}). Duplicate mobile numbers are strictly not allowed."
                 )
 
         if prevent_duplicates:

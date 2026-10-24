@@ -32,6 +32,7 @@ import '../../billing/screens/billing_workspace_view.dart';
 import '../../billing/providers/billing_provider.dart';
 import '../../doctors/repositories/doctor_repository.dart';
 import '../../doctors/models/doctor_model.dart';
+import '../../notifications/providers/notification_provider.dart';
 
 class RoleDashboardShell extends ConsumerStatefulWidget {
   const RoleDashboardShell({super.key});
@@ -77,6 +78,9 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
     final visitsAsync = ref.watch(visitListProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isNarrow = screenWidth < 380;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -99,11 +103,11 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          titleSpacing: 10,
+          titleSpacing: isNarrow ? 6 : 10,
           title: Row(
             children: [
-              const SmvmchHospitalLogo(size: 32),
-              const SizedBox(width: 8),
+              SmvmchHospitalLogo(size: isNarrow ? 28 : 32),
+              SizedBox(width: isNarrow ? 6 : 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,14 +121,14 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                             AppStrings.appName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 14.5,
+                            style: TextStyle(
+                              fontSize: isNarrow ? 13 : 14.5,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.3,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 5),
+                        const SizedBox(width: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                           decoration: BoxDecoration(
@@ -150,11 +154,11 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                       ],
                     ),
                     Text(
-                      AppStrings.hospitalFullName,
+                      isNarrow ? 'SMVMCH Puducherry' : AppStrings.hospitalFullName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 9.5,
+                        fontSize: isNarrow ? 8.5 : 9.5,
                         fontWeight: FontWeight.w500,
                         color: isDark
                             ? AppColors.darkTextSecondary
@@ -242,31 +246,47 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
               ),
             const SizedBox(width: 2),
 
-            // Notifications Icon with Badge
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.all(6),
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              tooltip: 'Hospital Notifications',
-              icon: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Icon(Icons.notifications_outlined, size: 21),
-                  Positioned(
-                    top: -2,
-                    right: -2,
-                    child: Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: AppColors.triageEmergency,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+            // Notifications Icon with Live Dynamic Badge
+            Consumer(
+              builder: (context, ref, _) {
+                final unreadAsync = ref.watch(unreadNotificationCountProvider);
+                final unread = unreadAsync.value ?? 0;
+                return IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.all(6),
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  tooltip: unread > 0 ? '$unread Unread Alerts' : 'Hospital Notifications',
+                  icon: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Icon(Icons.notifications_outlined, size: 21),
+                      if (unread > 0)
+                        Positioned(
+                          top: -3,
+                          right: -4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.triageEmergency,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                            child: Text(
+                              unread > 9 ? '9+' : '$unread',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
-              onPressed: () => context.push('/notifications'),
+                  onPressed: () => context.push('/notifications'),
+                );
+              },
             ),
 
             // Settings Icon

@@ -1,12 +1,14 @@
 import json
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, Body
+from fastapi import APIRouter, Depends, Query, Body, Header
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.responses import success_response
 from app.core.dependencies import get_current_user, require_roles, verify_patient_access
 from app.core.exceptions import NotFoundException, ForbiddenException, BadRequestException
+from app.core.idempotency import idempotency_manager
 from app.models.prescription import Prescription, PrescriptionItem, PrescriptionAmendment
 from app.models.visit import OPDVisit
 from app.models.clinical import ClinicalRecord
@@ -111,71 +113,98 @@ def check_allergies_endpoint(
 @router.post("", summary="Create Prescription (Doctor/Admin Only)")
 def create_prescription(
     prescription_in: PrescriptionCreate,
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["doctor", "admin"])),
 ):
-    visit = db.query(OPDVisit).filter(OPDVisit.id == prescription_in.visit_id).first()
-    if not visit:
-        raise NotFoundException(f"Visit '{prescription_in.visit_id}' not found")
-
-    target_status = (prescription_in.status or "SIGNED").upper()
-
-    # Safety: OCR-extracted prescription cannot be signed without clinician verification
-    is_ocr = prescription_in.is_ocr_extracted or False
-    is_verified = prescription_in.is_verified_by_clinician
-    if is_ocr and not is_verified:
-        target_status = "DRAFT"
-
-    # Safety: Allergy warnings check
-    patient_allergies = get_patient_allergies_text(db, visit.patient_id)
-    med_names = [it.medicine_name for it in prescription_in.items]
-    allergy_warnings = check_medication_allergies(patient_allergies, med_names)
-
-    if allergy_warnings and target_status == "SIGNED" and not prescription_in.allergy_warning_acknowledged:
-        warning_msg = allergy_warnings[0]["warning_message"]
-        raise BadRequestException(
-            f"Allergy Safety Alert: {warning_msg} You must explicitly confirm acknowledgement before signing."
-        )
-
-    rx = Prescription(
-        visit_id=visit.id,
-        patient_id=visit.patient_id,
-        doctor_id=visit.doctor_id,
-        notes=prescription_in.notes,
-        status=target_status,
-        version=1,
-        is_ocr_extracted=is_ocr,
-        is_verified_by_clinician=is_verified if is_verified is not None else True,
-        allergy_warning_acknowledged=prescription_in.allergy_warning_acknowledged or False,
-        signed_by_user_id=current_user.id if target_status == "SIGNED" else None,
-        signed_at=datetime.utcnow() if target_status == "SIGNED" else None,
+    can_proceed, cached_resp, status_code = idempotency_manager.acquire(
+        key=x_idempotency_key,
+        user_id=str(current_user.id),
+        endpoint="/api/v1/prescriptions",
+        payload=prescription_in.model_dump(),
     )
-    db.add(rx)
-    db.flush()
+    if not can_proceed and cached_resp is not None:
+        return JSONResponse(content=cached_resp, status_code=status_code)
 
-    for item_in in prescription_in.items:
-        rx_item = PrescriptionItem(
-            prescription_id=rx.id,
-            medicine_name=item_in.medicine_name,
-            form=item_in.form,
-            dosage=item_in.dosage,
-            route=item_in.route,
-            frequency=item_in.frequency,
-            duration_days=item_in.duration_days,
-            quantity=item_in.quantity,
-            timing=item_in.timing,
-            instructions=item_in.instructions,
-            is_dispensed=False,
+    try:
+        visit = db.query(OPDVisit).filter(OPDVisit.id == prescription_in.visit_id).first()
+        if not visit:
+            raise NotFoundException(f"Visit '{prescription_in.visit_id}' not found")
+
+        target_status = (prescription_in.status or "SIGNED").upper()
+
+        # Safety: OCR-extracted prescription cannot be signed without clinician verification
+        is_ocr = prescription_in.is_ocr_extracted or False
+        is_verified = prescription_in.is_verified_by_clinician
+        if is_ocr and not is_verified:
+            target_status = "DRAFT"
+
+        # Safety: Allergy warnings check
+        patient_allergies = get_patient_allergies_text(db, visit.patient_id)
+        med_names = [it.medicine_name for it in prescription_in.items]
+        allergy_warnings = check_medication_allergies(patient_allergies, med_names)
+
+        if allergy_warnings and target_status == "SIGNED" and not prescription_in.allergy_warning_acknowledged:
+            warning_msg = allergy_warnings[0]["warning_message"]
+            raise BadRequestException(
+                f"Allergy Safety Alert: {warning_msg} You must explicitly confirm acknowledgement before signing."
+            )
+
+        rx = Prescription(
+            visit_id=visit.id,
+            patient_id=visit.patient_id,
+            doctor_id=visit.doctor_id,
+            notes=prescription_in.notes,
+            status=target_status,
+            version=1,
+            is_ocr_extracted=is_ocr,
+            is_verified_by_clinician=is_verified if is_verified is not None else True,
+            allergy_warning_acknowledged=prescription_in.allergy_warning_acknowledged or False,
+            signed_by_user_id=current_user.id if target_status == "SIGNED" else None,
+            signed_at=datetime.utcnow() if target_status == "SIGNED" else None,
         )
-        db.add(rx_item)
+        db.add(rx)
+        db.flush()
 
-    db.commit()
-    db.refresh(rx)
-    return success_response(
-        data=PrescriptionRead.model_validate(rx).model_dump(),
-        message="Prescription created successfully",
-        status_code=201
-    )
+        for item_in in prescription_in.items:
+            rx_item = PrescriptionItem(
+                prescription_id=rx.id,
+                medicine_name=item_in.medicine_name,
+                form=item_in.form,
+                dosage=item_in.dosage,
+                route=item_in.route,
+                frequency=item_in.frequency,
+                duration_days=item_in.duration_days,
+                quantity=item_in.quantity,
+                timing=item_in.timing,
+                instructions=item_in.instructions,
+                is_dispensed=False,
+            )
+            db.add(rx_item)
+
+        db.commit()
+        db.refresh(rx)
+        rx_data = PrescriptionRead.model_validate(rx).model_dump()
+        resp_body = {
+            "status": "success",
+            "data": rx_data,
+            "message": "Prescription created successfully",
+            "error": None,
+        }
+        idempotency_manager.store_result(
+            key=x_idempotency_key,
+            user_id=str(current_user.id),
+            response_data=resp_body,
+            status_code=201,
+        )
+        return success_response(
+            data=rx_data,
+            message="Prescription created successfully",
+            status_code=201
+        )
+    except Exception:
+        idempotency_manager.mark_failed(key=x_idempotency_key, user_id=str(current_user.id))
+        raise
 
 
 @router.post("/{prescription_id}/sign", summary="Sign and Finalize Draft Prescription (Doctor/Admin)")

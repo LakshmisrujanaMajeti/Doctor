@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/network/dio_client.dart';
@@ -1181,12 +1182,30 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
                           );
                         }
                       } catch (e) {
+                        debugPrint('⚠️ [LAB ORDER] Error ordering lab test: $e');
                         setDialogState(() => isSubmitting = false);
                         if (mounted) {
+                          String userMessage = 'Unable to reach laboratory services. Please verify network connection and retry.';
+                          if (e is DioException) {
+                            if (e.response?.data is Map && e.response?.data['message'] != null) {
+                              userMessage = e.response!.data['message'].toString();
+                            } else if (e.type == DioExceptionType.connectionTimeout ||
+                                e.type == DioExceptionType.receiveTimeout) {
+                              userMessage = 'Laboratory service request timed out. Please retry.';
+                            } else if (e.response?.statusCode == 403) {
+                              userMessage = 'Unauthorized: Doctor or Administrator authorization required for formal lab orders.';
+                            }
+                          }
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               backgroundColor: AppColors.triageEmergency,
-                              content: Text("Error ordering lab test: $e"),
+                              behavior: SnackBarBehavior.floating,
+                              content: Text(userMessage),
+                              action: SnackBarAction(
+                                label: 'Retry',
+                                textColor: Colors.white,
+                                onPressed: () {},
+                              ),
                             ),
                           );
                         }

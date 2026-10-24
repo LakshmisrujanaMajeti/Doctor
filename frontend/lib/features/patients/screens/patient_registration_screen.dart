@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../routing/app_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/input_sanitizer.dart';
+import '../../../core/utils/submission_guard.dart';
+import '../../../core/services/postal_pincode_service.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../models/patient_model.dart';
@@ -27,6 +29,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _formKey = GlobalKey<FormState>();
+  final _submissionController = SubmissionController();
 
   // Section 1: Demographics & Identity
   final _hospitalRegController = TextEditingController();
@@ -43,9 +46,11 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _addressController = TextEditingController();
-  final _cityController = TextEditingController(text: 'Metro City');
-  final _stateController = TextEditingController(text: 'State Health Region');
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
   final _postalCodeController = TextEditingController();
+  bool _isLookingUpPin = false;
+  String? _pinLookupMessage;
 
   // Section 3: Clinical & Emergency
   String? _bloodGroup = 'O+';
@@ -86,6 +91,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
     _postalCodeController.dispose();
     _emergencyNameController.dispose();
     _emergencyPhoneController.dispose();
+    _submissionController.dispose();
     super.dispose();
   }
 
@@ -409,8 +415,103 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
     );
   }
 
+  void _resetRegistrationForm() {
+    _formKey.currentState?.reset();
+    _hospitalRegController.clear();
+    _nameController.clear();
+    _parentSpouseController.clear();
+    _parentRelation = 'S/o';
+    _selectedDob = null;
+    _dobController.clear();
+    _ageYearsController.clear();
+    _ageMonthsController.clear();
+    _gender = 'MALE';
+    _phoneController.clear();
+    _emailController.clear();
+    _addressController.clear();
+    _cityController.clear();
+    _stateController.clear();
+    _postalCodeController.clear();
+    _bloodGroup = 'O+';
+    _emergencyNameController.clear();
+    _emergencyPhoneController.clear();
+    _emergencyRelation = 'Spouse';
+    _pinLookupMessage = null;
+    _submissionController.reset();
+    _tabController.animateTo(0);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _handlePincodeLookup() async {
+    final pin = _postalCodeController.text.trim();
+    if (pin.length != 6) {
+      setState(() => _pinLookupMessage = 'Please enter a 6-digit Indian PIN code first.');
+      return;
+    }
+
+    setState(() {
+      _isLookingUpPin = true;
+      _pinLookupMessage = null;
+    });
+
+    try {
+      final res = await PostalPincodeService.lookupPincode(pin);
+      if (mounted) {
+        if (res.isSuccess) {
+          setState(() {
+            if (res.suggestedDistrict != null && _cityController.text.trim().isEmpty) {
+              _cityController.text = res.suggestedDistrict!;
+            } else if (res.suggestedDistrict != null) {
+              _showConfirmReplaceAddress(res.suggestedDistrict!, res.suggestedState ?? '');
+            }
+            if (res.suggestedState != null && _stateController.text.trim().isEmpty) {
+              _stateController.text = res.suggestedState!;
+            }
+            _pinLookupMessage = res.message;
+          });
+        } else {
+          setState(() {
+            _pinLookupMessage = res.message ?? 'PIN code verification failed. You may enter City/State manually.';
+          });
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isLookingUpPin = false);
+    }
+  }
+
+  void _showConfirmReplaceAddress(String newDistrict, String newState) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Update City & State?'),
+        content: Text(
+          'PIN code lookup suggests:\nDistrict: $newDistrict\nState: $newState\n\nWould you like to replace current values ("${_cityController.text}", "${_stateController.text}")?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Keep Current Values'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
+            onPressed: () {
+              setState(() {
+                _cityController.text = newDistrict;
+                _stateController.text = newState;
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Update', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleRegistrationSubmit({bool allowDuplicate = false}) async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_submissionController.begin()) return;
 
     setState(() => _isSaving = true);
     try {
@@ -454,6 +555,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
       PatientModel registered = await ref.read(patientRepositoryProvider).registerPatient(
         newPatient,
         allowDuplicate: allowDuplicate,
+        idempotencyKey: _submissionController.currentIdempotencyKey,
       );
 
       // Ensure 1 unique sequential OPD token is guaranteed for this newly registered patient
@@ -481,12 +583,15 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
       ref.invalidate(adminRegistrationsReportProvider);
       ref.invalidate(adminBillingReportProvider);
 
+      _submissionController.completeSuccess();
+
       if (mounted) {
         _showSuccessCard(registered);
       }
     } catch (e) {
+      final errText = e.toString().replaceAll('Exception: ', '');
+      _submissionController.completeError(errText);
       if (mounted) {
-        final errText = e.toString().replaceAll('Exception: ', '');
         if (errText.contains('Accidental duplicate prevented')) {
           _checkDuplicateWorkflow();
         } else {
@@ -571,6 +676,14 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
           ],
         ),
         actions: [
+          OutlinedButton.icon(
+            icon: const Icon(Icons.person_add_alt_1, size: 16),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _resetRegistrationForm();
+            },
+            label: const Text('Register Another Patient'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -952,7 +1065,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                 child: OPDTextField(
                   controller: _cityController,
                   label: 'City / District',
-                  hint: 'Metro City',
+                  hint: 'e.g. Puducherry',
                 ),
               ),
               const SizedBox(width: 8),
@@ -960,19 +1073,97 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                 child: OPDTextField(
                   controller: _stateController,
                   label: 'State / Province',
-                  hint: 'State Region',
+                  hint: 'e.g. Puducherry',
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          OPDTextField(
-            controller: _postalCodeController,
-            label: 'Postal / PIN Code',
-            hint: 'e.g. 500081',
-            keyboardType: TextInputType.number,
-            prefixIcon: const Icon(Icons.local_post_office_outlined),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: OPDTextField(
+                  controller: _postalCodeController,
+                  label: 'Postal / PIN Code (6 Digits)',
+                  hint: 'e.g. 605001',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  prefixIcon: const Icon(Icons.local_post_office_outlined),
+                  validator: (v) => PostalPincodeService.validatePincodeFormat(v),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryTeal,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    onPressed: _isLookingUpPin ? null : _handlePincodeLookup,
+                    icon: _isLookingUpPin
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.verified_outlined, size: 16),
+                    label: const Text('Verify PIN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+            ],
           ),
+          if (_pinLookupMessage != null) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _pinLookupMessage!.contains('Verified') || _pinLookupMessage!.contains('detected')
+                    ? AppColors.triageNormal.withOpacity(0.1)
+                    : Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _pinLookupMessage!.contains('Verified') || _pinLookupMessage!.contains('detected')
+                      ? AppColors.triageNormal.withOpacity(0.3)
+                      : Colors.amber.shade300,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _pinLookupMessage!.contains('Verified') || _pinLookupMessage!.contains('detected')
+                        ? Icons.check_circle_outline
+                        : Icons.info_outline,
+                    size: 14,
+                    color: _pinLookupMessage!.contains('Verified') || _pinLookupMessage!.contains('detected')
+                        ? AppColors.triageNormal
+                        : Colors.amber.shade900,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _pinLookupMessage!,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: _pinLookupMessage!.contains('Verified') || _pinLookupMessage!.contains('detected')
+                            ? AppColors.triageNormal
+                            : Colors.amber.shade900,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

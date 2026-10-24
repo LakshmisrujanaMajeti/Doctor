@@ -51,6 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   // --- STAFF AUTH HANDLER ---
   Future<void> _handleStaffLogin() async {
+    if (ref.read(authProvider).isLoading) return;
     if (!_staffFormKey.currentState!.validate()) return;
 
     final raw = _emailController.text.trim();
@@ -549,14 +550,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Authorized personnel: Doctors, Nurses, Reception, Pharmacy, Lab, Cashier & Admin.',
-            style: TextStyle(
-              fontSize: 11.5,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-            ),
-          ),
           const SizedBox(height: 14),
 
           // Inline Error Banner
@@ -709,24 +702,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
 
         // Identifier Field (Mobile Phone or UHID)
-        TextField(
+        OpdTextField(
+          label: 'Registered Mobile Number or UHID',
+          hint: 'e.g. 8374477999 or UHID-2026-00001',
           controller: _patientIdentifierController,
+          prefixIcon: Icons.phone_android_rounded,
           keyboardType: TextInputType.text,
-          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            labelText: 'Registered Mobile Number or UHID',
-            hintText: 'e.g. 8374477999 or UHID-2026-00001',
-            prefixIcon: const Icon(Icons.phone_android_rounded, color: AppColors.primaryTeal),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            suffixIcon: _patientIdentifierController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 18),
-                    onPressed: () => setState(() => _patientIdentifierController.clear()),
-                  )
-                : null,
-          ),
-          onSubmitted: (_) => _handlePatientLogin(),
+          suffixIcon: _patientIdentifierController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () => setState(() => _patientIdentifierController.clear()),
+                )
+              : null,
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 12),
@@ -771,24 +758,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: 14),
 
         // Patient Login Button
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryTeal,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          icon: _isPatientLoading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.login_rounded),
-          label: Text(
-            _isPatientLoading ? 'Verifying Patient Records...' : 'Access Health Records',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          ),
+        OpdButton(
+          label: _isPatientLoading ? 'Verifying Patient Records...' : 'Access Health Records',
+          isLoading: _isPatientLoading,
+          icon: Icons.login_rounded,
+          color: AppColors.primaryTeal,
           onPressed: _isPatientLoading ? null : _handlePatientLogin,
         ),
       ],

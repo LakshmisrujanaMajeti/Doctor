@@ -396,6 +396,19 @@ class LaboratoryService:
         if not visit:
             raise NotFoundException(f"Visit '{visit_id}' not found")
 
+        # Guard against duplicate orders on the same visit in active state
+        existing_order = (
+            db.query(LabOrder)
+            .filter(
+                LabOrder.visit_id == visit.id,
+                LabOrder.test_name.ilike(test_name.strip()),
+                LabOrder.status.in_(["ORDERED", "COLLECTED", "RECEIVED", "PROCESSING"]),
+            )
+            .first()
+        )
+        if existing_order:
+            return existing_order
+
         catalogue_match = LaboratoryService.find_catalogue_item(test_name)
         category = catalogue_match["category"] if catalogue_match else (test_category or "HAEMATOLOGY")
         specimen_type = catalogue_match["specimen_type"] if catalogue_match else "Whole Blood / Specimen"

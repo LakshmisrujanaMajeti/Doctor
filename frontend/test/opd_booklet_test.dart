@@ -158,9 +158,9 @@ void main() {
       );
 
       // Verify TabBar sections
-      expect(find.text('Demographics'), findsOneWidget);
-      expect(find.text('Contact & Addr'), findsOneWidget);
-      expect(find.text('Clinical & Emer'), findsOneWidget);
+      expect(find.text('1. Demographics'), findsOneWidget);
+      expect(find.text('2. Contact & Addr'), findsOneWidget);
+      expect(find.text('3. Clinical & Emer'), findsOneWidget);
 
       // Verify Demographics form fields
       expect(find.text('Patient Full Name *'), findsOneWidget);
@@ -169,7 +169,7 @@ void main() {
       expect(find.text('Age (Y)'), findsOneWidget);
       expect(find.text('Sex / Gender *'), findsOneWidget);
       expect(find.text('Check Duplicate'), findsOneWidget);
-      expect(find.text('Review & Save'), findsOneWidget);
+      expect(find.text('Next: Contact Info →'), findsOneWidget);
 
       // Enter patient name
       final nameFinder = find.descendant(
@@ -181,7 +181,7 @@ void main() {
       expect(find.text('Ananya Sen'), findsOneWidget);
 
       // Switch to Contact Tab
-      await tester.tap(find.text('Contact & Addr'));
+      await tester.tap(find.text('2. Contact & Addr'));
       await tester.pumpAndSettle();
       expect(find.text('Contact Phone Number *'), findsOneWidget);
       expect(find.text('Street / Residential Address *'), findsOneWidget);
@@ -195,7 +195,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch back to Demographics tab and verify data was preserved
-      await tester.tap(find.text('Demographics'));
+      await tester.tap(find.text('1. Demographics'));
       await tester.pumpAndSettle();
       expect(find.text('Ananya Sen'), findsOneWidget);
     });

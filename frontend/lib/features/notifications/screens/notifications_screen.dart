@@ -1,81 +1,63 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routing/app_router.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/data/mock_presentation_data.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_card.dart';
+import '../models/notification_item_model.dart';
+import '../providers/notification_provider.dart';
 
-class NotificationsScreen extends StatefulWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  late List<HospitalNotificationItem> _notifications;
-  String _selectedCategory = 'all';
-
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   final List<Map<String, String>> _categories = const [
     {'key': 'all', 'label': 'All Updates'},
     {'key': 'alert', 'label': 'Triage Alerts'},
     {'key': 'queue', 'label': 'Queue Updates'},
     {'key': 'lab', 'label': 'Lab Reports'},
     {'key': 'pharmacy', 'label': 'Pharmacy'},
+    {'key': 'billing', 'label': 'Billing'},
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _notifications = [];
-  }
+  bool _isMarkingAll = false;
 
-  void _markAllAsRead() {
-    setState(() {
-      _notifications = _notifications.map((item) {
-        return HospitalNotificationItem(
-          id: item.id,
-          title: item.title,
-          message: item.message,
-          timeAgo: item.timeAgo,
-          category: item.category,
-          isRead: true,
-          icon: item.icon,
-          color: item.color,
+  Future<void> _handleMarkAllAsRead() async {
+    if (_isMarkingAll) return;
+    setState(() => _isMarkingAll = true);
+    try {
+      await ref.read(notificationRepositoryProvider).markAllAsRead();
+      ref.invalidate(notificationsListProvider);
+      ref.invalidate(unreadNotificationCountProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All notifications marked as read'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-      }).toList();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('All notifications marked as read'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+      }
+    } finally {
+      if (mounted) setState(() => _isMarkingAll = false);
+    }
   }
 
-  void _toggleRead(String id) {
-    setState(() {
-      _notifications = _notifications.map((item) {
-        if (item.id == id) {
-          return HospitalNotificationItem(
-            id: item.id,
-            title: item.title,
-            message: item.message,
-            timeAgo: item.timeAgo,
-            category: item.category,
-            isRead: !item.isRead,
-            icon: item.icon,
-            color: item.color,
-          );
-        }
-        return item;
-      }).toList();
-    });
-  }
+  Future<void> _handleItemTap(NotificationItemModel item) async {
+    // 1. Mark as read on backend if not already read
+    if (!item.isRead) {
+      final success = await ref.read(notificationRepositoryProvider).markAsRead(item.id);
+      if (success) {
+        ref.invalidate(unreadNotificationCountProvider);
+        ref.invalidate(notificationsListProvider);
+      }
+    }
 
-  void _showNotificationDetail(HospitalNotificationItem item) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
@@ -99,7 +81,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
+                    color: Colors.grey.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -109,7 +91,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: item.color.withValues(alpha: 0.14),
+                      color: item.color.withOpacity(0.14),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(item.icon, color: item.color, size: 28),
@@ -152,34 +134,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 children: [
                   Expanded(
                     child: OpdButton(
-                      label: 'View in Queue',
-                      icon: Icons.open_in_new_rounded,
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        context.push('/queue');
-                      },
+                      label: 'Dismiss',
+                      isOutlined: true,
+                      onPressed: () => Navigator.pop(ctx),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  if (item.targetRoute != null && item.targetRoute!.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OpdButton(
+                        label: 'View Details →',
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          context.push(item.targetRoute!);
+                        },
                       ),
                     ),
-                    onPressed: () {
-                      _toggleRead(item.id);
-                      Navigator.pop(ctx);
-                    },
-                    child: Text(
-                      item.isRead ? 'Mark Unread' : 'Mark Read',
-                    ),
-                  ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 12),
             ],
           ),
         );
@@ -189,14 +162,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedCategory = ref.watch(notificationCategoryFilterProvider);
+    final notificationsAsync = ref.watch(notificationsListProvider);
+    final unreadCountAsync = ref.watch(unreadNotificationCountProvider);
+    final unreadCount = unreadCountAsync.value ?? 0;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final filtered = _notifications.where((n) {
-      if (_selectedCategory == 'all') return true;
-      return n.category == _selectedCategory;
-    }).toList();
-
-    final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -237,8 +207,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         actions: [
           IconButton(
             tooltip: 'Mark all as read',
-            icon: const Icon(Icons.done_all_rounded),
-            onPressed: unreadCount > 0 ? _markAllAsRead : null,
+            icon: _isMarkingAll
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.done_all_rounded),
+            onPressed: (unreadCount > 0 && !_isMarkingAll) ? _handleMarkAllAsRead : null,
           ),
         ],
       ),
@@ -250,92 +222,106 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Row(
               children: _categories.map((cat) {
-                final isSelected = _selectedCategory == cat['key'];
+                final isSelected = selectedCategory == cat['key'];
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
                     label: Text(cat['label']!),
                     selected: isSelected,
-                    selectedColor: AppColors.primaryBlue.withValues(alpha: 0.15),
+                    selectedColor: AppColors.primaryBlue.withOpacity(0.15),
                     checkmarkColor: AppColors.primaryBlue,
                     labelStyle: TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                          isSelected ? FontWeight.w700 : FontWeight.w500,
                       color: isSelected
                           ? AppColors.primaryBlue
-                          : (isDark
-                              ? AppColors.darkTextPrimary
-                              : AppColors.lightTextPrimary),
+                          : (isDark ? Colors.white70 : Colors.black87),
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 12.5,
                     ),
                     onSelected: (val) {
-                      setState(() {
-                        _selectedCategory = cat['key']!;
-                      });
+                      ref.read(notificationCategoryFilterProvider.notifier).setCategory(cat['key']!);
                     },
                   ),
                 );
               }).toList(),
             ),
           ),
-          const Divider(height: 1),
 
-          // Notification List
+          // Main Notifications List with Real Pull-to-Refresh
           Expanded(
-            child: _notifications.isEmpty
-                ? const Center(
-                    child: EmptyStateWidget(
-                      icon: Icons.notifications_none_rounded,
-                      title: 'No Notifications',
-                      message:
-                          'All clinical queues, triage alerts, and lab results are up to date.',
-                    ),
-                  )
-                : (filtered.isEmpty
-                    ? Center(
-                        child: EmptyStateWidget(
+            child: notificationsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.triageEmergency),
+                      const SizedBox(height: 12),
+                      Text('Error loading notifications: $err', textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry'),
+                        onPressed: () => ref.refresh(notificationsListProvider),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              data: (notifications) {
+                if (notifications.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(notificationsListProvider);
+                      ref.invalidate(unreadNotificationCountProvider);
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 100),
+                        EmptyStateWidget(
                           icon: Icons.notifications_none_rounded,
-                          title: 'No Alerts in this Category',
-                          message:
-                              'All outpatient updates for this category have been cleared or read.',
-                          actionLabel: 'View All Notifications',
-                          onAction: () {
-                            setState(() {
-                              _selectedCategory = 'all';
-                            });
-                          },
+                          title: 'No Notifications',
+                          message: 'All caught up! You do not have any alerts in this category.',
                         ),
-                      )
-                    : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 10),
+                      ],
+                    ),
+                  );
+                }
+
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(notificationsListProvider);
+                    ref.invalidate(unreadNotificationCountProvider);
+                  },
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: notifications.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
-                      final item = filtered[index];
+                      final item = notifications[index];
                       return OpdCard(
                         padding: const EdgeInsets.all(14),
-                        onTap: () => _showNotificationDetail(item),
+                        onTap: () => _handleItemTap(item),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: item.color.withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(12),
+                                color: item.color.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(
-                                item.icon,
-                                color: item.color,
-                                size: 22,
-                              ),
+                              child: Icon(item.icon, color: item.color, size: 22),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Text(
@@ -345,70 +331,80 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                             fontWeight: item.isRead
                                                 ? FontWeight.w600
                                                 : FontWeight.w800,
+                                            color: item.isRead
+                                                ? (isDark ? Colors.white70 : Colors.black87)
+                                                : (isDark ? Colors.white : Colors.black),
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      if (!item.isRead) ...[
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.primaryBlue,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    item.message,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      color: isDark
-                                          ? AppColors.darkTextSecondary
-                                          : AppColors.lightTextSecondary,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
+                                      const SizedBox(width: 6),
                                       Text(
                                         item.timeAgo,
                                         style: TextStyle(
                                           fontSize: 11,
                                           color: isDark
                                               ? AppColors.darkTextSecondary
-                                                  .withValues(alpha: 0.7)
-                                              : AppColors.lightTextSecondary
-                                                  .withValues(alpha: 0.8),
-                                        ),
-                                      ),
-                                      Text(
-                                        item.category.toUpperCase(),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: item.color,
-                                          letterSpacing: 0.5,
+                                              : AppColors.lightTextSecondary,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
                                   ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    item.message,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: isDark
+                                          ? AppColors.darkTextSecondary
+                                          : AppColors.lightTextSecondary,
+                                      height: 1.35,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (item.targetRoute != null && item.targetRoute!.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Tap to view details',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: item.color,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Icon(Icons.arrow_forward_rounded, size: 12, color: item.color),
+                                      ],
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
+                            if (!item.isRead) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                margin: const EdgeInsets.only(top: 6),
+                                decoration: BoxDecoration(
+                                  color: item.color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );
                     },
-                  )),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),

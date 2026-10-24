@@ -60,3 +60,8 @@ desktop_builds/
 desktop/node_modules/
 desktop/dist/
 desktop/web/
+
+# Local & Agent files
+.agents/
+skills-lock.json
+storage/

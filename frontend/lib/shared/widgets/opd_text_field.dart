@@ -85,6 +85,11 @@ class _OpdTextFieldState extends State<OpdTextField> {
         TextFormField(
           controller: widget.controller,
           obscureText: _obscured,
+          enableSuggestions: !_obscured,
+          autocorrect: !_obscured,
+          style: const TextStyle(
+            decoration: TextDecoration.none,
+          ),
           keyboardType: widget.keyboardType,
           inputFormatters: widget.inputFormatters ??
               (widget.keyboardType == TextInputType.phone

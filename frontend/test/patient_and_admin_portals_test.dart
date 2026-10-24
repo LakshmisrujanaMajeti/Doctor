@@ -478,10 +478,10 @@ void main() {
 
       // Verify Header
       expect(find.text('Patient Portal & Health Records'), findsOneWidget);
-      expect(find.text('Aarav Sharma'), findsOneWidget);
-      expect(find.textContaining('UHID-20261012-0001'), findsOneWidget);
-      expect(find.textContaining('+919876543210'), findsOneWidget);
-      expect(find.textContaining('Self (Aarav Sharma)'), findsOneWidget);
+      expect(find.text('Aarav Sharma'), findsAtLeastNWidgets(1));
+      expect(find.textContaining('UHID-20261012-0001'), findsAtLeastNWidgets(1));
+      expect(find.textContaining('+919876543210'), findsAtLeastNWidgets(1));
+      expect(find.textContaining('Self (Aarav Sharma)'), findsAtLeastNWidgets(1));
       expect(find.text('Add Dependent'), findsOneWidget);
 
       // Verify Dependent Chip

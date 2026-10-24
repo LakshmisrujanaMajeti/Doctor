@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/secure_storage_service.dart';
@@ -148,12 +149,21 @@ class BillingRepository {
     return null;
   }
 
-  Future<BillModel?> createBill(Map<String, dynamic> payload) async {
+  Future<BillModel?> createBill(
+    Map<String, dynamic> payload, {
+    String? idempotencyKey,
+  }) async {
     await loadCacheIfNeeded();
+
+    final headers = <String, dynamic>{
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+        'X-Idempotency-Key': idempotencyKey,
+    };
 
     try {
       final res = await _dioClient.dio.post(
         ApiEndpoints.bills,
+        options: Options(headers: headers),
         data: payload,
       );
       if (res.data['status'] == 'success' && res.data['data'] != null) {
@@ -251,15 +261,22 @@ class BillingRepository {
 
   Future<Map<String, dynamic>?> recordPayment(
     String billId,
-    Map<String, dynamic> payload,
-  ) async {
+    Map<String, dynamic> payload, {
+    String? idempotencyKey,
+  }) async {
     await loadCacheIfNeeded();
     final payAmt = (payload['amount'] as num?)?.toDouble() ?? 0.0;
     final method = payload['payment_method'] as String? ?? 'CASH';
 
+    final headers = <String, dynamic>{
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+        'X-Idempotency-Key': idempotencyKey,
+    };
+
     try {
       final res = await _dioClient.dio.post(
         ApiEndpoints.billingPayments(billId),
+        options: Options(headers: headers),
         data: payload,
       );
       if (res.data['status'] == 'success' && res.data['data'] != null) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/supabase_service.dart';
@@ -55,16 +56,47 @@ class VisitRepository {
 
   /// Instant Stale-While-Revalidate: returns cached visits in 0-1ms,
   /// then asynchronously updates from Supabase Cloud and backend without blocking the UI.
-  Future<List<OPDVisitModel>> getVisits({String? status, String? departmentId, String? query}) async {
+  /// When [forceRefresh] is true, awaits fresh data from the authoritative backend.
+  Future<List<OPDVisitModel>> getVisits({
+    String? status,
+    String? departmentId,
+    String? query,
+    bool forceRefresh = false,
+  }) async {
     await _loadCacheIfNeeded();
 
+    if (forceRefresh && DioClient.isHostReachable) {
+      try {
+        final res = await _dioClient.dio.get(
+          ApiEndpoints.visits,
+          queryParameters: {
+            if (status != null && status.isNotEmpty) 'status': status,
+            if (departmentId != null && departmentId.isNotEmpty) 'department_id': departmentId,
+            if (query != null && query.isNotEmpty) 'query': query,
+          },
+          options: Options(headers: {'Cache-Control': 'no-cache'}),
+        );
+
+        if (res.data is Map && res.data['status'] == 'success') {
+          final list = res.data['data'] as List<dynamic>;
+          final fetched = list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
+          if ((status == null || status.isEmpty) && (departmentId == null || departmentId.isEmpty) && (query == null || query.isEmpty)) {
+            _localVisits.clear();
+            _localVisits.addAll(fetched);
+            await _saveCache();
+          }
+          return _filterVisits(fetched, status, departmentId, query);
+        }
+      } catch (_) {}
+    }
+
     // 1. If we have cached visits, return immediately (0ms) and background sync
-    if (_localVisits.isNotEmpty) {
+    if (_localVisits.isNotEmpty && !forceRefresh) {
       _syncVisitsFromCloud(status, departmentId, query);
       return _filterVisits(_localVisits, status, departmentId, query);
     }
 
-    // 2. Cold first run with empty local storage: fetch from Supabase Cloud (works everywhere)
+    // 2. Cold first run or offline refresh: fetch from Supabase Cloud (works everywhere)
     try {
       final supaList = await SupabaseService.fetchVisits();
       if (supaList.isNotEmpty) {
@@ -86,7 +118,7 @@ class VisitRepository {
         },
       );
 
-      if (res.data['status'] == 'success') {
+      if (res.data is Map && res.data['status'] == 'success') {
         final list = res.data['data'] as List<dynamic>;
         final fetched = list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
         if ((status == null || status.isEmpty) && (departmentId == null || departmentId.isEmpty) && (query == null || query.isEmpty)) {
@@ -106,15 +138,20 @@ class VisitRepository {
       try {
         final supaList = await SupabaseService.fetchVisits();
         if (supaList.isNotEmpty) {
-          final existingIds = _localVisits.map((v) => v.id).toSet();
-          bool hasNew = false;
+          bool hasChanges = false;
           for (final sv in supaList) {
-            if (!existingIds.contains(sv.id)) {
+            final idx = _localVisits.indexWhere((v) => v.id == sv.id);
+            if (idx != -1) {
+              if (_localVisits[idx].status != sv.status) {
+                _localVisits[idx] = sv;
+                hasChanges = true;
+              }
+            } else {
               _localVisits.add(sv);
-              hasNew = true;
+              hasChanges = true;
             }
           }
-          if (hasNew) {
+          if (hasChanges) {
             await _saveCache();
           }
         }
@@ -131,18 +168,23 @@ class VisitRepository {
             },
           );
 
-          if (res.data['status'] == 'success') {
+          if (res.data is Map && res.data['status'] == 'success') {
             final list = res.data['data'] as List<dynamic>;
             final fetched = list.map((item) => OPDVisitModel.fromJson(item as Map<String, dynamic>)).toList();
-            final existingIds = _localVisits.map((v) => v.id).toSet();
-            bool hasNew = false;
+            bool hasChanges = false;
             for (final v in fetched) {
-              if (!existingIds.contains(v.id)) {
+              final idx = _localVisits.indexWhere((lv) => lv.id == v.id);
+              if (idx != -1) {
+                if (_localVisits[idx].status != v.status) {
+                  _localVisits[idx] = v;
+                  hasChanges = true;
+                }
+              } else {
                 _localVisits.add(v);
-                hasNew = true;
+                hasChanges = true;
               }
             }
-            if (hasNew) {
+            if (hasChanges) {
               await _saveCache();
             }
           }
@@ -197,10 +239,17 @@ class VisitRepository {
     String triagePriority = 'NORMAL',
     double consultationFee = 500.0,
     String? notes,
+    String? idempotencyKey,
   }) async {
+    final headers = <String, dynamic>{
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+        'X-Idempotency-Key': idempotencyKey,
+    };
+
     try {
       final res = await _dioClient.dio.post(
         ApiEndpoints.visits,
+        options: Options(headers: headers),
         data: {
           'patient_id': patientId,
           'doctor_id': doctorId,

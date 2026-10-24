@@ -38,7 +38,7 @@ class Permission(Base, TimestampMixin):
 class User(Base, TimestampMixin):
     __tablename__ = "users"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(String(64), primary_key=True, default=generate_uuid)
     email = Column(String(255), unique=True, nullable=False, index=True)
     phone = Column(String(30), unique=True, nullable=True, index=True)
     hashed_password = Column(String(255), nullable=False)
@@ -54,7 +54,7 @@ class User(Base, TimestampMixin):
     role = relationship("Role", back_populates="users")
 
     # Link to patient record for patient users
-    patient_id = Column(String(36), ForeignKey("patients.id", ondelete="SET NULL"), nullable=True, index=True)
+    patient_id = Column(String(36), ForeignKey("patients.id", ondelete="SET NULL", use_alter=True), nullable=True, index=True)
     patient = relationship("Patient", foreign_keys=[patient_id])
 
     refresh_sessions = relationship("RefreshTokenSession", back_populates="user", cascade="all, delete-orphan")

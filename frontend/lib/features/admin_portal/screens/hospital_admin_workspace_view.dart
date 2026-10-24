@@ -17,6 +17,7 @@ import '../providers/admin_portal_provider.dart';
 import '../../patient_portal/models/patient_portal_models.dart';
 import '../../patients/models/patient_model.dart';
 import '../../patients/providers/patient_provider.dart';
+import '../../patients/widgets/edit_patient_dialog.dart';
 import '../../doctors/repositories/doctor_repository.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/utils/file_download_helper.dart';
@@ -1425,114 +1426,12 @@ class _HospitalAdminWorkspaceViewState
     }
   }
 
-  void _showEditPatientInAdmin(BuildContext context, PatientModel patient) {
-    final nameCtrl = TextEditingController(text: patient.fullName);
-    final phoneCtrl = TextEditingController(text: patient.phone);
-    final ageCtrl = TextEditingController(text: patient.ageYears != null ? '${patient.ageYears}' : '');
-    final addressCtrl = TextEditingController(text: patient.address ?? '');
-    final relationNameCtrl = TextEditingController(text: patient.parentSpouseName ?? '');
-    String selectedGender = patient.gender.toUpperCase();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Edit Patient: ${patient.fullName}'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: phoneCtrl,
-                  decoration: const InputDecoration(labelText: 'Phone Number (10 Digits) *', isDense: true),
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: ageCtrl,
-                        decoration: const InputDecoration(labelText: 'Age (Years)', isDense: true),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: ['MALE', 'FEMALE', 'OTHER'].contains(selectedGender) ? selectedGender : 'OTHER',
-                        decoration: const InputDecoration(labelText: 'Gender', isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'MALE', child: Text('Male')),
-                          DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
-                          DropdownMenuItem(value: 'OTHER', child: Text('Other')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) setDialogState(() => selectedGender = val);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: relationNameCtrl,
-                  decoration: const InputDecoration(labelText: 'Father / Spouse Name', isDense: true),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: addressCtrl,
-                  decoration: const InputDecoration(labelText: 'Address', isDense: true),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty || phoneCtrl.text.trim().isEmpty) return;
-                final updated = patient.copyWith(
-                  fullName: nameCtrl.text.trim(),
-                  phone: phoneCtrl.text.trim(),
-                  ageYears: int.tryParse(ageCtrl.text.trim()),
-                  gender: selectedGender,
-                  parentSpouseName: relationNameCtrl.text.trim().isEmpty ? null : relationNameCtrl.text.trim(),
-                  address: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
-                );
-                try {
-                  await ref.read(patientRepositoryProvider).updatePatient(updated);
-                  ref.invalidate(patientListProvider);
-                  ref.invalidate(adminDashboardSummaryProvider);
-                  if (context.mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Patient "${updated.fullName}" updated successfully!')),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to update patient: $e'), backgroundColor: Colors.red),
-                    );
-                  }
-                }
-              },
-              child: const Text('Save Changes'),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _showEditPatientInAdmin(BuildContext context, PatientModel patient) async {
+    final updated = await EditPatientDialog.show(context, patient);
+    if (updated != null) {
+      ref.invalidate(patientListProvider);
+      ref.invalidate(adminDashboardSummaryProvider);
+    }
   }
 
   void _deletePatientInAdmin(BuildContext context, PatientModel patient) async {

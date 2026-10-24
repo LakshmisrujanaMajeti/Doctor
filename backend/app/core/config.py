@@ -42,7 +42,7 @@ class Settings(BaseSettings):
             url = url.replace("postgres://", "postgresql://", 1)
         if "channel_binding=" in url:
             url = url.replace("&channel_binding=require", "").replace("channel_binding=require&", "").replace("channel_binding=require", "")
-        if ("neon.tech" in url or "supabase.co" in url) and "sslmode=" not in url:
+        if ("neon.tech" in url or "supabase.co" in url or "supabase.com" in url) and "sslmode=" not in url:
             separator = "&" if "?" in url else "?"
             url = f"{url}{separator}sslmode=require"
         if "neon.tech" in url and "hostaddr=" not in url:
@@ -53,17 +53,18 @@ class Settings(BaseSettings):
     @property
     def effective_database_url(self) -> str:
         url = (
-            self.NEON_DATABASE_URL
-            or os.getenv("NEON_DATABASE_URL")
+            self.DATABASE_URL
             or self.POSTGRES_URL
             or os.getenv("POSTGRES_URL")
-            or self.DATABASE_URL
+            or self.NEON_DATABASE_URL
+            or os.getenv("NEON_DATABASE_URL")
+            or "sqlite:///./opd_connect.db"
         )
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
         if "channel_binding=" in url:
             url = url.replace("&channel_binding=require", "").replace("channel_binding=require&", "").replace("channel_binding=require", "")
-        if ("neon.tech" in url or "supabase.co" in url) and "sslmode=" not in url:
+        if ("neon.tech" in url or "supabase.co" in url or "supabase.com" in url) and "sslmode=" not in url:
             separator = "&" if "?" in url else "?"
             url = f"{url}{separator}sslmode=require"
         if "neon.tech" in url and "hostaddr=" not in url:
@@ -72,7 +73,7 @@ class Settings(BaseSettings):
         return url
 
     # Supabase Settings
-    SUPABASE_URL: str = "https://xxwidqatsxzsrulaxxal.supabase.co"
+    SUPABASE_URL: str = "https://opjqnvcykfkqksopydxl.supabase.co"
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
 
@@ -82,19 +83,49 @@ class Settings(BaseSettings):
     SUPABASE_STORAGE_BUCKET: str = "medical-documents"
 
     # CORS
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: List[str] = [
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://localhost:3000",
+        "http://localhost:5000",
+        "http://localhost:8000",
+        "http://localhost:54321",
+        "http://localhost:54322",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5000",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:54321",
+        "http://127.0.0.1:54322",
+    ]
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        default_origins = [
+            "http://localhost",
+            "http://127.0.0.1",
+            "http://localhost:3000",
+            "http://localhost:5000",
+            "http://localhost:8000",
+            "http://localhost:54321",
+            "http://localhost:54322",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5000",
+            "http://127.0.0.1:8000",
+            "http://127.0.0.1:54321",
+            "http://127.0.0.1:54322",
+        ]
         if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
+            origins = [i.strip() for i in v.split(",") if i.strip()]
+            filtered = [o for o in origins if o != "*"]
+            return filtered if filtered else default_origins
         elif isinstance(v, list):
-            return v
-        return ["*"]
+            filtered = [o for o in v if o != "*"]
+            return filtered if filtered else default_origins
+        return default_origins
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"), ".env"),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore"

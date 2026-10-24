@@ -268,8 +268,15 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                     );
                   }
 
-                  return ListView.separated(
-                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(visitListProvider);
+                      try {
+                        await ref.read(visitListProvider.future);
+                      } catch (_) {}
+                    },
+                    child: ListView.separated(
+                      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                     padding: EdgeInsets.symmetric(
                       horizontal: Responsive.horizontalPadding(context),
                       vertical: 8,
@@ -487,10 +494,44 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                         ),
                       );
                     },
-                  );
+                  ),
+                );
                 },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, _) => Center(child: Text('Error loading queue: $err')),
+                loading: () => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+                error: (err, _) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.triagePriority),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Unable to Load OPD Queue',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Network connection or queue service error occurred.\nPlease check your connection and retry.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
+                          icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+                          label: const Text('Retry Connection', style: TextStyle(color: Colors.white)),
+                          onPressed: () => ref.invalidate(visitListProvider),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

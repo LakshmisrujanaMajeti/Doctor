@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -234,12 +235,32 @@ class DioClient {
     }
   }
 
+  static Completer<bool>? _refreshCompleter;
+
   Future<bool> attemptTokenRefresh() async {
+    // If a refresh is already in flight, wait for its completion rather than initiating a concurrent request
+    if (_refreshCompleter != null && !_refreshCompleter!.isCompleted) {
+      debugPrint('⚡ [DIO REFRESH] Concurrent 401 detected; awaiting existing refresh operation...');
+      return await _refreshCompleter!.future;
+    }
+
+    final completer = Completer<bool>();
+    _refreshCompleter = completer;
+
     try {
       final refreshToken = await SecureStorageService.getRefreshToken();
-      if (refreshToken == null) return false;
+      if (refreshToken == null) {
+        completer.complete(false);
+        return false;
+      }
 
-      final refreshDio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+      final refreshDio = Dio(
+        BaseOptions(
+          baseUrl: AppConfig.apiBaseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
       final res = await refreshDio.post(
         ApiEndpoints.refresh,
         data: {'refresh_token': refreshToken},
@@ -254,10 +275,25 @@ class DioClient {
           accessToken: newAccess,
           refreshToken: newRefresh,
         );
+        debugPrint('⚡ [DIO REFRESH] Access & refresh tokens rotated successfully.');
+        completer.complete(true);
         return true;
+      } else {
+        completer.complete(false);
+        return false;
       }
-    } catch (_) {}
-    return false;
+    } catch (e) {
+      debugPrint('⚡ [DIO REFRESH ERROR] Failed to refresh token: $e');
+      completer.complete(false);
+      return false;
+    } finally {
+      // Clear completer reference after a short delay so subsequent 401s in future minutes start fresh
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_refreshCompleter == completer) {
+          _refreshCompleter = null;
+        }
+      });
+    }
   }
 
   static Future<void> saveTokens({

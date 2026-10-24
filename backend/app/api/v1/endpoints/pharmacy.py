@@ -1,12 +1,14 @@
 from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Header
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.responses import success_response
 from app.core.dependencies import require_roles, get_current_user
 from app.core.exceptions import NotFoundException, BadRequestException
+from app.core.idempotency import idempotency_manager
 from app.models.user import User
 from app.schemas.pharmacy import (
     StockReceiptRequest,
@@ -109,16 +111,43 @@ def get_prescriptions_for_dispensing(
 @router.post("/dispense", status_code=201, summary="Dispense Prescription Items with Real-time Stock Deduction")
 def dispense_prescription(
     payload: DispensePrescriptionRequest,
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["pharmacist", "admin"])),
 ):
-    dispense = PharmacyService.dispense_prescription(db, payload, current_user=current_user)
-    data = PharmacyService.get_dispense_by_id(db, dispense.id)
-    return success_response(
-        data=data,
-        message=f"Dispensing {dispense.dispense_number} completed successfully",
-        status_code=201,
+    can_proceed, cached_resp, status_code = idempotency_manager.acquire(
+        key=x_idempotency_key,
+        user_id=str(current_user.id),
+        endpoint="/api/v1/pharmacy/dispense",
+        payload=payload.model_dump(),
     )
+    if not can_proceed and cached_resp is not None:
+        return JSONResponse(content=cached_resp, status_code=status_code)
+
+    try:
+        dispense = PharmacyService.dispense_prescription(db, payload, current_user=current_user)
+        data = PharmacyService.get_dispense_by_id(db, dispense.id)
+        msg = f"Dispensing {dispense.dispense_number} completed successfully"
+        resp_body = {
+            "status": "success",
+            "data": data,
+            "message": msg,
+            "error": None,
+        }
+        idempotency_manager.store_result(
+            key=x_idempotency_key,
+            user_id=str(current_user.id),
+            response_data=resp_body,
+            status_code=201,
+        )
+        return success_response(
+            data=data,
+            message=msg,
+            status_code=201,
+        )
+    except Exception:
+        idempotency_manager.mark_failed(key=x_idempotency_key, user_id=str(current_user.id))
+        raise
 
 
 @router.get("/dispenses", summary="Get Traceable Dispensing History")

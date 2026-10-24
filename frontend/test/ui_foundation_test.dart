@@ -8,6 +8,8 @@ import 'package:opd_connect/features/auth/screens/profile_setup_screen.dart';
 import 'package:opd_connect/features/auth/screens/splash_screen.dart';
 import 'package:opd_connect/features/auth/screens/welcome_screen.dart';
 import 'package:opd_connect/features/notifications/screens/notifications_screen.dart';
+import 'package:opd_connect/features/notifications/providers/notification_provider.dart';
+import 'package:opd_connect/features/notifications/models/notification_item_model.dart';
 import 'package:opd_connect/features/settings/screens/settings_screen.dart';
 import 'package:opd_connect/shared/screens/empty_screen.dart';
 import 'package:opd_connect/shared/screens/loading_screen.dart';
@@ -184,7 +186,7 @@ void main() {
 
       expect(find.text(AppStrings.appName), findsOneWidget);
       expect(find.text('Sign In to Portal'), findsOneWidget);
-      expect(find.text('Patient Self-Registration'), findsOneWidget);
+      expect(find.text('Patient UHID & Records Lookup'), findsOneWidget);
       expect(find.text('Doctor Portal'), findsOneWidget);
     });
 
@@ -222,10 +224,17 @@ void main() {
     testWidgets('NotificationsScreen displays category filter chips',
         (WidgetTester tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: NotificationsScreen(),
+        ProviderScope(
+          overrides: [
+            notificationsListProvider.overrideWith((ref) async => <NotificationItemModel>[]),
+            unreadNotificationCountProvider.overrideWith((ref) async => 0),
+          ],
+          child: const MaterialApp(
+            home: NotificationsScreen(),
+          ),
         ),
       );
+      await tester.pump();
 
       expect(find.text('Hospital Alerts'), findsOneWidget);
       expect(find.text('All Updates'), findsOneWidget);

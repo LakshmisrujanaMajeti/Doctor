@@ -68,6 +68,17 @@ class PatientBase(BaseSchema):
             return digits
         return None
 
+    @field_validator("postal_code")
+    @classmethod
+    def validate_postal_code(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip():
+            clean = v.strip()
+            import re
+            if not re.match(r"^[1-9][0-9]{5}$", clean):
+                raise ValueError("Indian PIN code must be exactly 6 numeric digits (cannot start with 0)")
+            return clean
+        return None
+
 
 class PatientCreate(PatientBase):
     hospital_reg_num: Optional[str] = None
@@ -95,6 +106,17 @@ class PatientUpdate(BaseSchema):
     barcode_value: Optional[str] = None
     qr_code_data: Optional[str] = None
     guardian_id: Optional[str] = None
+
+    @field_validator("postal_code")
+    @classmethod
+    def validate_postal_code(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip():
+            clean = v.strip()
+            import re
+            if not re.match(r"^[1-9][0-9]{5}$", clean):
+                raise ValueError("Indian PIN code must be exactly 6 numeric digits (cannot start with 0)")
+            return clean
+        return None
 
 
 class PatientRead(PatientBase):

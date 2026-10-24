@@ -1,10 +1,12 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Header
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.responses import success_response
 from app.core.dependencies import get_current_user, require_roles, verify_patient_access
 from app.core.exceptions import ForbiddenException
+from app.core.idempotency import idempotency_manager
 from app.schemas.visit import (
     OPDVisitCreate,
     OPDVisitUpdate,
@@ -63,6 +65,7 @@ def list_visits(
 @router.post("", summary="Create OPD Visit & Issue Token (Receptionist/Doctor/Admin/Patient)")
 def create_visit(
     visit_in: OPDVisitCreate,
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -73,12 +76,38 @@ def create_visit(
     elif user_role not in ["receptionist", "doctor", "admin"]:
         require_roles(["receptionist", "doctor", "admin"])(current_user)
 
-    visit = VisitService.create_visit(db=db, visit_in=visit_in, current_user_id=current_user.id)
-    return success_response(
-        data=OPDVisitRead.model_validate(visit).model_dump(),
-        message="OPD visit booked and token generated",
-        status_code=201
+    can_proceed, cached_resp, status_code = idempotency_manager.acquire(
+        key=x_idempotency_key,
+        user_id=str(current_user.id),
+        endpoint="/api/v1/visits",
+        payload=visit_in.model_dump(),
     )
+    if not can_proceed and cached_resp is not None:
+        return JSONResponse(content=cached_resp, status_code=status_code)
+
+    try:
+        visit = VisitService.create_visit(db=db, visit_in=visit_in, current_user_id=current_user.id)
+        visit_data = OPDVisitRead.model_validate(visit).model_dump()
+        resp_body = {
+            "status": "success",
+            "data": visit_data,
+            "message": "OPD visit booked and token generated",
+            "error": None,
+        }
+        idempotency_manager.store_result(
+            key=x_idempotency_key,
+            user_id=str(current_user.id),
+            response_data=resp_body,
+            status_code=201,
+        )
+        return success_response(
+            data=visit_data,
+            message="OPD visit booked and token generated",
+            status_code=201
+        )
+    except Exception:
+        idempotency_manager.mark_failed(key=x_idempotency_key, user_id=str(current_user.id))
+        raise
 
 
 @router.get("/{visit_id}", summary="Get Visit Details")

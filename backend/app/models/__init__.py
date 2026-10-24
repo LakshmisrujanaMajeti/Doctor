@@ -33,6 +33,7 @@ from app.models.document import (
 from app.models.audit import AuditLog
 from app.models.support import SupportTicket
 from app.models.config import SystemConfig
+from app.models.notification import Notification
 
 __all__ = [
     "Base",
@@ -71,4 +72,5 @@ __all__ = [
     "AuditLog",
     "SupportTicket",
     "SystemConfig",
+    "Notification",
 ]

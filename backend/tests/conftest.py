@@ -5,7 +5,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
+import app.models  # Register all models for Base.metadata
 from app.main import app
+
+import sqlite3
+from decimal import Decimal
+sqlite3.register_adapter(Decimal, lambda d: str(d))
 
 # In-memory SQLite for tests
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -26,11 +31,10 @@ def setup_test_db():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def live_db_test_environment():
-    """Ensure test data exists for integration tests running against SessionLocal and cleans up completely at teardown."""
+def live_db_test_environment(setup_test_db):
+    """Ensure test data exists for integration tests running against TestingSessionLocal and cleans up completely at teardown."""
     from datetime import date
     from decimal import Decimal
-    from app.core.database import SessionLocal
     from app.core.security import get_password_hash
     from app.models.user import User, Role
     from app.models.doctor import Doctor
@@ -44,12 +48,128 @@ def live_db_test_environment():
     from app.models.billing import Bill, BillItem, PaymentTransaction
     from app.models.document import MedicalDocument, DocumentPage, DocumentOCRExtraction
 
-    db = SessionLocal()
+    db = TestingSessionLocal()
     try:
-        role_pat = db.query(Role).filter(Role.name == "patient").first()
-        if not role_pat:
-            role_pat = Role(name="patient", description="Patient user")
-            db.add(role_pat)
+        all_roles = ["admin", "patient", "doctor", "nurse", "receptionist", "pharmacist", "laboratory", "lab_tech"]
+        roles = {}
+        for r_name in all_roles:
+            r = db.query(Role).filter(Role.name == r_name).first()
+            if not r:
+                r = Role(name=r_name, description=r_name.capitalize())
+                db.add(r)
+                db.flush()
+            roles[r_name] = r
+        role_pat = roles["patient"]
+
+        test_dept = db.query(Department).first()
+        if not test_dept:
+            test_dept = Department(name="General Medicine", code="MED", is_active=True)
+            db.add(test_dept)
+            db.flush()
+
+        admin_user = db.query(User).filter(User.email == "admin@opdconnect.com").first()
+        if not admin_user:
+            admin_user = User(
+                email="admin@opdconnect.com",
+                full_name="Admin Administrator",
+                phone="+1555000001",
+                hashed_password=get_password_hash("Admin@123456"),
+                role_id=roles["admin"].id,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(admin_user)
+            db.flush()
+        else:
+            admin_user.hashed_password = get_password_hash("Admin@123456")
+            admin_user.is_active = True
+            db.flush()
+
+        doc_user = db.query(User).filter(User.email == "dr.chen@opdconnect.com").first()
+        if not doc_user:
+            doc_user = User(
+                email="dr.chen@opdconnect.com",
+                full_name="Dr. Sarah Chen, MD",
+                phone="+1555000002",
+                hashed_password=get_password_hash("Doctor@123456"),
+                role_id=roles["doctor"].id,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(doc_user)
+            db.flush()
+        else:
+            doc_user.hashed_password = get_password_hash("Doctor@123456")
+            doc_user.is_active = True
+            db.flush()
+
+        doc_profile = db.query(Doctor).filter(Doctor.user_id == doc_user.id).first()
+        if not doc_profile:
+            doc_profile = Doctor(
+                user_id=doc_user.id,
+                department_id=test_dept.id,
+                qualification="MBBS, MD",
+                specialization="Internal Medicine",
+                registration_number="MED-12345",
+                room_number="Room 101",
+                consultation_fee=Decimal("500.00"),
+                is_available=True,
+            )
+            db.add(doc_profile)
+            db.flush()
+
+        rec_user = db.query(User).filter(User.email == "receptionist@opdconnect.com").first()
+        if not rec_user:
+            rec_user = User(
+                email="receptionist@opdconnect.com",
+                full_name="Reception Staff",
+                phone="+1555000003",
+                hashed_password=get_password_hash("Reception@123456"),
+                role_id=roles["receptionist"].id,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(rec_user)
+            db.flush()
+        else:
+            rec_user.hashed_password = get_password_hash("Reception@123456")
+            rec_user.is_active = True
+            db.flush()
+
+        pharm_user = db.query(User).filter(User.email == "pharmacist@opdconnect.com").first()
+        if not pharm_user:
+            pharm_user = User(
+                email="pharmacist@opdconnect.com",
+                full_name="Pharmacist Staff",
+                phone="+1555000005",
+                hashed_password=get_password_hash("Pharmacy@123456"),
+                role_id=roles["pharmacist"].id,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(pharm_user)
+            db.flush()
+        else:
+            pharm_user.hashed_password = get_password_hash("Pharmacy@123456")
+            pharm_user.is_active = True
+            db.flush()
+
+        lab_user = db.query(User).filter(User.email == "lab@opdconnect.com").first()
+        if not lab_user:
+            lab_user = User(
+                email="lab@opdconnect.com",
+                full_name="Lab Technician",
+                phone="+1555000004",
+                hashed_password=get_password_hash("Lab@123456"),
+                role_id=roles["lab_tech"].id,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(lab_user)
+            db.flush()
+        else:
+            lab_user.hashed_password = get_password_hash("Lab@123456")
+            lab_user.is_active = True
             db.flush()
 
         p1 = db.query(Patient).filter(Patient.uhid == "UHID-2026-00001").first()
@@ -199,7 +319,7 @@ def live_db_test_environment():
 
     yield
 
-    cleanup_db = SessionLocal()
+    cleanup_db = TestingSessionLocal()
     try:
         cleanup_db.query(PaymentTransaction).delete()
         cleanup_db.query(BillItem).delete()
@@ -212,8 +332,7 @@ def live_db_test_environment():
         cleanup_db.query(PrescriptionItem).delete()
         cleanup_db.query(Prescription).delete()
         cleanup_db.query(ClinicalRecord).delete()
-        cleanup_db.query(OPDVisit).delete()
-        cleanup_db.query(User).filter(User.email == "patient@opdconnect.com").delete()
+        cleanup_db.query(User).filter(User.email.in_(["patient@opdconnect.com", "admin@opdconnect.com", "dr.chen@opdconnect.com", "receptionist@opdconnect.com"])).delete()
         cleanup_db.query(Patient).delete()
         cleanup_db.query(MedicineInventory).filter(MedicineInventory.batch_number == "BAT-2025-999").delete()
         pcm_clean = cleanup_db.query(MedicineInventory).filter(MedicineInventory.batch_number == "BAT-2026-001").first()

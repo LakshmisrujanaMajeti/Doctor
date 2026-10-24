@@ -1,11 +1,13 @@
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Response, Header
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.core.database import get_db
 from app.core.responses import success_response
 from app.core.exceptions import NotFoundException
 from app.core.dependencies import get_current_user, get_optional_current_user, require_roles, verify_patient_access
+from app.core.idempotency import idempotency_manager
 from app.schemas.patient import (
     PatientCreate,
     PatientUpdate,
@@ -79,20 +81,47 @@ def list_patients(
 def create_patient(
     patient_in: PatientCreate,
     allow_duplicate: bool = Query(False, description="Override warning if legitimate duplicate phone/name"),
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["receptionist", "doctor", "admin", "nurse", "billing", "lab_tech", "pharmacist"])),
 ):
-    patient = PatientService.create_patient(
-        db=db,
-        patient_in=patient_in,
-        current_user_id=current_user.id,
-        prevent_duplicates=not allow_duplicate,
+    can_proceed, cached_resp, status_code = idempotency_manager.acquire(
+        key=x_idempotency_key,
+        user_id=str(current_user.id),
+        endpoint="/api/v1/patients",
+        payload=patient_in.model_dump(),
     )
-    return success_response(
-        data=PatientRead.model_validate(patient).model_dump(),
-        message="Patient registered successfully",
-        status_code=201,
-    )
+    if not can_proceed and cached_resp is not None:
+        return JSONResponse(content=cached_resp, status_code=status_code)
+
+    try:
+        patient = PatientService.create_patient(
+            db=db,
+            patient_in=patient_in,
+            current_user_id=current_user.id,
+            prevent_duplicates=not allow_duplicate,
+        )
+        patient_data = PatientRead.model_validate(patient).model_dump()
+        resp_body = {
+            "status": "success",
+            "data": patient_data,
+            "message": "Patient registered successfully",
+            "error": None,
+        }
+        idempotency_manager.store_result(
+            key=x_idempotency_key,
+            user_id=str(current_user.id),
+            response_data=resp_body,
+            status_code=201,
+        )
+        return success_response(
+            data=patient_data,
+            message="Patient registered successfully",
+            status_code=201,
+        )
+    except Exception:
+        idempotency_manager.mark_failed(key=x_idempotency_key, user_id=str(current_user.id))
+        raise
 
 
 @router.get("/{patient_id}", summary="Get Patient by ID")

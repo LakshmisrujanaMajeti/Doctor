@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../models/pharmacy_models.dart';
@@ -134,9 +135,18 @@ class PharmacyRepository {
     return [];
   }
 
-  Future<PharmacyDispenseRecord?> dispensePrescription(Map<String, dynamic> payload) async {
+  Future<PharmacyDispenseRecord?> dispensePrescription(
+    Map<String, dynamic> payload, {
+    String? idempotencyKey,
+  }) async {
+    final headers = <String, dynamic>{
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+        'X-Idempotency-Key': idempotencyKey,
+    };
+
     final res = await _dioClient.dio.post(
       ApiEndpoints.pharmacyDispense,
+      options: Options(headers: headers),
       data: payload,
     );
     if (res.data['status'] == 'success' && res.data['data'] != null) {

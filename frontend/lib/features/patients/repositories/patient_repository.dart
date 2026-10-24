@@ -106,8 +106,33 @@ class PatientRepository {
 
   /// Instant Stale-While-Revalidate: returns cached patients in 0-1ms,
   /// then asynchronously updates from Supabase Cloud and backend without blocking the UI.
-  Future<List<PatientModel>> getPatients({String? query}) async {
+  /// When [forceRefresh] is true, queries the backend directly and updates the cache.
+  Future<List<PatientModel>> getPatients({String? query, bool forceRefresh = false}) async {
     await _loadCacheIfNeeded();
+
+    // If forceRefresh requested and online, fetch directly from backend
+    if (forceRefresh && DioClient.isHostReachable) {
+      try {
+        final res = await _dioClient.dio.get(
+          ApiEndpoints.patients,
+          queryParameters: query != null && query.isNotEmpty ? {'query': query} : null,
+          options: Options(headers: {'Cache-Control': 'no-cache'}),
+        );
+
+        final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
+        if (raw is Map && raw['status'] == 'success') {
+          final list = raw['data'] as List<dynamic>;
+          final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
+          if (query == null || query.isEmpty) {
+            _localPatients.clear();
+            _localPatients.addAll(fetched);
+            _deduplicateLocalPatients();
+            await _saveCache();
+          }
+          return _filterPatients(fetched, query);
+        }
+      } catch (_) {}
+    }
 
     // 1. If searching and online, fetch real-time search results directly from backend
     if (query != null && query.trim().isNotEmpty && DioClient.isHostReachable) {
@@ -129,7 +154,7 @@ class PatientRepository {
     }
 
     // 2. If we have cached patients, return filtered results immediately (0ms) and background sync
-    if (_localPatients.isNotEmpty) {
+    if (_localPatients.isNotEmpty && !forceRefresh) {
       _syncPatientsFromCloud(query);
       return _filterPatients(_localPatients, query);
     }
@@ -320,7 +345,11 @@ class PatientRepository {
     );
   }
 
-  Future<PatientModel> registerPatient(PatientModel patient, {bool allowDuplicate = false}) async {
+  Future<PatientModel> registerPatient(
+    PatientModel patient, {
+    bool allowDuplicate = false,
+    String? idempotencyKey,
+  }) async {
     await _loadCacheIfNeeded();
 
     final cleanDigits = patient.phone.replaceAll(RegExp(r'\D'), '');
@@ -348,10 +377,16 @@ class PatientRepository {
       }
     }
 
+    final headers = <String, dynamic>{
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+        'X-Idempotency-Key': idempotencyKey,
+    };
+
     try {
       final res = await _dioClient.dio.post(
         ApiEndpoints.patients,
         queryParameters: {'allow_duplicate': allowDuplicate},
+        options: Options(headers: headers),
         data: patient.toJson(),
       );
 
@@ -381,6 +416,7 @@ class PatientRepository {
               final retryRes = await _dioClient.dio.post(
                 ApiEndpoints.patients,
                 queryParameters: {'allow_duplicate': allowDuplicate},
+                options: Options(headers: headers),
                 data: patient.toJson(),
               );
               if (retryRes.data['status'] == 'success') {

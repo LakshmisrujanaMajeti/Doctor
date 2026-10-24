@@ -141,5 +141,12 @@ class ApiEndpoints {
   static const String patientPortalDocuments = '/patient-portal/documents';
   static const String patientPortalBills = '/patient-portal/bills';
   static const String patientPortalSupport = '/patient-portal/support';
+
+  // Notifications
+  static const String notifications = '/notifications';
+  static const String notificationsUnreadCount = '/notifications/unread-count';
+  static String notificationMarkRead(String id) => '/notifications/$id/read';
+  static const String notificationsMarkAllRead = '/notifications/mark-all-read';
 }
+
 

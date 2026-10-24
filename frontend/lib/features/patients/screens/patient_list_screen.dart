@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routing/app_router.dart';
@@ -13,6 +12,7 @@ import '../../dashboard/providers/dashboard_provider.dart';
 import '../models/patient_model.dart';
 import '../providers/patient_provider.dart';
 import '../widgets/patient_identifier_card_widget.dart';
+import '../widgets/edit_patient_dialog.dart';
 
 class PatientListScreen extends ConsumerWidget {
   const PatientListScreen({super.key});
@@ -96,8 +96,15 @@ class PatientListScreen extends ConsumerWidget {
                     );
                   }
 
-                return ListView.separated(
-                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    ref.invalidate(patientListProvider);
+                    try {
+                      await ref.read(patientListProvider.future);
+                    } catch (_) {}
+                  },
+                  child: ListView.separated(
+                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                   padding: EdgeInsets.symmetric(
                     horizontal: Responsive.horizontalPadding(context),
                     vertical: 8,
@@ -238,7 +245,8 @@ class PatientListScreen extends ConsumerWidget {
                       ),
                     );
                   },
-                );
+                ),
+              );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (err, _) => Center(child: Text('Error loading patients: $err')),
@@ -365,114 +373,12 @@ class PatientListScreen extends ConsumerWidget {
     );
   }
 
-  void _showEditPatientDialog(BuildContext context, WidgetRef ref, PatientModel patient) {
-    final nameCtrl = TextEditingController(text: patient.fullName);
-    final phoneCtrl = TextEditingController(text: patient.phone);
-    final ageCtrl = TextEditingController(text: patient.ageYears != null ? '${patient.ageYears}' : '');
-    final addressCtrl = TextEditingController(text: patient.address ?? '');
-    final relationNameCtrl = TextEditingController(text: patient.parentSpouseName ?? '');
-    String selectedGender = patient.gender.toUpperCase();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Edit ${patient.fullName}'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: phoneCtrl,
-                  decoration: const InputDecoration(labelText: 'Phone Number (10 Digits) *', isDense: true),
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: ageCtrl,
-                        decoration: const InputDecoration(labelText: 'Age (Years)', isDense: true),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: ['MALE', 'FEMALE', 'OTHER'].contains(selectedGender) ? selectedGender : 'OTHER',
-                        decoration: const InputDecoration(labelText: 'Gender', isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'MALE', child: Text('Male')),
-                          DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
-                          DropdownMenuItem(value: 'OTHER', child: Text('Other')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) setDialogState(() => selectedGender = val);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: relationNameCtrl,
-                  decoration: const InputDecoration(labelText: 'Father / Spouse Name', isDense: true),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: addressCtrl,
-                  decoration: const InputDecoration(labelText: 'Address', isDense: true),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty || phoneCtrl.text.trim().isEmpty) return;
-                final updated = patient.copyWith(
-                  fullName: nameCtrl.text.trim(),
-                  phone: phoneCtrl.text.trim(),
-                  ageYears: int.tryParse(ageCtrl.text.trim()),
-                  gender: selectedGender,
-                  parentSpouseName: relationNameCtrl.text.trim().isEmpty ? null : relationNameCtrl.text.trim(),
-                  address: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
-                );
-                try {
-                  await ref.read(patientRepositoryProvider).updatePatient(updated);
-                  ref.invalidate(patientListProvider);
-                  ref.invalidate(dashboardStatsProvider);
-                  if (context.mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Patient "${updated.fullName}" updated successfully!')),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to update patient: $e'), backgroundColor: Colors.red),
-                    );
-                  }
-                }
-              },
-              child: const Text('Save Changes'),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _showEditPatientDialog(BuildContext context, WidgetRef ref, PatientModel patient) async {
+    final updated = await EditPatientDialog.show(context, patient);
+    if (updated != null) {
+      ref.invalidate(patientListProvider);
+      ref.invalidate(dashboardStatsProvider);
+    }
   }
 
   void _confirmDeletePatient(BuildContext context, WidgetRef ref, PatientModel patient) async {

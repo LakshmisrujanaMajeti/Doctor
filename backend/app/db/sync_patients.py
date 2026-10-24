@@ -26,9 +26,9 @@ patients = [
         "phone": "8374477999",
         "email": "srujana@smvmch.ac.in",
         "address": "Flat 402, Sri Krishna Heights, Kalitheerthalkuppam",
-        "city": "Puducherry",
-        "state": "Puducherry",
-        "postal_code": "605107",
+        "city": "Rajahmundry",
+        "state": "Andhra Pradesh",
+        "postal_code": "533101",
         "blood_group": "O+"
     },
     {

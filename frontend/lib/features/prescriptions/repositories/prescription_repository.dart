@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/supabase_service.dart';
@@ -123,7 +124,10 @@ class PrescriptionRepository {
     return [];
   }
 
-  Future<PrescriptionModel> createPrescription(PrescriptionModel rx) async {
+  Future<PrescriptionModel> createPrescription(
+    PrescriptionModel rx, {
+    String? idempotencyKey,
+  }) async {
     final cli = SupabaseService.client;
     final rxId = rx.id.isNotEmpty ? rx.id : 'rx_${DateTime.now().millisecondsSinceEpoch}';
     if (cli != null) {
@@ -158,9 +162,15 @@ class PrescriptionRepository {
       }
     }
 
+    final headers = <String, dynamic>{
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
+        'X-Idempotency-Key': idempotencyKey,
+    };
+
     try {
       final res = await _dioClient.dio.post(
         ApiEndpoints.prescriptions,
+        options: Options(headers: headers),
         data: rx.toJson(),
       );
       if (res.data['status'] == 'success') {

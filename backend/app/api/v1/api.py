@@ -15,6 +15,7 @@ from app.api.v1.endpoints import (
     documents,
     admin,
     patient_portal,
+    notifications,
 )
 
 api_router = APIRouter()
@@ -34,4 +35,5 @@ api_router.include_router(billing.router, prefix="/billing", tags=["Billing & In
 api_router.include_router(documents.router, prefix="/documents", tags=["Medical Documents"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Administration & Audit"])
 api_router.include_router(patient_portal.router, prefix="/patient-portal", tags=["Patient Portal"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 
