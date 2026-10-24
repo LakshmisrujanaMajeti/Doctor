@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routing/app_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/field_validators.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../core/utils/submission_guard.dart';
 import '../../../core/services/postal_pincode_service.dart';
@@ -283,33 +284,43 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
   }
 
   void _showReviewBeforeSubmit() {
-    if (_nameController.text.trim().isEmpty) {
+    final nameErr = FieldValidators.validatePersonName(_nameController.text, fieldName: 'Patient Full Name', isRequired: true);
+    if (nameErr != null) {
       _tabController.animateTo(0);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.red,
-          content: Text('Patient Full Name is required in Step 1 (Demographics).'),
-        ),
+        SnackBar(backgroundColor: Colors.red, content: Text(nameErr)),
       );
       return;
     }
-    if (_phoneController.text.trim().length < 10) {
+    final phoneErr = FieldValidators.validateIndianPhone(_phoneController.text, fieldName: 'Contact Phone Number', isRequired: true);
+    if (phoneErr != null) {
       _tabController.animateTo(1);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.red,
-          content: Text('A valid 10-digit Contact Phone Number is required in Step 2 (Contact).'),
-        ),
+        SnackBar(backgroundColor: Colors.red, content: Text(phoneErr)),
       );
       return;
     }
-    if (_addressController.text.trim().isEmpty) {
+    final addrErr = FieldValidators.validateAddress(_addressController.text, fieldName: 'Residential Street Address', isRequired: true);
+    if (addrErr != null) {
       _tabController.animateTo(1);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.red,
-          content: Text('Residential Street Address is required in Step 2 (Contact & Address).'),
-        ),
+        SnackBar(backgroundColor: Colors.red, content: Text(addrErr)),
+      );
+      return;
+    }
+    final emergNameErr = FieldValidators.validatePersonName(_emergencyNameController.text, fieldName: 'Emergency Contact Person', isRequired: true);
+    if (emergNameErr != null) {
+      _tabController.animateTo(2);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(backgroundColor: Colors.red, content: Text(emergNameErr)),
+      );
+      return;
+    }
+    final emergPhoneErr = FieldValidators.validateIndianPhone(_emergencyPhoneController.text, fieldName: 'Emergency Phone Number', isRequired: true);
+    if (emergPhoneErr != null) {
+      _tabController.animateTo(2);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(backgroundColor: Colors.red, content: Text(emergPhoneErr)),
       );
       return;
     }
@@ -770,33 +781,26 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                         ),
                         onPressed: () {
                           if (_tabController.index == 0) {
-                            if (_nameController.text.trim().isEmpty) {
+                            final nameErr = FieldValidators.validatePersonName(_nameController.text, fieldName: 'Patient Full Name', isRequired: true);
+                            if (nameErr != null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  backgroundColor: Colors.red,
-                                  content: Text('Please enter Patient Full Name before proceeding.'),
-                                ),
+                                SnackBar(backgroundColor: Colors.red, content: Text(nameErr)),
                               );
                               return;
                             }
                             _tabController.animateTo(1);
                           } else if (_tabController.index == 1) {
-                            final phone = _phoneController.text.trim();
-                            if (phone.length < 10) {
+                            final phoneErr = FieldValidators.validateIndianPhone(_phoneController.text, fieldName: 'Contact Phone Number', isRequired: true);
+                            if (phoneErr != null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  backgroundColor: Colors.red,
-                                  content: Text('Please enter a valid 10-digit Contact Phone Number.'),
-                                ),
+                                SnackBar(backgroundColor: Colors.red, content: Text(phoneErr)),
                               );
                               return;
                             }
-                            if (_addressController.text.trim().isEmpty) {
+                            final addrErr = FieldValidators.validateAddress(_addressController.text, fieldName: 'Residential Address', isRequired: true);
+                            if (addrErr != null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  backgroundColor: Colors.red,
-                                  content: Text('Please enter Residential Address before proceeding.'),
-                                ),
+                                SnackBar(backgroundColor: Colors.red, content: Text(addrErr)),
                               );
                               return;
                             }
@@ -929,7 +933,11 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             label: 'Patient Full Name *',
             hint: 'e.g. Aarav Sharma',
             prefixIcon: const Icon(Icons.person_outline),
-            validator: (v) => v == null || v.trim().isEmpty ? 'Patient full name is required' : null,
+            inputFormatters: [
+              PersonNameInputFormatter(),
+              LengthLimitingTextInputFormatter(100),
+            ],
+            validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Patient Full Name', isRequired: true),
           ),
           const SizedBox(height: 12),
           Row(
@@ -956,6 +964,11 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                   label: 'Parent / Spouse Name',
                   hint: 'e.g. Dev Sharma',
                   prefixIcon: const Icon(Icons.family_restroom),
+                  inputFormatters: [
+                    PersonNameInputFormatter(),
+                    LengthLimitingTextInputFormatter(100),
+                  ],
+                  validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Parent / Spouse Name', isRequired: false),
                 ),
               ),
             ],
@@ -984,6 +997,11 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                   label: 'Age (Y)',
                   hint: 'Years',
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(3),
+                  ],
+                  validator: (v) => FieldValidators.validateAge(v, isRequired: false),
                 ),
               ),
               const SizedBox(width: 8),
@@ -993,6 +1011,11 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                   label: 'Months',
                   hint: '0-11',
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(2),
+                  ],
+                  validator: (v) => FieldValidators.validateAgeMonths(v),
                 ),
               ),
             ],
@@ -1038,7 +1061,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
               LengthLimitingTextInputFormatter(10),
             ],
             prefixIcon: const Icon(Icons.phone_outlined),
-            validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Contact Phone Number'),
+            validator: (v) => FieldValidators.validateIndianPhone(v, fieldName: 'Contact Phone Number', isRequired: true),
           ),
           const SizedBox(height: 12),
           OPDTextField(
@@ -1047,7 +1070,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             hint: 'patient@example.com',
             keyboardType: TextInputType.emailAddress,
             prefixIcon: const Icon(Icons.email_outlined),
-            validator: (v) => InputSanitizer.validateEmail(v, isRequired: false),
+            validator: (v) => FieldValidators.validateEmail(v, isRequired: false),
           ),
           const SizedBox(height: 12),
           OPDTextField(
@@ -1056,7 +1079,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             hint: 'Flat, Street, Landmark',
             maxLines: 2,
             prefixIcon: const Icon(Icons.home_outlined),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Residential address is mandatory' : null,
+            validator: (v) => FieldValidators.validateAddress(v, fieldName: 'Street / Residential Address', isRequired: true),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1092,7 +1115,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                     LengthLimitingTextInputFormatter(6),
                   ],
                   prefixIcon: const Icon(Icons.local_post_office_outlined),
-                  validator: (v) => PostalPincodeService.validatePincodeFormat(v),
+                  validator: (v) => FieldValidators.validatePinCode(v, isRequired: false),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1201,7 +1224,11 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             label: 'Emergency Contact Person *',
             hint: 'Name of guardian / kin',
             prefixIcon: const Icon(Icons.person_pin_outlined),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Emergency contact name is mandatory' : null,
+            inputFormatters: [
+              PersonNameInputFormatter(),
+              LengthLimitingTextInputFormatter(100),
+            ],
+            validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Emergency Contact Person', isRequired: true),
           ),
           const SizedBox(height: 12),
           OPDTextField(
@@ -1214,7 +1241,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
               LengthLimitingTextInputFormatter(10),
             ],
             prefixIcon: const Icon(Icons.phone_in_talk_outlined),
-            validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Emergency Phone Number'),
+            validator: (v) => FieldValidators.validateIndianPhone(v, fieldName: 'Emergency Phone Number', isRequired: true),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(

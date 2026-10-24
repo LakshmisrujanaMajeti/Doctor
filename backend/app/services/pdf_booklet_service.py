@@ -16,10 +16,50 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.graphics.shapes import Drawing, Rect, String as DString, Line as DLine
 from reportlab.graphics.barcode import code128
 
+import os
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
 from app.models.patient import Patient
 from app.models.visit import OPDVisit
 from app.models.billing import Bill
 from app.models.prescription import Prescription
+
+_registered_font = False
+BASE_FONT = 'Helvetica'
+BASE_FONT_BOLD = 'Helvetica-Bold'
+
+
+def setup_unicode_fonts():
+    """
+    Registers a TrueType Unicode font (Nirmala UI / Noto / DejaVu) to support
+    Indic languages including Tamil alongside English, preventing garbled characters.
+    """
+    global _registered_font, BASE_FONT, BASE_FONT_BOLD
+    if _registered_font:
+        return
+
+    font_candidates = [
+        ('C:/Windows/Fonts/Nirmala.ttf', 'C:/Windows/Fonts/NirmalaB.ttf', 'Nirmala', 'Nirmala-Bold'),
+        ('C:/Windows/Fonts/Latha.ttf', 'C:/Windows/Fonts/LathaB.ttf', 'Latha', 'Latha-Bold'),
+        ('/usr/share/fonts/truetype/noto/NotoSansTamil-Regular.ttf', '/usr/share/fonts/truetype/noto/NotoSansTamil-Bold.ttf', 'NotoTamil', 'NotoTamil-Bold'),
+        ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 'DejaVuSans', 'DejaVuSans-Bold'),
+    ]
+
+    for reg_path, bold_path, reg_name, bold_name in font_candidates:
+        if os.path.exists(reg_path):
+            try:
+                pdfmetrics.registerFont(TTFont(reg_name, reg_path))
+                BASE_FONT = reg_name
+                if os.path.exists(bold_path):
+                    pdfmetrics.registerFont(TTFont(bold_name, bold_path))
+                    BASE_FONT_BOLD = bold_name
+                else:
+                    BASE_FONT_BOLD = reg_name
+                _registered_font = True
+                break
+            except Exception:
+                continue
 
 
 class PDFBookletService:
@@ -33,7 +73,10 @@ class PDFBookletService:
         """
         Generates a comprehensive 7-page PDF booklet strictly reflecting
         the physical Out Patient Book of Sri Manakula Vinayagar Medical College and Hospital.
+        Supports full Unicode text (English and Tamil) without garbled characters.
         """
+        setup_unicode_fonts()
+
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer,
@@ -46,11 +89,11 @@ class PDFBookletService:
 
         styles = getSampleStyleSheet()
 
-        # Custom paragraph styles
+        # Custom paragraph styles supporting multilingual glyphs
         header_title_style = ParagraphStyle(
             'HospitalTitle',
             parent=styles['Heading1'],
-            fontName='Helvetica-Bold',
+            fontName=BASE_FONT_BOLD,
             fontSize=14,
             leading=17,
             alignment=1, # Center
@@ -59,7 +102,7 @@ class PDFBookletService:
         subtitle_style = ParagraphStyle(
             'HospitalSubtitle',
             parent=styles['Normal'],
-            fontName='Helvetica',
+            fontName=BASE_FONT,
             fontSize=9,
             leading=12,
             alignment=1,
@@ -68,7 +111,7 @@ class PDFBookletService:
         book_title_style = ParagraphStyle(
             'BookTitle',
             parent=styles['Heading1'],
-            fontName='Helvetica-Bold',
+            fontName=BASE_FONT_BOLD,
             fontSize=16,
             leading=20,
             alignment=1,
@@ -77,7 +120,7 @@ class PDFBookletService:
         label_style = ParagraphStyle(
             'FieldLabel',
             parent=styles['Normal'],
-            fontName='Helvetica-Bold',
+            fontName=BASE_FONT_BOLD,
             fontSize=10,
             leading=13,
             textColor=colors.HexColor('#1E293B'),
@@ -85,7 +128,7 @@ class PDFBookletService:
         val_style = ParagraphStyle(
             'FieldValue',
             parent=styles['Normal'],
-            fontName='Helvetica',
+            fontName=BASE_FONT,
             fontSize=10,
             leading=13,
             textColor=colors.HexColor('#0F172A'),
@@ -93,7 +136,7 @@ class PDFBookletService:
         footer_note_style = ParagraphStyle(
             'FooterNote',
             parent=styles['Normal'],
-            fontName='Helvetica-Bold',
+            fontName=BASE_FONT_BOLD,
             fontSize=9,
             leading=12,
             alignment=1,
@@ -216,9 +259,9 @@ class PDFBookletService:
             
             sticker_table = Table([
                 [sticker_bc],
-                [Paragraph(f"<b>{uhid} - {age_str}/{gender_str}</b>", ParagraphStyle('Stk1', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', alignment=1))],
-                [Paragraph(f"{patient.full_name[:24]}", ParagraphStyle('Stk2', parent=styles['Normal'], fontSize=7, alignment=1))],
-                [Paragraph(f"{relation}: {parent_name[:22]}", ParagraphStyle('Stk3', parent=styles['Normal'], fontSize=7, alignment=1))],
+                [Paragraph(f"<b>{uhid} - {age_str}/{gender_str}</b>", ParagraphStyle('Stk1', parent=styles['Normal'], fontSize=8, fontName=BASE_FONT_BOLD, alignment=1))],
+                [Paragraph(f"{patient.full_name[:24]}", ParagraphStyle('Stk2', parent=styles['Normal'], fontName=BASE_FONT, fontSize=7, alignment=1))],
+                [Paragraph(f"{relation}: {parent_name[:22]}", ParagraphStyle('Stk3', parent=styles['Normal'], fontName=BASE_FONT, fontSize=7, alignment=1))],
             ], colWidths=[240])
             sticker_table.setStyle(TableStyle([
                 ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#64748B')),
@@ -446,8 +489,8 @@ class PDFBookletService:
             [Paragraph("<b>CGST (2.5%):</b>", val_style), Paragraph("₹ 2.54", val_style)],
             [Paragraph("<b>SGST (2.5%):</b>", val_style), Paragraph("₹ 2.54", val_style)],
             [Paragraph("<b>Total GST:</b>", val_style), Paragraph("₹ 5.07", val_style)],
-            [Paragraph("<b>NET PAYABLE AMOUNT:</b>", label_style), Paragraph("<b>₹ 106.50</b>", ParagraphStyle('Net', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', textColor=colors.HexColor('#15803D')))],
-            [Paragraph("<b>Payment Status:</b>", label_style), Paragraph("<b>PAID IN FULL (CASH COUNTER)</b>", ParagraphStyle('Paid', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#0284C7')))],
+            [Paragraph("<b>NET PAYABLE AMOUNT:</b>", label_style), Paragraph("<b>₹ 106.50</b>", ParagraphStyle('Net', parent=styles['Normal'], fontSize=12, fontName=BASE_FONT_BOLD, textColor=colors.HexColor('#15803D')))],
+            [Paragraph("<b>Payment Status:</b>", label_style), Paragraph("<b>PAID IN FULL (CASH COUNTER)</b>", ParagraphStyle('Paid', parent=styles['Normal'], fontSize=9, fontName=BASE_FONT_BOLD, textColor=colors.HexColor('#0284C7')))],
         ]
         totals_table = Table(totals_data, colWidths=[360, 160])
         totals_table.setStyle(TableStyle([

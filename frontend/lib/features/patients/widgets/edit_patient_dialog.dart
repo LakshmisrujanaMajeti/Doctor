@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/postal_pincode_service.dart';
+import '../../../../core/utils/field_validators.dart';
 import '../../../../core/utils/input_sanitizer.dart';
 import '../../../../core/utils/submission_guard.dart';
 import '../../../../shared/widgets/opd_text_field.dart';
@@ -344,7 +345,11 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                       label: 'Patient Full Name *',
                       hint: 'e.g. Ramesh Kumar',
                       prefixIcon: const Icon(Icons.person_outline),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
+                      inputFormatters: [
+                        PersonNameInputFormatter(),
+                        LengthLimitingTextInputFormatter(100),
+                      ],
+                      validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Patient Full Name', isRequired: true),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -365,6 +370,11 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                             label: 'Father / Spouse Name',
                             hint: 'Name of guardian / spouse',
                             prefixIcon: const Icon(Icons.family_restroom_outlined),
+                            inputFormatters: [
+                              PersonNameInputFormatter(),
+                              LengthLimitingTextInputFormatter(100),
+                            ],
+                            validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Father / Spouse Name', isRequired: false),
                           ),
                         ),
                       ],
@@ -378,7 +388,11 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                             label: 'Age (Years)',
                             hint: 'e.g. 35',
                             keyboardType: TextInputType.number,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3),
+                            ],
+                            validator: (v) => FieldValidators.validateAge(v, isRequired: false),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -388,7 +402,11 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                             label: 'Age (Months)',
                             hint: '0-11',
                             keyboardType: TextInputType.number,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(2),
+                            ],
+                            validator: (v) => FieldValidators.validateAgeMonths(v),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -430,7 +448,7 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(10),
                       ],
-                      validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Contact Phone'),
+                      validator: (v) => FieldValidators.validateIndianPhone(v, fieldName: 'Contact Phone', isRequired: true),
                     ),
                     const SizedBox(height: 12),
                     OPDTextField(
@@ -439,6 +457,7 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                       hint: 'e.g. patient@gmail.com',
                       keyboardType: TextInputType.emailAddress,
                       prefixIcon: const Icon(Icons.email_outlined),
+                      validator: (v) => FieldValidators.validateEmail(v, isRequired: false),
                     ),
                     const SizedBox(height: 12),
                     OPDTextField(
@@ -447,7 +466,7 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                       hint: 'Door No, Street Name, Landmark',
                       maxLines: 2,
                       prefixIcon: const Icon(Icons.location_on_outlined),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Street address is required' : null,
+                      validator: (v) => FieldValidators.validateAddress(v, fieldName: 'House / Street / Locality', isRequired: true),
                     ),
                     const SizedBox(height: 12),
 
@@ -466,7 +485,7 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                               FilteringTextInputFormatter.digitsOnly,
                               LengthLimitingTextInputFormatter(6),
                             ],
-                            validator: PostalPincodeService.validatePincodeFormat,
+                            validator: (v) => FieldValidators.validatePinCode(v, isRequired: false),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -534,6 +553,11 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                       label: 'Emergency Contact Person Name',
                       hint: 'Name of relative / friend',
                       prefixIcon: const Icon(Icons.person_pin_outlined),
+                      inputFormatters: [
+                        PersonNameInputFormatter(),
+                        LengthLimitingTextInputFormatter(100),
+                      ],
+                      validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Emergency Contact Person Name', isRequired: false),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -549,6 +573,7 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                               FilteringTextInputFormatter.digitsOnly,
                               LengthLimitingTextInputFormatter(10),
                             ],
+                            validator: (v) => FieldValidators.validateIndianPhone(v, fieldName: 'Emergency Phone Number', isRequired: false),
                           ),
                         ),
                         const SizedBox(width: 8),

@@ -1,8 +1,9 @@
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
-from pydantic import Field
+from pydantic import Field, field_validator
 from app.schemas.common import BaseSchema
 from app.schemas.patient import PatientRead
+from app.core.validators import validate_person_name, validate_indian_phone
 
 
 # ==========================================
@@ -18,6 +19,14 @@ class PatientDependentCreate(BaseSchema):
     age_months: Optional[int] = Field(None, ge=0, le=11)
     blood_group: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
+
+    @field_validator("full_name")
+    def validate_dependent_name(cls, v: str) -> str:
+        return validate_person_name(v, "Dependent Name", required=True)
+
+    @field_validator("emergency_contact_phone")
+    def validate_contact_phone(cls, v: Optional[str]) -> Optional[str]:
+        return validate_indian_phone(v, "Emergency Contact Phone", required=False)
 
 
 class DependentProfileItem(BaseSchema):

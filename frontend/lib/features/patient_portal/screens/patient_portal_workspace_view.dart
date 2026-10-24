@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routing/app_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/field_validators.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../shared/widgets/empty_state_widget.dart';
 import '../../../shared/widgets/medical_illustrator_background.dart';
@@ -1515,6 +1517,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
   }
 
   void _showAddDependentDialog(BuildContext context) {
+    final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController();
     final relationCtrl = TextEditingController(text: 'Son');
     final ageCtrl = TextEditingController();
@@ -1526,47 +1529,67 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
         builder: (ctx, setDlgState) => AlertDialog(
           title: const Text('Add Permitted Dependent Profile'),
           content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name *')),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: relationCtrl.text,
-                  decoration: const InputDecoration(labelText: 'Relationship to Primary Patient *'),
-                  items: const [
-                    DropdownMenuItem(value: 'Son', child: Text('Son')),
-                    DropdownMenuItem(value: 'Daughter', child: Text('Daughter')),
-                    DropdownMenuItem(value: 'Mother', child: Text('Mother')),
-                    DropdownMenuItem(value: 'Father', child: Text('Father')),
-                    DropdownMenuItem(value: 'Spouse', child: Text('Spouse')),
-                    DropdownMenuItem(value: 'Ward', child: Text('Ward / Guardian')),
-                  ],
-                  onChanged: (v) => setDlgState(() => relationCtrl.text = v!),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: gender,
-                  decoration: const InputDecoration(labelText: 'Gender *'),
-                  items: const [
-                    DropdownMenuItem(value: 'MALE', child: Text('Male')),
-                    DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
-                    DropdownMenuItem(value: 'OTHER', child: Text('Other')),
-                  ],
-                  onChanged: (v) => setDlgState(() => gender = v!),
-                ),
-                const SizedBox(height: 8),
-                TextField(controller: ageCtrl, decoration: const InputDecoration(labelText: 'Age (Years) *'), keyboardType: TextInputType.number),
-              ],
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Full Name *'),
+                    inputFormatters: [
+                      PersonNameInputFormatter(),
+                      LengthLimitingTextInputFormatter(100),
+                    ],
+                    validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Dependent Full Name', isRequired: true),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: relationCtrl.text,
+                    decoration: const InputDecoration(labelText: 'Relationship to Primary Patient *'),
+                    items: const [
+                      DropdownMenuItem(value: 'Son', child: Text('Son')),
+                      DropdownMenuItem(value: 'Daughter', child: Text('Daughter')),
+                      DropdownMenuItem(value: 'Mother', child: Text('Mother')),
+                      DropdownMenuItem(value: 'Father', child: Text('Father')),
+                      DropdownMenuItem(value: 'Spouse', child: Text('Spouse')),
+                      DropdownMenuItem(value: 'Ward', child: Text('Ward / Guardian')),
+                    ],
+                    onChanged: (v) => setDlgState(() => relationCtrl.text = v!),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: gender,
+                    decoration: const InputDecoration(labelText: 'Gender *'),
+                    items: const [
+                      DropdownMenuItem(value: 'MALE', child: Text('Male')),
+                      DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
+                      DropdownMenuItem(value: 'OTHER', child: Text('Other')),
+                    ],
+                    onChanged: (v) => setDlgState(() => gender = v!),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: ageCtrl,
+                    decoration: const InputDecoration(labelText: 'Age (Years) *'),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(3),
+                    ],
+                    validator: (v) => FieldValidators.validateAge(v, isRequired: true),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
                 final cleanName = InputSanitizer.sanitizeText(nameCtrl.text);
                 final cleanRelation = InputSanitizer.sanitizeText(relationCtrl.text);
-                if (cleanName.isEmpty) return;
                 try {
                   final repo = ref.read(patientPortalRepositoryProvider);
                   await repo.addDependent(
@@ -1592,6 +1615,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
   }
 
   void _showNewSupportTicketDialog(BuildContext context) {
+    final formKey = GlobalKey<FormState>();
     final subCtrl = TextEditingController();
     final msgCtrl = TextEditingController();
     String category = 'GENERAL';
@@ -1602,35 +1626,47 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
         builder: (ctx, setDlgState) => AlertDialog(
           title: const Text('Submit Support Request / Inquiry'),
           content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: category,
-                  decoration: const InputDecoration(labelText: 'Inquiry Category'),
-                  items: const [
-                    DropdownMenuItem(value: 'GENERAL', child: Text('General Question')),
-                    DropdownMenuItem(value: 'APPOINTMENT', child: Text('Appointment & Queue')),
-                    DropdownMenuItem(value: 'BILLING', child: Text('Billing & Receipts')),
-                    DropdownMenuItem(value: 'MEDICAL_RECORDS', child: Text('Medical Records / Lab')),
-                    DropdownMenuItem(value: 'PHARMACY', child: Text('Pharmacy & Prescription')),
-                  ],
-                  onChanged: (v) => setDlgState(() => category = v!),
-                ),
-                const SizedBox(height: 8),
-                TextField(controller: subCtrl, decoration: const InputDecoration(labelText: 'Subject *')),
-                const SizedBox(height: 8),
-                TextField(controller: msgCtrl, decoration: const InputDecoration(labelText: 'Details / Description *'), maxLines: 4),
-              ],
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: category,
+                    decoration: const InputDecoration(labelText: 'Inquiry Category'),
+                    items: const [
+                      DropdownMenuItem(value: 'GENERAL', child: Text('General Question')),
+                      DropdownMenuItem(value: 'APPOINTMENT', child: Text('Appointment & Queue')),
+                      DropdownMenuItem(value: 'BILLING', child: Text('Billing & Receipts')),
+                      DropdownMenuItem(value: 'MEDICAL_RECORDS', child: Text('Medical Records / Lab')),
+                      DropdownMenuItem(value: 'PHARMACY', child: Text('Pharmacy & Prescription')),
+                    ],
+                    onChanged: (v) => setDlgState(() => category = v!),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: subCtrl,
+                    decoration: const InputDecoration(labelText: 'Subject *'),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Subject is required' : null,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: msgCtrl,
+                    decoration: const InputDecoration(labelText: 'Details / Description *'),
+                    maxLines: 4,
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Details are required' : null,
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
                 final cleanSub = InputSanitizer.sanitizeClinicalNotes(subCtrl.text);
                 final cleanMsg = InputSanitizer.sanitizeClinicalNotes(msgCtrl.text);
-                if (cleanSub.isEmpty || cleanMsg.isEmpty) return;
                 try {
                   final repo = ref.read(patientPortalRepositoryProvider);
                   final selectedId = ref.read(selectedPortalPatientIdProvider);

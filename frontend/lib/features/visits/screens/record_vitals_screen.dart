@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/field_validators.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/opd_text_field.dart';
 import '../models/visit_model.dart';
@@ -103,6 +105,28 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
   }
 
   Future<void> _handleSave() async {
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('Please correct the validation errors in the vitals form before saving.'),
+        ),
+      );
+      return;
+    }
+
+    final sys = int.tryParse(_systolicController.text.trim());
+    final dia = int.tryParse(_diastolicController.text.trim());
+    if (sys != null && dia != null && sys <= dia) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('Systolic BP ($sys mmHg) must be strictly greater than Diastolic BP ($dia mmHg).'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
@@ -229,6 +253,11 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                           controller: _systolicController,
                           keyboardType: TextInputType.number,
                           prefixIcon: Icons.favorite_border_rounded,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(3),
+                          ],
+                          validator: (v) => FieldValidators.validateSystolicBp(v, isRequired: false),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -239,6 +268,11 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                           controller: _diastolicController,
                           keyboardType: TextInputType.number,
                           prefixIcon: Icons.favorite_border_rounded,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(3),
+                          ],
+                          validator: (v) => FieldValidators.validateDiastolicBp(v, isRequired: false),
                         ),
                       ),
                     ],
@@ -255,6 +289,11 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                           controller: _pulseController,
                           keyboardType: TextInputType.number,
                           prefixIcon: Icons.monitor_heart_outlined,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(3),
+                          ],
+                          validator: (v) => FieldValidators.validatePulseRate(v, isRequired: false),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -265,6 +304,11 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                           controller: _tempController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.thermostat_rounded,
+                          inputFormatters: [
+                            DecimalInputFormatter(),
+                            LengthLimitingTextInputFormatter(5),
+                          ],
+                          validator: (v) => FieldValidators.validateTemperature(v, isRequired: false),
                         ),
                       ),
                     ],
@@ -281,6 +325,11 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                           controller: _spo2Controller,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.air_rounded,
+                          inputFormatters: [
+                            DecimalInputFormatter(),
+                            LengthLimitingTextInputFormatter(5),
+                          ],
+                          validator: (v) => FieldValidators.validateSpO2(v, isRequired: false),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -291,6 +340,11 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                           controller: _respController,
                           keyboardType: TextInputType.number,
                           prefixIcon: Icons.waves_rounded,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(2),
+                          ],
+                          validator: (v) => FieldValidators.validateRespiratoryRate(v, isRequired: false),
                         ),
                       ),
                     ],
@@ -307,6 +361,11 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                           controller: _heightController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.height_rounded,
+                          inputFormatters: [
+                            DecimalInputFormatter(),
+                            LengthLimitingTextInputFormatter(5),
+                          ],
+                          validator: (v) => FieldValidators.validateHeight(v, isRequired: false),
                           onChanged: (_) => _updateBmi(),
                         ),
                       ),
@@ -318,6 +377,11 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                           controller: _weightController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           prefixIcon: Icons.fitness_center_rounded,
+                          inputFormatters: [
+                            DecimalInputFormatter(),
+                            LengthLimitingTextInputFormatter(5),
+                          ],
+                          validator: (v) => FieldValidators.validateWeight(v, isRequired: false),
                           onChanged: (_) => _updateBmi(),
                         ),
                       ),

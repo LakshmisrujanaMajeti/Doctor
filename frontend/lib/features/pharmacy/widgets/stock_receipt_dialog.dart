@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/field_validators.dart';
 import '../providers/pharmacy_provider.dart';
 
 class StockReceiptDialog extends ConsumerStatefulWidget {
@@ -69,9 +71,9 @@ class _StockReceiptDialogState extends ConsumerState<StockReceiptDialog> {
   Future<void> _pickExpiryDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _expiryDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      initialDate: _expiryDate.isBefore(DateTime.now()) ? DateTime.now().add(const Duration(days: 30)) : _expiryDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
     );
     if (picked != null) {
       setState(() => _expiryDate = picked);
@@ -81,6 +83,14 @@ class _StockReceiptDialogState extends ConsumerState<StockReceiptDialog> {
   Future<void> _submit() async {
     if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
+
+    final expiryErr = FieldValidators.validateExpiryDate(_expiryDate);
+    if (expiryErr != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(backgroundColor: Colors.red, content: Text(expiryErr)),
+      );
+      return;
+    }
 
     setState(() => _isSubmitting = true);
     final repo = ref.read(pharmacyRepositoryProvider);
@@ -322,7 +332,7 @@ class _StockReceiptDialogState extends ConsumerState<StockReceiptDialog> {
                                       hintText: 'e.g. BAT-2026-X1',
                                       prefixIcon: Icon(Icons.qr_code, size: 18),
                                     ),
-                                    validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+                                    validator: (val) => FieldValidators.validateBatchNumber(val, isRequired: true),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -358,15 +368,15 @@ class _StockReceiptDialogState extends ConsumerState<StockReceiptDialog> {
                                     child: TextFormField(
                                       controller: _quantityController,
                                       keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(6),
+                                      ],
                                       decoration: const InputDecoration(
                                         labelText: 'Quantity (Units) *',
                                         prefixIcon: Icon(Icons.numbers, size: 18),
                                       ),
-                                      validator: (val) {
-                                        final n = int.tryParse(val ?? '');
-                                        if (n == null || n <= 0) return 'Must be > 0';
-                                        return null;
-                                      },
+                                      validator: (val) => FieldValidators.validateQuantity(val, fieldName: 'Stock Quantity', isRequired: true),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -374,15 +384,15 @@ class _StockReceiptDialogState extends ConsumerState<StockReceiptDialog> {
                                     child: TextFormField(
                                       controller: _unitPriceController,
                                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      inputFormatters: [
+                                        DecimalInputFormatter(),
+                                        LengthLimitingTextInputFormatter(8),
+                                      ],
                                       decoration: const InputDecoration(
                                         labelText: 'Unit Price (₹) *',
                                         prefixIcon: Icon(Icons.currency_rupee, size: 18),
                                       ),
-                                      validator: (val) {
-                                        final d = double.tryParse(val ?? '');
-                                        if (d == null || d < 0) return 'Must be >= 0';
-                                        return null;
-                                      },
+                                      validator: (val) => FieldValidators.validatePrice(val, fieldName: 'Unit Price', isRequired: true),
                                     ),
                                   ),
                                 ],
@@ -410,15 +420,15 @@ class _StockReceiptDialogState extends ConsumerState<StockReceiptDialog> {
                                     child: TextFormField(
                                       controller: _quantityController,
                                       keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(6),
+                                      ],
                                       decoration: const InputDecoration(
                                         labelText: 'Quantity (Units) *',
                                         prefixIcon: Icon(Icons.numbers, size: 18),
                                       ),
-                                      validator: (val) {
-                                        final n = int.tryParse(val ?? '');
-                                        if (n == null || n <= 0) return 'Must be > 0';
-                                        return null;
-                                      },
+                                      validator: (val) => FieldValidators.validateQuantity(val, fieldName: 'Stock Quantity', isRequired: true),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -426,15 +436,15 @@ class _StockReceiptDialogState extends ConsumerState<StockReceiptDialog> {
                                     child: TextFormField(
                                       controller: _unitPriceController,
                                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      inputFormatters: [
+                                        DecimalInputFormatter(),
+                                        LengthLimitingTextInputFormatter(8),
+                                      ],
                                       decoration: const InputDecoration(
                                         labelText: 'Unit Price (₹) *',
                                         prefixIcon: Icon(Icons.currency_rupee, size: 18),
                                       ),
-                                      validator: (val) {
-                                        final d = double.tryParse(val ?? '');
-                                        if (d == null || d < 0) return 'Must be >= 0';
-                                        return null;
-                                      },
+                                      validator: (val) => FieldValidators.validatePrice(val, fieldName: 'Unit Price', isRequired: true),
                                     ),
                                   ),
                                   const SizedBox(width: 12),

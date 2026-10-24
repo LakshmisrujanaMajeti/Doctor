@@ -1043,7 +1043,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             icon: Icons.domain_rounded,
             color: const Color(0xFF8B5CF6),
             subtitle: 'Operational',
-            onTap: () => context.push('/admin/portal?tab=departments'),
+            onTap: () => _showActiveClinicsDialog(context),
           ),
           StatMetricCard(
             title: 'Doctor Roster',

@@ -4,6 +4,17 @@ from pydantic import field_validator
 from app.schemas.common import BaseSchema
 
 
+from app.core.validators import (
+    validate_person_name,
+    validate_indian_phone,
+    validate_pin_code,
+    validate_email_address,
+    validate_age_years,
+    validate_date_of_birth,
+    validate_address_text,
+)
+
+
 class PatientBase(BaseSchema):
     full_name: str
     parent_spouse_name: Optional[str] = None
@@ -27,57 +38,57 @@ class PatientBase(BaseSchema):
     qr_code_data: Optional[str] = None
     guardian_id: Optional[str] = None
 
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, v: str) -> str:
+        res = validate_person_name(v, "Patient Full Name", is_required=True)
+        return res or v
+
+    @field_validator("parent_spouse_name")
+    @classmethod
+    def validate_parent_spouse_name(cls, v: Optional[str]) -> Optional[str]:
+        return validate_person_name(v, "Parent / Spouse Name", is_required=False)
+
+    @field_validator("emergency_contact_name")
+    @classmethod
+    def validate_emergency_contact_name(cls, v: Optional[str]) -> Optional[str]:
+        return validate_person_name(v, "Emergency Contact Name", is_required=False)
+
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("Phone number is required")
-        import re
-        digits = re.sub(r"\D", "", v)
-        if len(digits) == 12 and digits.startswith("91"):
-            digits = digits[2:]
-        elif len(digits) == 11 and (digits.startswith("0") or digits.startswith("1")):
-            digits = digits[1:]
-        if len(digits) != 10 and not v.startswith("+1555"):
-            raise ValueError("Phone number must be exactly 10 digits")
-        return v.strip()
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v.strip():
-            import re
-            email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-            if not re.match(email_regex, v.strip()):
-                raise ValueError("Enter a valid email address (e.g. name@domain.com)")
-            return v.strip().lower()
-        return None
+        res = validate_indian_phone(v, "Contact Phone", is_required=True)
+        return res or v
 
     @field_validator("emergency_contact_phone")
     @classmethod
     def validate_emergency_phone(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v.strip():
-            import re
-            digits = re.sub(r"\D", "", v)
-            if len(digits) == 12 and digits.startswith("91"):
-                digits = digits[2:]
-            elif len(digits) == 11 and (digits.startswith("0") or digits.startswith("1")):
-                digits = digits[1:]
-            if len(digits) != 10 and not v.startswith("+1555"):
-                raise ValueError("Emergency contact phone must be exactly 10 digits")
-            return digits
-        return None
+        return validate_indian_phone(v, "Emergency Contact Phone", is_required=False)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        return validate_email_address(v, "Email Address", is_required=False)
 
     @field_validator("postal_code")
     @classmethod
     def validate_postal_code(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v.strip():
-            clean = v.strip()
-            import re
-            if not re.match(r"^[1-9][0-9]{5}$", clean):
-                raise ValueError("Indian PIN code must be exactly 6 numeric digits (cannot start with 0)")
-            return clean
-        return None
+        return validate_pin_code(v, "PIN Code", is_required=False)
+
+    @field_validator("age_years")
+    @classmethod
+    def validate_age(cls, v: Optional[int]) -> Optional[int]:
+        return validate_age_years(v, "Age", is_required=False)
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_dob(cls, v: Optional[date]) -> Optional[date]:
+        return validate_date_of_birth(v, "Date of Birth", is_required=False)
+
+    @field_validator("address")
+    @classmethod
+    def validate_address(cls, v: Optional[str]) -> Optional[str]:
+        return validate_address_text(v, "Residential Address", is_required=False)
 
 
 class PatientCreate(PatientBase):
@@ -107,16 +118,55 @@ class PatientUpdate(BaseSchema):
     qr_code_data: Optional[str] = None
     guardian_id: Optional[str] = None
 
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, v: Optional[str]) -> Optional[str]:
+        return validate_person_name(v, "Patient Full Name", is_required=False)
+
+    @field_validator("parent_spouse_name")
+    @classmethod
+    def validate_parent_spouse_name(cls, v: Optional[str]) -> Optional[str]:
+        return validate_person_name(v, "Parent / Spouse Name", is_required=False)
+
+    @field_validator("emergency_contact_name")
+    @classmethod
+    def validate_emergency_contact_name(cls, v: Optional[str]) -> Optional[str]:
+        return validate_person_name(v, "Emergency Contact Name", is_required=False)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        return validate_indian_phone(v, "Contact Phone", is_required=False)
+
+    @field_validator("emergency_contact_phone")
+    @classmethod
+    def validate_emergency_phone(cls, v: Optional[str]) -> Optional[str]:
+        return validate_indian_phone(v, "Emergency Contact Phone", is_required=False)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        return validate_email_address(v, "Email Address", is_required=False)
+
     @field_validator("postal_code")
     @classmethod
     def validate_postal_code(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v.strip():
-            clean = v.strip()
-            import re
-            if not re.match(r"^[1-9][0-9]{5}$", clean):
-                raise ValueError("Indian PIN code must be exactly 6 numeric digits (cannot start with 0)")
-            return clean
-        return None
+        return validate_pin_code(v, "PIN Code", is_required=False)
+
+    @field_validator("age_years")
+    @classmethod
+    def validate_age(cls, v: Optional[int]) -> Optional[int]:
+        return validate_age_years(v, "Age", is_required=False)
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def validate_dob(cls, v: Optional[date]) -> Optional[date]:
+        return validate_date_of_birth(v, "Date of Birth", is_required=False)
+
+    @field_validator("address")
+    @classmethod
+    def validate_address(cls, v: Optional[str]) -> Optional[str]:
+        return validate_address_text(v, "Residential Address", is_required=False)
 
 
 class PatientRead(PatientBase):

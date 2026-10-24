@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/opd_constants.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/utils/field_validators.dart';
 import '../../../core/utils/input_sanitizer.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/confirmation_dialog.dart';
@@ -1280,14 +1281,15 @@ class _HospitalAdminWorkspaceViewState
                         TextFormField(
                           controller: nameCtrl,
                           decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          inputFormatters: [PersonNameInputFormatter()],
+                          validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Full Name', isRequired: true),
                         ),
                         const SizedBox(height: 10),
                         TextFormField(
                           controller: emailCtrl,
                           decoration: const InputDecoration(labelText: 'Hospital Email *', isDense: true),
                           keyboardType: TextInputType.emailAddress,
-                          validator: (v) => InputSanitizer.validateEmail(v, fieldName: 'Hospital Email'),
+                          validator: (v) => FieldValidators.validateEmail(v, fieldName: 'Hospital Email', isRequired: true),
                         ),
                         const SizedBox(height: 10),
                         TextFormField(
@@ -1298,7 +1300,7 @@ class _HospitalAdminWorkspaceViewState
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(10),
                           ],
-                          validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Phone Number'),
+                          validator: (v) => FieldValidators.validateIndianPhone(v, isRequired: false, fieldName: 'Phone Number'),
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
@@ -1342,7 +1344,9 @@ class _HospitalAdminWorkspaceViewState
                           TextFormField(
                             controller: feeCtrl,
                             decoration: const InputDecoration(labelText: 'Consultation Fee (₹)', isDense: true),
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [DecimalInputFormatter()],
+                            validator: (v) => FieldValidators.validatePrice(v, fieldName: 'Consultation Fee', isRequired: false),
                           ),
                         ],
                       ],
@@ -1737,14 +1741,15 @@ class _HospitalAdminWorkspaceViewState
                         TextFormField(
                           controller: nameCtrl,
                           decoration: const InputDecoration(labelText: 'Full Name *', isDense: true),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          inputFormatters: [PersonNameInputFormatter()],
+                          validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Full Name', isRequired: true),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: emailCtrl,
                           decoration: const InputDecoration(labelText: 'Hospital Email *', isDense: true),
                           keyboardType: TextInputType.emailAddress,
-                          validator: (v) => InputSanitizer.validateEmail(v, fieldName: 'Hospital Email'),
+                          validator: (v) => FieldValidators.validateEmail(v, fieldName: 'Hospital Email', isRequired: true),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -1762,7 +1767,7 @@ class _HospitalAdminWorkspaceViewState
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(10),
                           ],
-                          validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: false, fieldName: 'Phone Number'),
+                          validator: (v) => FieldValidators.validateIndianPhone(v, isRequired: false, fieldName: 'Phone Number'),
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
@@ -1830,8 +1835,9 @@ class _HospitalAdminWorkspaceViewState
                                 child: TextFormField(
                                   controller: feeCtrl,
                                   decoration: const InputDecoration(labelText: 'Consultation Fee (₹) *', isDense: true),
-                                  keyboardType: TextInputType.number,
-                                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [DecimalInputFormatter()],
+                                  validator: (v) => FieldValidators.validatePrice(v, fieldName: 'Consultation Fee', isRequired: true),
                                 ),
                               ),
                             ],

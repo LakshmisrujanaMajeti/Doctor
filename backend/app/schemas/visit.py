@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import Field
+from pydantic import Field, model_validator
 from app.schemas.common import BaseSchema
 from app.schemas.patient import PatientRead
 from app.schemas.doctor import DoctorRead, DoctorDashboardStats, FollowUpItem, RecentAuthorizedPatientItem
@@ -10,16 +10,23 @@ from app.schemas.department import DepartmentRead
 class VitalSignsBase(BaseSchema):
     systolic_bp: Optional[int] = Field(None, ge=40, le=280)
     diastolic_bp: Optional[int] = Field(None, ge=30, le=180)
-    pulse_rate: Optional[int] = Field(None, ge=30, le=250)
+    pulse_rate: Optional[int] = Field(None, ge=25, le=250)
     temperature_f: Optional[float] = Field(None, ge=90.0, le=110.0)
     spo2_percent: Optional[float] = Field(None, ge=50.0, le=100.0)
-    respiratory_rate: Optional[int] = Field(None, ge=6, le=60)
-    weight_kg: Optional[float] = Field(None, ge=1.0, le=400.0)
+    respiratory_rate: Optional[int] = Field(None, ge=6, le=80)
+    weight_kg: Optional[float] = Field(None, ge=0.5, le=400.0)
     height_cm: Optional[float] = Field(None, ge=20.0, le=260.0)
     bmi: Optional[float] = None
     blood_glucose_mg_dl: Optional[float] = Field(None, ge=10.0, le=1000.0)
     recorded_by_user_id: Optional[str] = None
     notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_vital_signs(self):
+        if self.systolic_bp is not None and self.diastolic_bp is not None:
+            if self.systolic_bp <= self.diastolic_bp:
+                raise ValueError("Systolic BP must be greater than Diastolic BP")
+        return self
 
 
 class VitalSignsCreate(VitalSignsBase):
@@ -37,7 +44,7 @@ class OPDVisitBase(BaseSchema):
     doctor_id: str
     department_id: str
     triage_priority: str = "NORMAL" # NORMAL, PRIORITY, EMERGENCY
-    consultation_fee: float = 500.0
+    consultation_fee: float = Field(default=500.0, ge=0.0)
     notes: Optional[str] = None
 
 

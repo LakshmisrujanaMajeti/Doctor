@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/opd_constants.dart';
+import '../../../core/utils/field_validators.dart';
 import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/triage_chip.dart';
 import '../../patients/models/patient_model.dart';
@@ -48,6 +50,14 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
     if (_selectedPatient == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a patient')),
+      );
+      return;
+    }
+
+    final feeErr = FieldValidators.validatePrice(_feeController.text, fieldName: 'Consultation Fee', isRequired: true);
+    if (feeErr != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(backgroundColor: Colors.red, content: Text(feeErr)),
       );
       return;
     }
@@ -402,11 +412,16 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _feeController,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    DecimalInputFormatter(),
+                    LengthLimitingTextInputFormatter(8),
+                  ],
                   decoration: const InputDecoration(
-                    labelText: 'Consultation Fee (\$)',
-                    prefixIcon: Icon(Icons.payments_outlined),
+                    labelText: 'Consultation Fee (₹)',
+                    prefixIcon: Icon(Icons.currency_rupee),
                   ),
+                  validator: (v) => FieldValidators.validatePrice(v, fieldName: 'Consultation Fee', isRequired: true),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(

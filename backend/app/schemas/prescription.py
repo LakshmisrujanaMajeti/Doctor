@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
+from pydantic import Field
 from app.schemas.common import BaseSchema
 from app.schemas.doctor import DoctorRead
 
@@ -10,8 +11,8 @@ class PrescriptionItemBase(BaseSchema):
     dosage: str          # 650mg, 500mg, 10mg, 5ml, 2 puffs
     route: str = "Oral"  # Oral, Topical, IV, IM, Inhalation, Sublingual
     frequency: str = "OD"# OD, BD, TID, QID, SOS
-    duration_days: int = 5
-    quantity: Optional[int] = None
+    duration_days: int = Field(default=5, ge=1, le=365)
+    quantity: Optional[int] = Field(default=None, ge=1, le=1000)
     timing: str = "After Food" # After food, Before food, Bedtime, Empty stomach
     instructions: Optional[str] = None
 
