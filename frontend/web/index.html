@@ -58,20 +58,22 @@
           });
         });
       }
-      // Purge cached offline/duplicate patients
-      if (!localStorage.getItem('smvmch_doc_fix_v5')) {
+      // Purge cached offline/duplicate patients and invalid staff cache
+      if (!localStorage.getItem('smvmch_doc_fix_v6')) {
         localStorage.removeItem('flutter.opd_patients_data');
         localStorage.removeItem('flutter.opd_visits_data');
         localStorage.removeItem('flutter.opd_bills_data');
+        localStorage.removeItem('flutter.opd_staff_directory_data');
         localStorage.removeItem('opd_patients_data');
         localStorage.removeItem('opd_visits_data');
         localStorage.removeItem('opd_bills_data');
-        localStorage.setItem('smvmch_doc_fix_v5', '1');
+        localStorage.removeItem('opd_staff_directory_data');
+        localStorage.setItem('smvmch_doc_fix_v6', '1');
       }
     } catch(e) {
       console.warn('Cache purge error:', e);
     }
   </script>
-  <script src="flutter_bootstrap.js?v=doc_fix_v5" async></script>
+  <script src="flutter_bootstrap.js?v=doc_fix_v6" async></script>
 </body>
 </html>

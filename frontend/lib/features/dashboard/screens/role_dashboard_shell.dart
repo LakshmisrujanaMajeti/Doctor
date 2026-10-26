@@ -33,6 +33,7 @@ import '../../billing/providers/billing_provider.dart';
 import '../../doctors/repositories/doctor_repository.dart';
 import '../../doctors/models/doctor_model.dart';
 import '../../notifications/providers/notification_provider.dart';
+import '../../history/screens/role_history_screen.dart';
 
 class RoleDashboardShell extends ConsumerStatefulWidget {
   const RoleDashboardShell({super.key});
@@ -103,6 +104,13 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
+          leading: _currentTabIndex != 0
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  tooltip: 'Return to Dashboard',
+                  onPressed: () => setState(() => _currentTabIndex = 0),
+                )
+              : null,
           titleSpacing: isNarrow ? 6 : 10,
           title: Row(
             children: [
@@ -116,19 +124,21 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Flexible(
-                          child: Text(
-                            AppStrings.appName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: isNarrow ? 13 : 14.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                            ),
+                      Flexible(
+                        child: Text(
+                          _currentTabIndex == 3
+                              ? 'Activity History & Records'
+                              : (isNarrow ? 'OPD Connect' : AppStrings.appName),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: isNarrow ? 12.5 : 14.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
                           ),
                         ),
-                        const SizedBox(width: 4),
+                      ),
+                      const SizedBox(width: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
                           decoration: BoxDecoration(
@@ -342,9 +352,11 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             const SizedBox(width: 8),
           ],
         ),
-        body: MedicalIllustratorBackground(
-          variant: MedicalBackgroundVariant.dashboard,
-          child: RefreshIndicator(
+        body: _currentTabIndex == 3
+            ? const RoleHistoryScreen(showAppBar: false)
+            : MedicalIllustratorBackground(
+                variant: MedicalBackgroundVariant.dashboard,
+                child: RefreshIndicator(
 
           onRefresh: () async {
             ref.invalidate(dashboardStatsProvider);
@@ -503,6 +515,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Patients',
           ),
           NavigationDestination(
+            icon: Icon(Icons.history_edu_rounded),
+            label: 'History',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -511,7 +527,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/patients');
-          if (idx == 3) context.push('/settings');
+          if (idx == 4) context.push('/settings');
         };
         break;
 
@@ -530,6 +546,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Patients',
           ),
           NavigationDestination(
+            icon: Icon(Icons.history_edu_rounded),
+            label: 'History',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -538,7 +558,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/patients');
-          if (idx == 3) context.push('/settings');
+          if (idx == 4) context.push('/settings');
         };
         break;
 
@@ -557,6 +577,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Intake / Reg',
           ),
           NavigationDestination(
+            icon: Icon(Icons.history_edu_rounded),
+            label: 'History',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -565,7 +589,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/patients');
-          if (idx == 3) context.push('/settings');
+          if (idx == 4) context.push('/settings');
         };
         break;
 
@@ -584,6 +608,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Formulary',
           ),
           NavigationDestination(
+            icon: Icon(Icons.history_edu_rounded),
+            label: 'History',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -592,7 +620,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/pharmacy');
-          if (idx == 3) context.push('/settings');
+          if (idx == 4) context.push('/settings');
         };
         break;
 
@@ -612,6 +640,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Worklist',
           ),
           NavigationDestination(
+            icon: Icon(Icons.history_edu_rounded),
+            label: 'History',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -620,7 +652,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/laboratory');
-          if (idx == 3) context.push('/settings');
+          if (idx == 4) context.push('/settings');
         };
         break;
 
@@ -639,6 +671,10 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Billing Counter',
           ),
           NavigationDestination(
+            icon: Icon(Icons.history_edu_rounded),
+            label: 'History',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.person_rounded),
             label: 'Profile',
           ),
@@ -647,7 +683,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/billing');
-          if (idx == 3) context.push('/settings');
+          if (idx == 4) context.push('/settings');
         };
         break;
 
@@ -667,8 +703,8 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             label: 'Admin',
           ),
           NavigationDestination(
-            icon: Icon(Icons.people_alt_rounded),
-            label: 'Patients',
+            icon: Icon(Icons.history_edu_rounded),
+            label: 'History',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_rounded),
@@ -679,7 +715,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
           setState(() => _currentTabIndex = idx);
           if (idx == 1) context.push('/queue');
           if (idx == 2) context.push('/admin/portal');
-          if (idx == 3) context.push('/patients');
           if (idx == 4) context.push('/settings');
         };
         break;
@@ -1610,28 +1645,29 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
   }) {
     final Color color = action['color'] as Color;
     return OpdCard(
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       onTap: action['onTap'] as VoidCallback,
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(action['icon'] as IconData, color: color, size: 22),
+            child: Icon(action['icon'] as IconData, color: color, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   action['title'] as String,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  maxLines: 2,
+                  softWrap: true,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, height: 1.2),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1639,7 +1675,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     color: isDark
                         ? AppColors.darkTextSecondary
                         : AppColors.lightTextSecondary,
@@ -1669,8 +1705,8 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             Expanded(
               child: Text(
                 role == 'patient'
-                    ? 'Your Active Outpatient Token'
-                    : 'Active OPD Patient Stream',
+                    ? 'Active Outpatient Token'
+                    : 'Active OPD Queue',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
@@ -1678,14 +1714,22 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             ),
             role == 'patient'
                 ? TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
                     onPressed: () => context.push('/patient/portal'),
-                    icon: const Icon(Icons.folder_shared_rounded, size: 16),
-                    label: const Text('My Health Records'),
+                    icon: const Icon(Icons.folder_shared_rounded, size: 15),
+                    label: const Text('My Records', style: TextStyle(fontSize: 12)),
                   )
                 : TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
                     onPressed: () => context.push('/queue'),
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                    label: const Text('View All Queue'),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 15),
+                    label: const Text('View Queue', style: TextStyle(fontSize: 12)),
                   ),
           ],
         ),
@@ -1762,50 +1806,12 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
               itemBuilder: (context, index) {
                 final v = visits[index];
                 return OpdCard(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
                   onTap: () => context.push('/visits/${v.id}'),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Token Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.2)),
-                        ),
-                        alignment: Alignment.center,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              'TOKEN',
-                              style: TextStyle(
-                                fontSize: 7.5,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryBlue,
-                              ),
-                            ),
-                            Text(
-                              v.formattedToken,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 9.5,
-                                color: AppColors.primaryBlue,
-                              ),
-                            ),
-                            Text(
-                              'Seq #${v.queueToken}',
-                              style: TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
+                      // Patient Info & Status chips
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1816,6 +1822,8 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14.5,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -1826,17 +1834,60 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                                     ? AppColors.darkTextSecondary
                                     : AppColors.lightTextSecondary,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                TriageChip(priority: v.triagePriority, compact: true),
+                                StatusBadge(status: v.status),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          TriageChip(priority: v.triagePriority, compact: true),
-                          const SizedBox(height: 4),
-                          StatusBadge(status: v.status),
-                        ],
+                      const SizedBox(width: 8),
+                      // Small round token badge at top right
+                      Tooltip(
+                        message: 'Token: ${v.formattedToken}',
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                            border: Border.all(
+                              color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'TOKEN',
+                                style: TextStyle(
+                                  fontSize: 7,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryBlue,
+                                ),
+                              ),
+                              Text(
+                                '#${v.queueToken}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 13,
+                                  color: AppColors.primaryBlue,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),

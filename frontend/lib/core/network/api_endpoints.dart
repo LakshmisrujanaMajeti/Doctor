@@ -148,6 +148,10 @@ class ApiEndpoints {
   static const String notificationsUnreadCount = '/notifications/unread-count';
   static String notificationMarkRead(String id) => '/notifications/$id/read';
   static const String notificationsMarkAllRead = '/notifications/mark-all-read';
+
+  // Role History & Admin Billing Ledger
+  static const String adminBillingHistory = '/admin/billing-history';
+  static const String roleHistory = '/history/my-history';
 }
 
 

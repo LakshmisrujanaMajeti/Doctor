@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routing/app_router.dart';
@@ -25,14 +24,80 @@ class PatientPortalWorkspaceView extends ConsumerStatefulWidget {
   ConsumerState<PatientPortalWorkspaceView> createState() => _PatientPortalWorkspaceViewState();
 }
 
+class _PortalModuleItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+
+  const _PortalModuleItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
+}
+
 class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorkspaceView>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
+  static const List<_PortalModuleItem> _portalModules = [
+    _PortalModuleItem(
+      title: 'Patient ID Card',
+      subtitle: 'Digital UHID & Barcode Identification',
+      icon: Icons.badge_rounded,
+      color: AppColors.primaryBlue,
+    ),
+    _PortalModuleItem(
+      title: 'Appointments',
+      subtitle: 'Consultation Reviews & Slot Booking',
+      icon: Icons.calendar_month_rounded,
+      color: AppColors.accentTeal,
+    ),
+    _PortalModuleItem(
+      title: 'Prescriptions',
+      subtitle: 'Medication Orders & Doctor Rx',
+      icon: Icons.medication_rounded,
+      color: AppColors.hospitalMaroon,
+    ),
+    _PortalModuleItem(
+      title: 'Lab Reports',
+      subtitle: 'Diagnostic Investigations & Results',
+      icon: Icons.biotech_rounded,
+      color: Color(0xFF0284C7),
+    ),
+    _PortalModuleItem(
+      title: 'Medical Documents',
+      subtitle: 'Clinical Records & Scans',
+      icon: Icons.folder_shared_rounded,
+      color: Color(0xFFD97706),
+    ),
+    _PortalModuleItem(
+      title: 'Bills & Receipts',
+      subtitle: 'OPD Invoices & Payment Slips',
+      icon: Icons.receipt_long_rounded,
+      color: Color(0xFF059669),
+    ),
+    _PortalModuleItem(
+      title: 'Visit History',
+      subtitle: 'Past Hospital Visits & Timeline',
+      icon: Icons.timeline_rounded,
+      color: Color(0xFF7C3AED),
+    ),
+    _PortalModuleItem(
+      title: 'Support & Inquiries',
+      subtitle: 'Hospital Desk Inquiries & Assistance',
+      icon: Icons.contact_support_rounded,
+      color: Color(0xFFE11D48),
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 8, vsync: this);
+    _tabController.addListener(_onTabChanged);
     Future.microtask(() {
       if (mounted) {
         ref.invalidate(patientProfileProvider);
@@ -40,8 +105,15 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     });
   }
 
+  void _onTabChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -338,6 +410,11 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
         title: const Text('Patient Portal & Health Records'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: 'Modules Menu Bar',
+            onPressed: () => _openModulesMenu(context, isDark),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh Records',
             onPressed: () {
@@ -392,27 +469,8 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                 // 1. Patient Profile Header & Dependent Profile Switcher
                 _buildProfileHeader(patient, dependents, profile, isDark),
 
-                // 2. Navigation Tabs
-                Container(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
-                  child: TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    labelColor: AppColors.primaryBlue,
-                    unselectedLabelColor: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                    indicatorColor: AppColors.primaryBlue,
-                    tabs: const [
-                      Tab(icon: Icon(Icons.badge_rounded, size: 18), text: 'Patient ID Card'),
-                      Tab(icon: Icon(Icons.calendar_month, size: 18), text: 'Appointments'),
-                      Tab(icon: Icon(Icons.medication, size: 18), text: 'Prescriptions'),
-                      Tab(icon: Icon(Icons.biotech, size: 18), text: 'Lab Reports'),
-                      Tab(icon: Icon(Icons.folder_shared, size: 18), text: 'Medical Documents'),
-                      Tab(icon: Icon(Icons.receipt_long, size: 18), text: 'Bills & Receipts'),
-                      Tab(icon: Icon(Icons.timeline, size: 18), text: 'Visit History'),
-                      Tab(icon: Icon(Icons.contact_support, size: 18), text: 'Support & Inquiries'),
-                    ],
-                  ),
-                ),
+                // 2. Interactive Menu Bar Navigation
+                _buildMenuBar(context, isDark),
 
                 // 3. Tab Views
                 Expanded(
@@ -468,7 +526,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     final displayGender = (isViewingDependent && activeDependent != null) ? activeDependent.gender : patient.gender;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
         border: Border(bottom: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300)),
@@ -480,37 +538,42 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
             builder: (context, constraints) {
               final tokenWidget = profile.hasActiveToken
                   ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         color: const Color(0xFFFEF3C7),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+                        border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.amber.withValues(alpha: 0.12),
+                            color: Colors.amber.withValues(alpha: 0.15),
                             blurRadius: 4,
                             offset: const Offset(0, 1),
                           ),
                         ],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.confirmation_number_rounded, color: Color(0xFFB45309), size: 16),
-                          const SizedBox(width: 5),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Active Token: ${(profile.activeTokenNumber ?? '').startsWith('#') ? (profile.activeTokenNumber ?? '') : '#${profile.activeTokenNumber ?? ''}'}',
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFF92400E)),
-                              ),
-                              Text(
-                                profile.activeTokenQueueStatus ?? 'REGISTERED',
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
-                              ),
-                            ],
+                          const Text(
+                            'TOKEN',
+                            style: TextStyle(
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF92400E),
+                            ),
+                          ),
+                          Text(
+                            (profile.activeTokenNumber ?? '').startsWith('#')
+                                ? (profile.activeTokenNumber ?? '')
+                                : '#${profile.activeTokenNumber ?? ''}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                              color: Color(0xFF92400E),
+                              height: 1.0,
+                            ),
                           ),
                         ],
                       ),
@@ -521,14 +584,14 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
-                    radius: 26,
+                    radius: 22,
                     backgroundColor: isViewingDependent ? AppColors.accentTeal : AppColors.primaryBlue,
                     child: Text(
                       displayName.isNotEmpty ? displayName[0].toUpperCase() : 'P',
-                      style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,104 +602,104 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                             Expanded(
                               child: Wrap(
                                 crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 8,
+                                spacing: 6,
                                 runSpacing: 4,
                                 children: [
                                   Text(
                                     displayName,
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                                     softWrap: true,
                                   ),
                                   if (isViewingDependent && activeDependent != null)
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                       decoration: BoxDecoration(
                                         color: AppColors.accentTeal.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
-                                        'Dependent (${activeDependent.relation})',
-                                        style: const TextStyle(fontSize: 11, color: AppColors.accentTeal, fontWeight: FontWeight.bold),
+                                        '(${activeDependent.relation})',
+                                        style: const TextStyle(fontSize: 10, color: AppColors.accentTeal, fontWeight: FontWeight.bold),
                                       ),
                                     ),
                                 ],
                               ),
                             ),
                             if (tokenWidget != null) ...[
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               tokenWidget,
                             ],
                           ],
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'UHID: $displayUhid • Age: $displayAge • Gender: $displayGender • Phone: ${patient.phone}',
+                          'UHID: $displayUhid • Age: $displayAge • Gender: $displayGender',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                           ),
                           softWrap: true,
                         ),
+                        Text(
+                          'Phone: ${patient.phone}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                        ),
                         if (patient.registrationDate != null || patient.createdAt != null) ...[
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
-                            'Registration Date & Time: ${_formatPortalDateTime(patient.registrationDate ?? patient.createdAt)}',
+                            'Registered: ${_formatPortalDateTime(patient.registrationDate ?? patient.createdAt)}',
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 11,
                               color: isDark ? Colors.grey.shade300 : const Color(0xFF1E3A8A),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                         if (patient.registeredByStaffName != null) ...[
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
-                            'Registered by Staff: ${patient.registeredByStaffName} (${patient.registeredByStaffRole ?? "Staff"})',
+                            'Staff: ${patient.registeredByStaffName}',
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 10.5,
                               color: AppColors.primaryBlue,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
+                        // Sleek Compact Action Row
                         Wrap(
-                          spacing: 8,
+                          spacing: 6,
                           runSpacing: 6,
                           children: [
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.badge_rounded, size: 14),
-                              label: const Text('My Patient ID Card'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryBlue,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: () {
-                                _tabController.animateTo(0);
-                              },
+                            ActionChip(
+                              avatar: const Icon(Icons.badge_rounded, size: 14, color: AppColors.primaryBlue),
+                              label: const Text('ID Card', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryBlue)),
+                              backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.08),
+                              side: BorderSide(color: AppColors.primaryBlue.withValues(alpha: 0.3)),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _tabController.animateTo(0),
                             ),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.download_rounded, size: 14),
-                              label: const Text('Download Booklet (PDF)'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.hospitalMaroon,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
+                            ActionChip(
+                              avatar: const Icon(Icons.download_rounded, size: 14, color: AppColors.hospitalMaroon),
+                              label: const Text('PDF Booklet', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.hospitalMaroon)),
+                              backgroundColor: AppColors.hospitalMaroon.withValues(alpha: 0.08),
+                              side: BorderSide(color: AppColors.hospitalMaroon.withValues(alpha: 0.3)),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              visualDensity: VisualDensity.compact,
                               onPressed: () => _downloadBooklet(context, displayUhid),
                             ),
-                            OutlinedButton.icon(
-                              icon: const Icon(Icons.auto_stories_rounded, size: 14),
-                              label: const Text('View 7-Page Booklet'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.hospitalMaroon,
-                                side: const BorderSide(color: AppColors.hospitalMaroon),
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                              ),
+                            ActionChip(
+                              avatar: const Icon(Icons.auto_stories_rounded, size: 14, color: AppColors.hospitalMaroon),
+                              label: const Text('7-Page Booklet', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.hospitalMaroon)),
+                              backgroundColor: AppColors.hospitalMaroon.withValues(alpha: 0.08),
+                              side: BorderSide(color: AppColors.hospitalMaroon.withValues(alpha: 0.3)),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              visualDensity: VisualDensity.compact,
                               onPressed: () {
                                 context.pushNamed(
                                   RouteNames.digitalOpdBooklet,
@@ -653,89 +716,42 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
               );
             },
           ),
-          const SizedBox(height: 8),
-
-          // Application Version Banner in Patient Portal Profile Section
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.verified_rounded, size: 14, color: AppColors.primaryTeal),
-                const SizedBox(width: 6),
-                const Text(
-                  'Application Version: ',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  'v1.2.0 • Enterprise Production Build',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.green.withValues(alpha: 0.25)),
-                  ),
-                  child: const Text(
-                    'PRODUCTION READY',
-                    style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Profile Switcher Bar with horizontal scroll so it never clips or overflows
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Row(
-              children: [
-                const Text('Active Profile: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: Text('Self (${patient.fullName})', style: const TextStyle(fontSize: 12)),
-                  selected: selectedId == null || selectedId == patient.id,
-                  onSelected: (selected) {
-                    if (selected) {
-                      ref.read(selectedPortalPatientIdProvider.notifier).state = patient.id;
-                    }
-                  },
-                ),
-                const SizedBox(width: 8),
-                for (final dep in dependents) ...[
+          // Profile Switcher Bar (only shown if patient has dependents)
+          if (dependents.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  const Text('Active Profile: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 8),
                   ChoiceChip(
-                    label: Text('${dep.fullName} (${dep.relation})', style: const TextStyle(fontSize: 12)),
-                    selected: selectedId == dep.id,
+                    label: Text('Self (${patient.fullName})', style: const TextStyle(fontSize: 12)),
+                    selected: selectedId == null || selectedId == patient.id,
                     onSelected: (selected) {
                       if (selected) {
-                        ref.read(selectedPortalPatientIdProvider.notifier).state = dep.id;
+                        ref.read(selectedPortalPatientIdProvider.notifier).state = patient.id;
                       }
                     },
                   ),
                   const SizedBox(width: 8),
+                  for (final dep in dependents) ...[
+                    ChoiceChip(
+                      label: Text('${dep.fullName} (${dep.relation})', style: const TextStyle(fontSize: 12)),
+                      selected: selectedId == dep.id,
+                      onSelected: (selected) {
+                        if (selected) {
+                          ref.read(selectedPortalPatientIdProvider.notifier).state = dep.id;
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                 ],
-                ActionChip(
-                  avatar: const Icon(Icons.person_add, size: 16),
-                  label: const Text('Add Dependent', style: TextStyle(fontSize: 12)),
-                  onPressed: () => _showAddDependentDialog(context),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -761,99 +777,287 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
         : patient;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
       physics: const BouncingScrollPhysics(),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PatientIdentifierCardWidget(
-                patient: targetPatient,
-                onDownloadBooklet: () => _downloadBooklet(context, targetPatient.uhid),
-              ),
-              const SizedBox(height: 16),
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
-                ),
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.verified_user_rounded, color: AppColors.hospitalMaroon, size: 22),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Official SMVMCH Hospital Identification Card',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
-                                color: isDark ? Colors.white : AppColors.hospitalMaroon,
-                              ),
-                            ),
-                          ),
-                        ],
+          child: PatientIdentifierCardWidget(
+            patient: targetPatient,
+            onDownloadBooklet: () => _downloadBooklet(context, targetPatient.uhid),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuBar(BuildContext context, bool isDark) {
+    final currentIndex = _tabController.index.clamp(0, _portalModules.length - 1);
+    final currentModule = _portalModules[currentIndex];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Menu Bar button
+          Material(
+            color: AppColors.primaryBlue,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => _openModulesMenu(context, isDark),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.menu_rounded, size: 17, color: Colors.white),
+                    SizedBox(width: 6),
+                    Text(
+                      'Menu Bar',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'This digital card contains your verified Unique Hospital Identification (UHID) and high-density 1D/2D barcodes. Present this screen at any OPD counter, doctor consultation room, diagnostic laboratory, or pharmacy desk for immediate contactless verification and record retrieval.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
-                          height: 1.45,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Active Module Dropdown Trigger
+          Expanded(
+            child: Material(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _openModulesMenu(context, isDark),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        currentModule.icon,
+                        size: 16,
+                        color: currentModule.color,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          currentModule.title,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : Colors.grey.shade900,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.auto_stories_rounded, size: 16),
-                              label: const Text('View 7-Page Booklet'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.hospitalMaroon,
-                                side: const BorderSide(color: AppColors.hospitalMaroon),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                              ),
-                              onPressed: () {
-                                context.pushNamed(
-                                  RouteNames.digitalOpdBooklet,
-                                  pathParameters: {'registrationId': targetPatient.uhid},
-                                );
-                              },
-                            ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryBlue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${currentIndex + 1}/8',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryBlue,
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.download_rounded, size: 16),
-                              label: const Text('Download PDF'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.hospitalMaroon,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                              ),
-                              onPressed: () => _downloadBooklet(context, targetPatient.uhid),
-                            ),
-                          ),
-                        ],
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.arrow_drop_down_rounded,
+                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                        size: 22,
                       ),
                     ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  void _openModulesMenu(BuildContext context, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.apps_rounded, color: AppColors.primaryBlue, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Patient Portal Menu Bar',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.grey.shade900,
+                            ),
+                          ),
+                          Text(
+                            'Select any module to access your clinical records',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _portalModules.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 6),
+                    itemBuilder: (context, idx) {
+                      final item = _portalModules[idx];
+                      final isSelected = _tabController.index == idx;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _tabController.animateTo(idx);
+                          setState(() {});
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? (isDark
+                                    ? AppColors.primaryBlue.withValues(alpha: 0.25)
+                                    : AppColors.primaryBlue.withValues(alpha: 0.08))
+                                : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primaryBlue
+                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                              width: isSelected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: item.color.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(item.icon, size: 20, color: item.color),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.title,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                        color: isSelected
+                                            ? AppColors.primaryBlue
+                                            : (isDark ? Colors.white : Colors.grey.shade900),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      item.subtitle,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(Icons.check_circle_rounded, color: AppColors.primaryBlue, size: 20)
+                              else
+                                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -864,32 +1068,61 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-          child: Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              Text(
-                'Consultations & Reviews',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.grey.shade900,
-                ),
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                label: const Text('Book Appointment Slot'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-                onPressed: () => _showBookAppointmentSlotDialog(context),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 600;
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Consultations & Reviews',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.grey.shade900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                      label: const Text('Book Appointment Slot'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () => _showBookAppointmentSlotDialog(context),
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Consultations & Reviews',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.grey.shade900,
+                    ),
+                  ),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                    label: const Text('Book Appointment Slot'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () => _showBookAppointmentSlotDialog(context),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         Expanded(
@@ -957,17 +1190,16 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Wrap(
-                                  alignment: WrapAlignment.spaceBetween,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  spacing: 8,
-                                  runSpacing: 4,
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      'Scheduled Review: ${a.scheduledDate}',
-                                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
-                                      softWrap: true,
+                                    Expanded(
+                                      child: Text(
+                                        'Scheduled Review: ${a.scheduledDate}',
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
@@ -981,7 +1213,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                                       child: Text(
                                         a.isCompleted ? 'Completed' : 'Upcoming Follow-up',
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 10.5,
                                           fontWeight: FontWeight.bold,
                                           color: a.isCompleted ? Colors.blue.shade800 : Colors.green.shade800,
                                         ),
@@ -1516,103 +1748,7 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
     );
   }
 
-  void _showAddDependentDialog(BuildContext context) {
-    final formKey = GlobalKey<FormState>();
-    final nameCtrl = TextEditingController();
-    final relationCtrl = TextEditingController(text: 'Son');
-    final ageCtrl = TextEditingController();
-    String gender = 'MALE';
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          title: const Text('Add Permitted Dependent Profile'),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Full Name *'),
-                    inputFormatters: [
-                      PersonNameInputFormatter(),
-                      LengthLimitingTextInputFormatter(100),
-                    ],
-                    validator: (v) => FieldValidators.validatePersonName(v, fieldName: 'Dependent Full Name', isRequired: true),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: relationCtrl.text,
-                    decoration: const InputDecoration(labelText: 'Relationship to Primary Patient *'),
-                    items: const [
-                      DropdownMenuItem(value: 'Son', child: Text('Son')),
-                      DropdownMenuItem(value: 'Daughter', child: Text('Daughter')),
-                      DropdownMenuItem(value: 'Mother', child: Text('Mother')),
-                      DropdownMenuItem(value: 'Father', child: Text('Father')),
-                      DropdownMenuItem(value: 'Spouse', child: Text('Spouse')),
-                      DropdownMenuItem(value: 'Ward', child: Text('Ward / Guardian')),
-                    ],
-                    onChanged: (v) => setDlgState(() => relationCtrl.text = v!),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: gender,
-                    decoration: const InputDecoration(labelText: 'Gender *'),
-                    items: const [
-                      DropdownMenuItem(value: 'MALE', child: Text('Male')),
-                      DropdownMenuItem(value: 'FEMALE', child: Text('Female')),
-                      DropdownMenuItem(value: 'OTHER', child: Text('Other')),
-                    ],
-                    onChanged: (v) => setDlgState(() => gender = v!),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: ageCtrl,
-                    decoration: const InputDecoration(labelText: 'Age (Years) *'),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(3),
-                    ],
-                    validator: (v) => FieldValidators.validateAge(v, isRequired: true),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                final cleanName = InputSanitizer.sanitizeText(nameCtrl.text);
-                final cleanRelation = InputSanitizer.sanitizeText(relationCtrl.text);
-                try {
-                  final repo = ref.read(patientPortalRepositoryProvider);
-                  await repo.addDependent(
-                    fullName: cleanName,
-                    relation: cleanRelation.isNotEmpty ? cleanRelation : 'Dependent',
-                    gender: gender,
-                    ageYears: int.tryParse(ageCtrl.text),
-                  );
-                  Navigator.pop(ctx);
-                  ref.invalidate(patientProfileProvider);
-                  ref.invalidate(patientDependentsProvider);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dependent registered successfully!')));
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              },
-              child: const Text('Register Dependent'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _showNewSupportTicketDialog(BuildContext context) {
     final formKey = GlobalKey<FormState>();

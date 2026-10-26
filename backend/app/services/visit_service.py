@@ -8,6 +8,7 @@ from app.models.visit import OPDVisit, VitalSigns
 from app.models.patient import Patient
 from app.models.doctor import Doctor
 from app.models.department import Department
+from app.models.user import User
 from app.schemas.visit import OPDVisitCreate, OPDVisitUpdate, VitalSignsCreate
 from app.models.audit import AuditLog
 
@@ -39,24 +40,77 @@ class VisitService:
         if not patient:
             raise NotFoundException(f"Patient with ID '{visit_in.patient_id}' not found")
 
-        dept = db.query(Department).filter(Department.id == visit_in.department_id).first()
-        if not dept:
-            dept = db.query(Department).filter(
-                (Department.code == visit_in.department_id) |
-                (Department.name.ilike(f"%{visit_in.department_id}%"))
-            ).first()
-        if not dept:
-            dept = db.query(Department).filter(Department.is_active == True).first()
-        if not dept:
-            raise NotFoundException(f"Department with ID '{visit_in.department_id}' not found")
+        # Resolve doctor
+        doctor = None
+        doc_key = (visit_in.doctor_id or "").strip()
+        if doc_key:
+            # 1. Direct Doctor.id match
+            doctor = db.query(Doctor).filter(Doctor.id == doc_key).first()
+            # 2. Doctor by user_id
+            if not doctor:
+                doctor = db.query(Doctor).filter(Doctor.user_id == doc_key).first()
+            # 3. Doctor by user email or name or doctor specialization
+            if not doctor:
+                doctor = (
+                    db.query(Doctor)
+                    .join(User, Doctor.user_id == User.id)
+                    .filter(
+                        or_(
+                            User.email.ilike(f"%{doc_key}%"),
+                            User.full_name.ilike(f"%{doc_key}%"),
+                            Doctor.specialization.ilike(f"%{doc_key}%"),
+                        )
+                    )
+                    .first()
+                )
+            # 4. Handle slug styles like 'doc-cardio', 'doc-pulmo', 'cardio', 'derma', etc.
+            if not doctor:
+                clean_slug = doc_key.replace("doc-", "").replace("user-", "").strip()
+                if clean_slug:
+                    doctor = (
+                        db.query(Doctor)
+                        .join(User, Doctor.user_id == User.id)
+                        .filter(
+                            or_(
+                                User.email.ilike(f"%{clean_slug}%"),
+                                User.full_name.ilike(f"%{clean_slug}%"),
+                                Doctor.specialization.ilike(f"%{clean_slug}%"),
+                            )
+                        )
+                        .first()
+                    )
 
-        doctor = db.query(Doctor).filter(Doctor.id == visit_in.doctor_id).first()
-        if not doctor:
+        # Resolve department
+        dept = None
+        dept_key = (visit_in.department_id or "").strip()
+        if dept_key:
+            dept = db.query(Department).filter(Department.id == dept_key).first()
+            if not dept:
+                dept = db.query(Department).filter(
+                    or_(
+                        Department.code == dept_key,
+                        Department.name.ilike(f"%{dept_key}%"),
+                    )
+                ).first()
+
+        # If doctor was found, sync department if dept is None or mismatch
+        if doctor and not dept:
+            dept = doctor.department
+
+        # If dept was found but doctor wasn't, find available doctor for that department
+        if dept and not doctor:
             doctor = db.query(Doctor).filter(Doctor.department_id == dept.id, Doctor.is_available == True).first()
+            if not doctor:
+                doctor = db.query(Doctor).filter(Doctor.department_id == dept.id).first()
+
+        # Ultimate fallbacks
         if not doctor:
-            doctor = db.query(Doctor).filter(Doctor.is_available == True).first()
-        if not doctor:
-            doctor = db.query(Doctor).first()
+            doctor = db.query(Doctor).filter(Doctor.is_available == True).first() or db.query(Doctor).first()
+        if not dept:
+            if doctor and doctor.department:
+                dept = doctor.department
+            else:
+                dept = db.query(Department).filter(Department.is_active == True).first()
         if not doctor:
             raise NotFoundException(f"Doctor with ID '{visit_in.doctor_id}' not found")
 

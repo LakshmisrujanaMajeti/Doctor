@@ -13,6 +13,8 @@ import '../../visits/providers/visit_provider.dart';
 import '../../../core/utils/file_download_helper.dart';
 import '../../billing/repositories/billing_repository.dart';
 import '../../billing/models/billing_models.dart';
+import '../../prescriptions/providers/prescription_provider.dart';
+import '../../prescriptions/models/prescription_model.dart';
 
 class DigitalOpdBookletScreen extends ConsumerStatefulWidget {
   final String patientId;
@@ -587,18 +589,27 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  visit?.notes ?? 'Pt. C/o sensitivity in (L) lower back tooth region x 1 month',
-                  style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
+                  visit?.notes != null && visit!.notes!.isNotEmpty
+                      ? visit.notes!
+                      : 'No presenting complaints recorded yet (Awaiting clinical intake).',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontStyle: visit?.notes != null && visit!.notes!.isNotEmpty ? FontStyle.normal : FontStyle.italic,
+                    color: visit?.notes != null && visit!.notes!.isNotEmpty ? null : Colors.grey,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
 
               // 2. Allergy
-              Row(
+              const Row(
                 children: [
-                  const Text('Allergy: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const Chip(
-                    label: Text('No Known Drug Allergies', style: TextStyle(fontSize: 11, color: Colors.green)),
+                  Text('Allergy: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Chip(
+                    label: Text(
+                      'No Known Drug Allergies (NKDA)',
+                      style: TextStyle(fontSize: 11, color: Colors.green),
+                    ),
                     backgroundColor: Color(0xFFECFDF5),
                   ),
                 ],
@@ -613,9 +624,9 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                 runSpacing: 8,
                 children: [
                   _buildStatusCheckbox('Previous Hospitalization', false),
-                  _buildStatusCheckbox('Hypertension', true), // Checked in doc
+                  _buildStatusCheckbox('Hypertension', false),
                   _buildStatusCheckbox('Diabetes', false),
-                  _buildStatusCheckbox('Asthma', true), // Checked in doc
+                  _buildStatusCheckbox('Asthma', false),
                   _buildStatusCheckbox('TB', false),
                   _buildStatusCheckbox('Smoking', false),
                   _buildStatusCheckbox('Alcoholism', false),
@@ -630,9 +641,9 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _buildStatusCheckbox('Diabetes', true), // Checked in doc
-                  _buildStatusCheckbox('Hypertension', true), // Checked in doc
-                  _buildStatusCheckbox('Heart Disease', true), // Checked in doc
+                  _buildStatusCheckbox('Diabetes', false),
+                  _buildStatusCheckbox('Hypertension', false),
+                  _buildStatusCheckbox('Heart Disease', false),
                   _buildStatusCheckbox('Kidney Disease', false),
                 ],
               ),
@@ -641,47 +652,78 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
               // 5. Physical Examination & Vitals
               const Text('Physical Examination & Vitals:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Column(
-                  children: [
-                    Row(
+              if (vitals == null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: const Center(
+                    child: Column(
                       children: [
-                        Expanded(child: _buildVitalCell('Height', '${vitals?.heightCm?.toInt() ?? 170} cms')),
-                        Expanded(child: _buildVitalCell('Weight', '${vitals?.weightKg?.toInt() ?? 65} Kgs')),
-                        Expanded(child: _buildVitalCell('BMI', '${vitals?.bmi?.toStringAsFixed(1) ?? '22.5'} kg/m²')),
-                      ],
-                    ),
-                    const Divider(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildVitalCell(
-                            'B.P.',
-                            '${vitals?.systolicBp ?? 131} / ${vitals?.diastolicBp ?? 103} mmHg',
-                            isAlert: (vitals?.systolicBp ?? 131) > 130,
-                          ),
+                        Icon(Icons.monitor_heart_outlined, color: Colors.grey, size: 36),
+                        SizedBox(height: 8),
+                        Text(
+                          'No Vitals Recorded Yet',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
-                        Expanded(child: _buildVitalCell('Pulse Rate', '${vitals?.pulseRate ?? 115} /min', isAlert: (vitals?.pulseRate ?? 115) > 100)),
-                        Expanded(child: _buildVitalCell('Temp', '${vitals?.temperatureF ?? 98.4} °F')),
+                        SizedBox(height: 4),
+                        Text(
+                          'Awaiting vital signs logging by the triage nurse.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
-                    const Divider(height: 20),
-                    Row(
-                      children: [
-                        Expanded(child: _buildVitalCell('Pallor', 'No')),
-                        Expanded(child: _buildVitalCell('Icterus', 'No')),
-                        Expanded(child: _buildVitalCell('Cyanosis', 'No')),
-                      ],
-                    ),
-                  ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: _buildVitalCell('Height', vitals.heightCm != null ? '${vitals.heightCm!.toInt()} cms' : '—')),
+                          Expanded(child: _buildVitalCell('Weight', vitals.weightKg != null ? '${vitals.weightKg!.toInt()} Kgs' : '—')),
+                          Expanded(child: _buildVitalCell('BMI', vitals.bmi != null ? '${vitals.bmi!.toStringAsFixed(1)} kg/m²' : '—')),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildVitalCell(
+                              'B.P.',
+                              vitals.systolicBp != null && vitals.diastolicBp != null
+                                  ? '${vitals.systolicBp} / ${vitals.diastolicBp} mmHg'
+                                  : '—',
+                              isAlert: (vitals.systolicBp ?? 0) > 130,
+                            ),
+                          ),
+                          Expanded(child: _buildVitalCell('Pulse Rate', vitals.pulseRate != null ? '${vitals.pulseRate} /min' : '—', isAlert: (vitals.pulseRate ?? 0) > 100)),
+                          Expanded(child: _buildVitalCell('Temp', vitals.temperatureF != null ? '${vitals.temperatureF} °F' : '—')),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Row(
+                        children: [
+                          Expanded(child: _buildVitalCell('Pallor', 'No')),
+                          Expanded(child: _buildVitalCell('Icterus', 'No')),
+                          Expanded(child: _buildVitalCell('Cyanosis', 'No')),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 16),
 
               // Footer Form Code
@@ -768,47 +810,73 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Systemic & Dental Examination', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text('Systemic Examination & Diagnosis', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const Divider(height: 24),
 
-              _buildExamRow('RS (Respiratory System)', 'Normal vesicular breath sounds. No wheeze or rhonchi.'),
-              _buildExamRow('CVS (Cardiovascular System)', 'S1, S2 heard. No murmurs.'),
-              _buildExamRow('GI (Gastrointestinal)', 'Soft, non-tender, no organomegaly.'),
-              _buildExamRow('CNS (Central Nervous System)', 'Conscious, oriented, no focal neurological deficits.'),
-              const Divider(height: 24),
-
-              // Oral / Dental Findings
-              const Text('Oral / Dental Findings (O/E):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFCD34D)),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'O/E: Periodontitis 48 (Lower Right Third Molar)',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+              if (visit == null || visit.notes == null || visit.notes!.isEmpty || visit.notes == 'Initial OPD Registration Visit')
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: const Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.medical_services_outlined, color: Colors.grey, size: 40),
+                        SizedBox(height: 10),
+                        Text(
+                          'No Clinical Examination Recorded Yet',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Awaiting doctor consultation and examination notes.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Adv: IOPA 48 (Intraoral Periapical X-Ray)',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF78350F), fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                  ),
+                )
+              else ...[
+                _buildExamRow('RS (Respiratory System)', 'Normal vesicular breath sounds. Clear bilaterally.'),
+                _buildExamRow('CVS (Cardiovascular System)', 'S1, S2 heard. No murmurs.'),
+                _buildExamRow('GI (Gastrointestinal)', 'Soft, non-tender.'),
+                _buildExamRow('CNS (Central Nervous System)', 'Conscious, oriented.'),
+                const Divider(height: 24),
+                const Text('Clinical Findings & Diagnosis:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFCD34D)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Diagnosis: ${visit.notes ?? "Under Clinical Evaluation"}',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Department: ${visit.departmentName ?? "General OPD"}',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF78350F), fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              _buildExamRow('Provisional Diagnosis', 'Periodontitis 48 / Dental Sensitivity', isHighlight: true),
-              _buildExamRow('Care Plan', 'Advised IOPA X-Ray 48, antibiotic coverage, analgesic and oral hygiene review.'),
-              _buildExamRow('Investigations Ordered', 'IOPA 48, Blood Routine, Urine Routine'),
-              _buildExamRow('Final Diagnosis', 'Periodontitis 48'),
+                const SizedBox(height: 16),
+                _buildExamRow('Provisional Diagnosis', visit.notes ?? 'Under Evaluation', isHighlight: true),
+                _buildExamRow('Care Plan', 'Consultation assessment in progress.'),
+                _buildExamRow('Final Diagnosis', visit.status == 'COMPLETED' ? (visit.notes ?? 'Completed') : 'Pending investigation results'),
+              ],
             ],
           ),
         ),
@@ -841,6 +909,11 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
   // TAB 4: TREATMENT PLAN & RX (Page 5)
   // ==========================================
   Widget _buildTreatmentPlanTab(PatientModel patient, OPDVisitModel? visit, bool isDark) {
+    final rxAsync = visit != null ? ref.watch(prescriptionListProvider(visit.id)) : null;
+    final rxList = rxAsync?.value ?? [];
+    final allItems = rxList.expand((rx) => rx.items).toList();
+    final hasRx = allItems.isNotEmpty;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -862,111 +935,140 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                      color: hasRx
+                          ? Colors.green.shade50
+                          : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(
+                        color: hasRx
+                            ? Colors.green.shade200
+                            : Colors.grey.shade300,
+                      ),
                     ),
-                    child: const Text('Rx SIGNED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
+                    child: Text(
+                      hasRx ? 'Rx SIGNED' : 'PENDING CONSULT',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: hasRx ? Colors.green : Colors.grey,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const Divider(height: 24),
 
-              // Rx Items Table
-              Table(
-                border: TableBorder.all(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(8)),
-                columnWidths: const {
-                  0: FixedColumnWidth(40),
-                  1: FlexColumnWidth(4),
-                  2: FlexColumnWidth(2),
-                  3: FlexColumnWidth(2),
-                },
-                children: [
-                  TableRow(
-                    decoration: BoxDecoration(color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
-                    children: const [
-                      Padding(padding: EdgeInsets.all(8), child: Text('Sl.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                      Padding(padding: EdgeInsets.all(8), child: Text('Drugs (Medicine Name)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                      Padding(padding: EdgeInsets.all(8), child: Text('Frequency', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                      Padding(padding: EdgeInsets.all(8), child: Text('Duration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                    ],
+              if (!hasRx)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                  const TableRow(
-                    children: [
-                      Padding(padding: EdgeInsets.all(10), child: Text('1.')),
-                      Padding(
-                        padding: EdgeInsets.all(10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('T. CEFIXIME 200mg', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            Text('Brand: MAHACEF-200mg • Antibiotic', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                          ],
+                  child: const Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.medication_outlined, color: Colors.grey, size: 40),
+                        SizedBox(height: 10),
+                        Text(
+                          'No Active Prescriptions',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
-                      ),
-                      Padding(padding: EdgeInsets.all(10), child: Text('1 - 0 - 1\n(Morning & Night)', style: TextStyle(fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(10), child: Text('3 days\n(Qty: 6)', style: TextStyle(fontSize: 11))),
-                    ],
-                  ),
-                  const TableRow(
-                    children: [
-                      Padding(padding: EdgeInsets.all(10), child: Text('2.')),
-                      Padding(
-                        padding: EdgeInsets.all(10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('T. HIFENAC P', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            Text('Aceclofenac + Paracetamol • Analgesic', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                          ],
+                        SizedBox(height: 4),
+                        Text(
+                          'Prescriptions will appear here once written by the consulting doctor.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                      Padding(padding: EdgeInsets.all(10), child: Text('1 - 0 - 1\n(After Food)', style: TextStyle(fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(10), child: Text('3 days\n(Qty: 6)', style: TextStyle(fontSize: 11))),
-                    ],
+                      ],
+                    ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Attending Clinician Signature & Date
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                )
+              else ...[
+                Table(
+                  border: TableBorder.all(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(8)),
+                  columnWidths: const {
+                    0: FixedColumnWidth(40),
+                    1: FlexColumnWidth(4),
+                    2: FlexColumnWidth(2),
+                    3: FlexColumnWidth(2),
+                  },
                   children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Doctor's Name:", style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        SizedBox(height: 2),
-                        Text('Dr. Arunraj', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        Text('Date & Time: 11/10/2026', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    TableRow(
+                      decoration: BoxDecoration(color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                      children: const [
+                        Padding(padding: EdgeInsets.all(8), child: Text('Sl.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                        Padding(padding: EdgeInsets.all(8), child: Text('Drugs (Medicine Name)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                        Padding(padding: EdgeInsets.all(8), child: Text('Frequency', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                        Padding(padding: EdgeInsets.all(8), child: Text('Duration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
                       ],
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text('Sign / Digital Seal:', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.hospitalNavy),
-                            borderRadius: BorderRadius.circular(6),
+                    ...allItems.asMap().entries.map((entry) {
+                      final idx = entry.key + 1;
+                      final rx = entry.value;
+                      return TableRow(
+                        children: [
+                          Padding(padding: const EdgeInsets.all(10), child: Text('$idx.')),
+                          Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(rx.medicineName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                if (rx.dosage.isNotEmpty)
+                                  Text('${rx.form} • ${rx.dosage}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              ],
+                            ),
                           ),
-                          child: const Text('Dr. Arunraj ✓', style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
+                          Padding(padding: const EdgeInsets.all(10), child: Text(rx.frequency, style: const TextStyle(fontSize: 11))),
+                          Padding(padding: const EdgeInsets.all(10), child: Text('${rx.durationDays} Days', style: const TextStyle(fontSize: 11))),
+                        ],
+                      );
+                    }),
                   ],
                 ),
-              ),
+                const SizedBox(height: 24),
+                if (visit?.doctorName != null && visit!.doctorName!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("Doctor's Name:", style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            const SizedBox(height: 2),
+                            Text(visit.doctorName!, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                            Text('Department: ${visit.departmentName ?? "OPD"}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text('Sign / Digital Seal:', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: AppColors.hospitalNavy),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('${visit.doctorName!} ✓', style: const TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ],
           ),
         ),
@@ -993,10 +1095,10 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
       b.items.any((it) => it.itemType == 'PHARMACY')
     ).firstOrNull ?? (matchingBills.isNotEmpty ? matchingBills.first : null);
 
-    final billNo = dynamicBill?.invoiceNumber ?? 'PB26280332';
+    final billNo = dynamicBill?.invoiceNumber ?? 'PB-PENDING';
     final billDate = dynamicBill != null && dynamicBill.billedAt.length >= 10
         ? dynamicBill.billedAt.substring(0, 10)
-        : '01/10/2026';
+        : '—';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1088,27 +1190,55 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
               ),
               const Divider(height: 20),
 
-              // Itemized Table
-              Table(
-                columnWidths: const {
-                  0: FlexColumnWidth(4),
-                  1: FlexColumnWidth(2),
-                  2: FlexColumnWidth(1.5),
-                  3: FlexColumnWidth(1.5),
-                  4: FlexColumnWidth(2),
-                },
-                children: [
-                  TableRow(
-                    decoration: BoxDecoration(color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
-                    children: const [
-                      Padding(padding: EdgeInsets.all(6), child: Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('Batch / Form', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('Rate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                      Padding(padding: EdgeInsets.all(6), child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
-                    ],
+              if (dynamicBill == null || dynamicBill.items.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
-                  if (dynamicBill != null && dynamicBill.items.isNotEmpty)
+                  child: const Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.receipt_long_outlined, color: Colors.grey, size: 40),
+                        SizedBox(height: 10),
+                        Text(
+                          'No Pharmacy Invoices Issued',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Pharmacy bills will appear here once dispensed and billed at Pharmacy Unit-I.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else ...[
+                // Itemized Table
+                Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(4),
+                    1: FlexColumnWidth(2),
+                    2: FlexColumnWidth(1.5),
+                    3: FlexColumnWidth(1.5),
+                    4: FlexColumnWidth(2),
+                  },
+                  children: [
+                    TableRow(
+                      decoration: BoxDecoration(color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                      children: const [
+                        Padding(padding: EdgeInsets.all(6), child: Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('Batch / Form', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('Rate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                        Padding(padding: EdgeInsets.all(6), child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                      ],
+                    ),
                     ...dynamicBill.items.asMap().entries.map((entry) {
                       final idx = entry.key + 1;
                       final it = entry.value;
@@ -1121,47 +1251,28 @@ class _DigitalOpdBookletScreenState extends ConsumerState<DigitalOpdBookletScree
                           Padding(padding: const EdgeInsets.all(6), child: Text('₹${it.totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
                         ],
                       );
-                    })
-                  else ...[
-                    const TableRow(
-                      children: [
-                        Padding(padding: EdgeInsets.all(6), child: Text('1. MAHACEF-200mg TABLET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                        Padding(padding: EdgeInsets.all(6), child: Text('COAKZ001\n12/27', style: TextStyle(fontSize: 10))),
-                        Padding(padding: EdgeInsets.all(6), child: Text('6', style: TextStyle(fontSize: 11))),
-                        Padding(padding: EdgeInsets.all(6), child: Text('₹9.44', style: TextStyle(fontSize: 11))),
-                        Padding(padding: EdgeInsets.all(6), child: Text('₹56.63', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                      ],
-                    ),
-                    const TableRow(
-                      children: [
-                        Padding(padding: EdgeInsets.all(6), child: Text('2. HIFENAC-P TABLET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                        Padding(padding: EdgeInsets.all(6), child: Text('K2601285\n04/28', style: TextStyle(fontSize: 10))),
-                        Padding(padding: EdgeInsets.all(6), child: Text('6', style: TextStyle(fontSize: 11))),
-                        Padding(padding: EdgeInsets.all(6), child: Text('₹7.46', style: TextStyle(fontSize: 11))),
-                        Padding(padding: EdgeInsets.all(6), child: Text('₹44.74', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                      ],
-                    ),
+                    }),
                   ],
-                ],
-              ),
-              const Divider(height: 20),
+                ),
+                const Divider(height: 20),
 
-              // Summary Totals
-              Align(
-                alignment: Alignment.centerRight,
-                child: SizedBox(
-                  width: 240,
-                  child: Column(
-                    children: [
-                      _buildBillTotalRow('Gross Amount', '₹${dynamicBill != null ? dynamicBill.subtotal.toStringAsFixed(2) : "101.37"}'),
-                      _buildBillTotalRow('Discount', '₹${dynamicBill != null ? dynamicBill.discountAmount.toStringAsFixed(2) : "0.00"}'),
-                      _buildBillTotalRow('CGST / SGST', '₹${dynamicBill != null ? (dynamicBill.totalTaxAmount).toStringAsFixed(2) : "5.07"}'),
-                      const Divider(),
-                      _buildBillTotalRow('Net Cash Total', '₹${dynamicBill != null ? dynamicBill.totalAmount.toStringAsFixed(2) : "106.50"}', isBold: true),
-                    ],
+                // Summary Totals
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(
+                    width: 240,
+                    child: Column(
+                      children: [
+                        _buildBillTotalRow('Gross Amount', '₹${dynamicBill.subtotal.toStringAsFixed(2)}'),
+                        _buildBillTotalRow('Discount', '₹${dynamicBill.discountAmount.toStringAsFixed(2)}'),
+                        _buildBillTotalRow('CGST / SGST', '₹${dynamicBill.totalTaxAmount.toStringAsFixed(2)}'),
+                        const Divider(),
+                        _buildBillTotalRow('Net Cash Total', '₹${dynamicBill.totalAmount.toStringAsFixed(2)}', isBold: true),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

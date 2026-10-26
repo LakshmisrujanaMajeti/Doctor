@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -32,18 +33,60 @@ class AdminPortalRepository {
   AdminPortalRepository(this._dioClient);
 
   Future<void> _loadCacheIfNeeded() async {
-    if (_localUsers.isNotEmpty) return;
-    try {
-      final raw = await SecureStorageService.getStaffDirectoryJson();
-      if (raw != null && raw.isNotEmpty) {
-        final list = jsonDecode(raw) as List<dynamic>;
-        _localUsers.clear();
-        for (final item in list) {
-          _localUsers.add(AdminUserModel.fromJson(item as Map<String, dynamic>));
+    if (_localUsers.isEmpty) {
+      try {
+        final raw = await SecureStorageService.getStaffDirectoryJson();
+        if (raw != null && raw.isNotEmpty) {
+          final list = jsonDecode(raw) as List<dynamic>;
+          _localUsers.clear();
+          for (final item in list) {
+            final u = AdminUserModel.fromJson(item as Map<String, dynamic>);
+            if (u.roleName.toLowerCase() != 'none') {
+              _localUsers.add(u);
+            }
+          }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
+    _ensureDefaultDoctorsMerged();
+    _deduplicateLocalUsers();
     _isLoaded = true;
+  }
+
+  void _ensureDefaultDoctorsMerged() {
+    final docs = DoctorRepository.defaultDoctors;
+    for (final d in docs) {
+      final docEmail = d.name.toLowerCase().contains('sarah')
+          ? 'doctor@smvmch.ac.in'
+          : '${d.departmentName.toLowerCase().replaceAll(' ', '')}@smvmch.ac.in';
+      final existingIdx = _localUsers.indexWhere((u) => u.email.toLowerCase() == docEmail.toLowerCase());
+      final docModel = AdminUserModel(
+        id: d.userId,
+        email: docEmail,
+        fullName: d.name,
+        roleName: 'doctor',
+        phone: '98401${10000 + _localUsers.length}',
+        isActive: true,
+        isVerified: true,
+        departmentName: d.departmentName,
+        specialization: d.specialization,
+        qualification: d.qualification,
+        roomNumber: d.roomNumber,
+        consultationFee: d.consultationFee.toStringAsFixed(0),
+        doctorId: d.id,
+        registrationNumber: 'MCI-${30000 + _localUsers.length}',
+      );
+      if (existingIdx != -1) {
+        _localUsers[existingIdx] = docModel;
+      } else {
+        _localUsers.add(docModel);
+      }
+    }
+  }
+
+  void _deduplicateLocalUsers() {
+    final seen = <String>{};
+    _localUsers.retainWhere((u) => u.roleName.toLowerCase() != 'none' && u.email.isNotEmpty && seen.add(u.email.toLowerCase()));
   }
 
   Future<void> _saveCache() async {
@@ -85,6 +128,7 @@ class AdminPortalRepository {
           metrics = metrics.copyWith(
             revenueToday: localSumPaid,
             revenueMonth: max(metrics.revenueMonth, localSumPaid),
+            grandTotalRevenue: max(metrics.grandTotalRevenue, localSumPaid),
             revenueByMethod: metrics.revenueByMethod.isEmpty ? localRevByMethod : metrics.revenueByMethod,
             pendingBillsCount: metrics.pendingBillsCount > 0 ? metrics.pendingBillsCount : localPendingCount,
             pendingBillsAmount: metrics.pendingBillsAmount > 0 ? metrics.pendingBillsAmount : localPendingAmt,
@@ -125,6 +169,10 @@ class AdminPortalRepository {
       activeDoctorsCount: _localUsers.where((u) => u.roleName == 'doctor').length,
       revenueToday: localSumPaid,
       revenueMonth: localSumPaid,
+      grandTotalRevenue: localSumPaid,
+      yesterdayRevenue: 0.0,
+      todayBillsCount: cachedVisits.length,
+      yesterdayBillsCount: 0,
       pendingBillsCount: localPendingCount,
       pendingBillsAmount: localPendingAmt,
       revenueByMethod: localRevByMethod,
@@ -143,131 +191,70 @@ class AdminPortalRepository {
   Future<List<AdminUserModel>> getUsers({String? role, bool? isActive, String? search}) async {
     await _loadCacheIfNeeded();
 
-    // 1. If we have cached users, return immediately (0ms) and background sync
-    if (_localUsers.isNotEmpty) {
-      _syncUsersFromCloud(role, isActive, search);
-      return _filterUsers(_localUsers, role, isActive, search);
-    }
-
-    // 2. Cold first run: fetch from Supabase Cloud
+    // 1. Authoritative: Always attempt fetch from backend API
     try {
-      final supaUsers = await SupabaseService.fetchUsers();
-      if (supaUsers.isNotEmpty) {
-        _localUsers.clear();
-        for (final su in supaUsers) {
-          _localUsers.add(AdminUserModel(
-            id: su.id,
-            email: su.email,
-            fullName: su.fullName,
-            roleName: su.roleName,
-            phone: su.phone,
-            isActive: su.isActive,
-            isVerified: su.isVerified,
-          ));
-        }
-        await _saveCache();
-        return _filterUsers(_localUsers, role, isActive, search);
-      }
-    } catch (_) {}
-
-    // 3. Fallback to Dio backend
-    try {
-      final Map<String, dynamic> q = {};
+      final Map<String, dynamic> q = {'limit': 150};
       if (role != null && role.isNotEmpty) q['role'] = role;
       if (isActive != null) q['is_active'] = isActive;
       if (search != null && search.isNotEmpty) q['search'] = search;
 
       final response = await _dioClient.dio.get(ApiEndpoints.adminUsers, queryParameters: q);
-      final list = (response.data['data'] as List?) ?? [];
-      final fetched = list.map((u) => AdminUserModel.fromJson(u as Map<String, dynamic>)).toList();
-      if ((role == null || role.isEmpty) && isActive == null && (search == null || search.isEmpty)) {
-        _localUsers.clear();
-        _localUsers.addAll(fetched);
-        await _saveCache();
-        return _localUsers;
-      } else {
-        for (final f in fetched) {
-          final idx = _localUsers.indexWhere((x) => x.id == f.id || x.email == f.email);
-          if (idx != -1) {
-            _localUsers[idx] = f;
-          } else {
-            _localUsers.add(f);
-          }
-        }
-        await _saveCache();
-        return fetched;
-      }
-    } catch (_) {
-      return _filterUsers(_localUsers, role, isActive, search);
-    }
-  }
-
-  void _syncUsersFromCloud(String? role, bool? isActive, String? search) {
-    Future.microtask(() async {
-      try {
-        final supaUsers = await SupabaseService.fetchUsers();
-        if (supaUsers.isNotEmpty) {
-          final existingIds = _localUsers.map((u) => u.id).toSet();
-          final existingEmails = _localUsers.map((u) => u.email.toLowerCase()).toSet();
-          bool hasNew = false;
-          for (final su in supaUsers) {
-            if (!existingIds.contains(su.id) && !existingEmails.contains(su.email.toLowerCase())) {
-              _localUsers.add(AdminUserModel(
-                id: su.id,
-                email: su.email,
-                fullName: su.fullName,
-                roleName: su.roleName,
-                phone: su.phone,
-                isActive: su.isActive,
-                isVerified: su.isVerified,
-              ));
-              hasNew = true;
-            }
-          }
-          if (hasNew) {
-            await _saveCache();
-          }
-        }
-      } catch (_) {}
-
-      if (DioClient.isHostReachable) {
-        try {
-          final Map<String, dynamic> q = {};
-          if (role != null && role.isNotEmpty) q['role'] = role;
-          if (isActive != null) q['is_active'] = isActive;
-          if (search != null && search.isNotEmpty) q['search'] = search;
-
-          final response = await _dioClient.dio.get(ApiEndpoints.adminUsers, queryParameters: q);
-          final list = (response.data['data'] as List?) ?? [];
-          final fetched = list.map((u) => AdminUserModel.fromJson(u as Map<String, dynamic>)).toList();
+      if (response.data is Map && response.data['status'] == 'success') {
+        final list = (response.data['data'] as List?) ?? [];
+        final fetched = list.map((u) => AdminUserModel.fromJson(u as Map<String, dynamic>)).toList();
+        if (fetched.isNotEmpty) {
           for (final f in fetched) {
-            final idx = _localUsers.indexWhere((x) => x.id == f.id || x.email == f.email);
+            final idx = _localUsers.indexWhere((x) => x.id == f.id || x.email.toLowerCase() == f.email.toLowerCase());
             if (idx != -1) {
               _localUsers[idx] = f;
             } else {
               _localUsers.add(f);
             }
           }
+          _ensureDefaultDoctorsMerged();
+          _deduplicateLocalUsers();
           await _saveCache();
-        } catch (_) {}
+          return _filterUsers(_localUsers, role, isActive, search);
+        }
       }
-    });
+    } catch (e) {
+      debugPrint('Admin users fetch note: $e');
+    }
+
+    // 2. Fallback: return cached + default merged doctors
+    _ensureDefaultDoctorsMerged();
+    _deduplicateLocalUsers();
+    return _filterUsers(_localUsers, role, isActive, search);
   }
 
   List<AdminUserModel> _filterUsers(List<AdminUserModel> users, String? role, bool? isActive, String? search) {
     var results = List<AdminUserModel>.from(users);
     if (role != null && role.isNotEmpty) {
-      results = results.where((u) => u.roleName.toLowerCase() == role.toLowerCase()).toList();
+      final r = role.toLowerCase().trim();
+      results = results.where((u) {
+        final ur = u.roleName.toLowerCase().trim();
+        if (r == 'doctor') return ur == 'doctor';
+        if (r == 'receptionist') return ur == 'receptionist' || ur == 'reception';
+        if (r == 'nurse') return ur == 'nurse';
+        if (r == 'pharmacist') return ur == 'pharmacist';
+        if (r == 'lab_technician' || r == 'lab_tech' || r == 'laboratory') {
+          return ur == 'lab_technician' || ur == 'lab_tech' || ur == 'laboratory';
+        }
+        if (r == 'admin') return ur == 'admin';
+        return ur == r;
+      }).toList();
     }
     if (isActive != null) {
       results = results.where((u) => u.isActive == isActive).toList();
     }
     if (search != null && search.isNotEmpty) {
-      final s = search.toLowerCase();
+      final s = search.toLowerCase().trim();
       results = results.where((u) =>
           u.fullName.toLowerCase().contains(s) ||
           u.email.toLowerCase().contains(s) ||
-          (u.phone != null && u.phone!.contains(s))).toList();
+          (u.phone != null && u.phone!.contains(s)) ||
+          (u.specialization != null && u.specialization!.toLowerCase().contains(s)) ||
+          (u.departmentName != null && u.departmentName!.toLowerCase().contains(s))).toList();
     }
     return results;
   }

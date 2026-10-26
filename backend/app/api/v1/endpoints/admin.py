@@ -169,6 +169,36 @@ def get_operational_dashboard_summary(
     all_bills_paid = db.query(func.sum(Bill.paid_amount)).filter(Bill.paid_amount > 0).scalar() or 0.0
     all_tx_paid = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED").scalar() or 0.0
 
+    # Grand Total Collections (all-time completed payments / bills)
+    all_bills_paid = db.query(func.sum(Bill.paid_amount)).filter(Bill.paid_amount > 0).scalar() or 0.0
+    all_tx_paid = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED").scalar() or 0.0
+    grand_total_revenue = float(max(all_bills_paid, all_tx_paid))
+
+    # Yesterday's bill payments & count
+    yesterday_start = today_start - timedelta(days=1)
+    yesterday_end = today_start
+    tx_yesterday = (
+        db.query(func.sum(PaymentTransaction.amount))
+        .filter(PaymentTransaction.payment_status == "COMPLETED", PaymentTransaction.created_at >= yesterday_start, PaymentTransaction.created_at < yesterday_end)
+        .scalar() or 0.0
+    )
+    bills_yesterday = (
+        db.query(func.sum(Bill.paid_amount))
+        .filter(Bill.payment_status.in_(["PAID", "PARTIAL"]), Bill.billed_at >= yesterday_start, Bill.billed_at < yesterday_end)
+        .scalar() or 0.0
+    )
+    yesterday_revenue = float(max(tx_yesterday, bills_yesterday))
+    yesterday_bills_count = db.query(func.count(Bill.id)).filter(
+        Bill.payment_status.in_(["PAID", "PARTIAL"]),
+        Bill.billed_at >= yesterday_start,
+        Bill.billed_at < yesterday_end
+    ).scalar() or 0
+
+    today_bills_count = db.query(func.count(Bill.id)).filter(
+        Bill.payment_status.in_(["PAID", "PARTIAL"]),
+        Bill.billed_at >= today_start
+    ).scalar() or 0
+
     # Maximize across transaction and invoice payment tracking to ensure no collections are missed
     revenue_today = max(float(tx_today), float(bills_paid_today))
     if revenue_today == 0.0 and (all_bills_paid > 0 or all_tx_paid > 0):
@@ -253,6 +283,10 @@ def get_operational_dashboard_summary(
         active_doctors_count=active_doctors,
         revenue_today=float(revenue_today),
         revenue_month=float(revenue_month),
+        grand_total_revenue=float(grand_total_revenue),
+        yesterday_revenue=float(yesterday_revenue),
+        today_bills_count=today_bills_count,
+        yesterday_bills_count=yesterday_bills_count,
         pending_bills_count=pending_bills_count,
         pending_bills_amount=float(pending_bills_amount),
         revenue_by_method=revenue_by_method,
@@ -276,6 +310,98 @@ def get_operational_dashboard_summary(
     return success_response(data=metrics.model_dump(), message="Operational dashboard summaries retrieved")
 
 
+@router.get("/billing-history", summary="Comprehensive Hospital Patient Billing History (Admin Only)")
+def get_admin_billing_history(
+    date_filter: Optional[str] = Query(None, description="today, yesterday, month, or all"),
+    search: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "billing"])),
+):
+    """Returns comprehensive hospital billing ledger including grand totals, yesterday's payments, and line items."""
+    today_start = datetime.combine(date.today(), datetime.min.time())
+    yesterday_start = today_start - timedelta(days=1)
+    yesterday_end = today_start
+
+    # Grand Totals
+    all_bills_paid = db.query(func.sum(Bill.paid_amount)).filter(Bill.paid_amount > 0).scalar() or 0.0
+    all_tx_paid = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED").scalar() or 0.0
+    grand_total_revenue = float(max(all_bills_paid, all_tx_paid))
+
+    tx_today = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED", PaymentTransaction.created_at >= today_start).scalar() or 0.0
+    bills_today = db.query(func.sum(Bill.paid_amount)).filter(Bill.payment_status.in_(["PAID", "PARTIAL"]), Bill.billed_at >= today_start).scalar() or 0.0
+    today_revenue = float(max(tx_today, bills_today))
+    today_bills_count = db.query(func.count(Bill.id)).filter(Bill.billed_at >= today_start).scalar() or 0
+
+    tx_yesterday = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED", PaymentTransaction.created_at >= yesterday_start, PaymentTransaction.created_at < yesterday_end).scalar() or 0.0
+    bills_yesterday = db.query(func.sum(Bill.paid_amount)).filter(Bill.payment_status.in_(["PAID", "PARTIAL"]), Bill.billed_at >= yesterday_start, Bill.billed_at < yesterday_end).scalar() or 0.0
+    yesterday_revenue = float(max(tx_yesterday, bills_yesterday))
+    yesterday_bills_count = db.query(func.count(Bill.id)).filter(Bill.billed_at >= yesterday_start, Bill.billed_at < yesterday_end).scalar() or 0
+
+    # Query Bills
+    q = db.query(Bill).join(Patient, Bill.patient_id == Patient.id, isouter=True)
+    if date_filter == "today":
+        q = q.filter(Bill.billed_at >= today_start)
+    elif date_filter == "yesterday":
+        q = q.filter(Bill.billed_at >= yesterday_start, Bill.billed_at < yesterday_end)
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        q = q.filter(
+            or_(
+                Bill.bill_number.ilike(term),
+                Patient.full_name.ilike(term),
+                Patient.uhid.ilike(term),
+            )
+        )
+
+    total_count = q.count()
+    bills = q.order_by(Bill.billed_at.desc()).offset(skip).limit(limit).all()
+
+    items = []
+    for b in bills:
+        pat = b.patient
+        v = b.visit
+        cashier = b.billed_by_user
+        items.append({
+            "id": b.id,
+            "bill_number": b.bill_number,
+            "patient_id": b.patient_id,
+            "patient_name": pat.full_name if pat else "Walk-in Patient",
+            "patient_uhid": pat.uhid if pat else "N/A",
+            "visit_id": b.visit_id,
+            "visit_number": v.visit_number if v else "N/A",
+            "department_name": (v.department.name if v and v.department else "General"),
+            "doctor_name": (v.doctor.user.full_name if v and v.doctor and v.doctor.user else "Consulting Doctor"),
+            "total_amount": float(b.total_amount or 0.0),
+            "discount_amount": float(b.discount_amount or 0.0),
+            "tax_amount": float(b.tax_amount or 0.0),
+            "paid_amount": float(b.paid_amount or 0.0),
+            "pending_amount": float(b.pending_amount or 0.0),
+            "payment_status": b.payment_status,
+            "payment_method": b.payment_method or "CASH",
+            "billed_at": b.billed_at.isoformat() if b.billed_at else None,
+            "cashier_name": cashier.full_name if cashier else "OPD Cashier",
+            "items_count": len(b.items) if b.items else 0,
+        })
+
+    return success_response(
+        data={
+            "summary": {
+                "grand_total_revenue": grand_total_revenue,
+                "today_revenue": today_revenue,
+                "yesterday_revenue": yesterday_revenue,
+                "today_bills_count": today_bills_count,
+                "yesterday_bills_count": yesterday_bills_count,
+                "total_bills_count": total_count,
+            },
+            "bills": items,
+        },
+        message="Hospital billing history retrieved successfully"
+    )
+
+
 # ==========================================
 # 2. Staff, Role & Permission Management
 # ==========================================
@@ -286,14 +412,28 @@ def list_hospital_users(
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(150, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"])),
 ):
     q = db.query(User).join(Role, User.role_id == Role.id, isouter=True)
 
     if role and role.strip():
-        q = q.filter(Role.name == role.strip().lower())
+        r_name = role.strip().lower()
+        if r_name == "doctor":
+            q = q.filter(Role.name == "doctor")
+        elif r_name in ["receptionist", "reception"]:
+            q = q.filter(Role.name.in_(["receptionist", "reception"]))
+        elif r_name in ["lab_technician", "lab_tech", "laboratory"]:
+            q = q.filter(Role.name.in_(["lab_technician", "lab_tech", "laboratory"]))
+        elif r_name == "pharmacist":
+            q = q.filter(Role.name == "pharmacist")
+        elif r_name == "nurse":
+            q = q.filter(Role.name == "nurse")
+        elif r_name == "admin":
+            q = q.filter(Role.name == "admin")
+        else:
+            q = q.filter(Role.name == r_name)
 
     if is_active is not None:
         q = q.filter(User.is_active == is_active)
@@ -303,8 +443,32 @@ def list_hospital_users(
         q = q.filter(or_(User.full_name.ilike(term), User.email.ilike(term), User.phone.ilike(term)))
 
     users = q.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
+
+    user_list = []
+    for u in users:
+        d = UserRead.model_validate(u).model_dump()
+        role_str = u.role.name if u.role else "staff"
+        d["role_name"] = role_str
+        d["role"] = {"id": u.role.id, "name": role_str} if u.role else {"name": role_str}
+        # Look up doctor profile
+        doc = db.query(Doctor).filter(or_(Doctor.user_id == u.id, Doctor.id == u.id)).first()
+        if not doc and u.email:
+            prefix = u.email.split("@")[0].lower()
+            doc = db.query(Doctor).filter(Doctor.specialization.ilike(f"%{prefix}%")).first()
+        if doc:
+            d["doctor_id"] = doc.id
+            d["department_id"] = doc.department_id
+            d["department_name"] = doc.department.name if doc.department else "Specialty Clinic"
+            d["specialization"] = doc.specialization
+            d["qualification"] = doc.qualification
+            d["room_number"] = doc.room_number or "Cabin 101"
+            d["consultation_fee"] = str(doc.consultation_fee or "500.00")
+            d["registration_number"] = doc.registration_number
+            d["is_available"] = doc.is_available
+        user_list.append(d)
+
     return success_response(
-        data=[UserRead.model_validate(u).model_dump() for u in users],
+        data=user_list,
         message="Hospital users retrieved"
     )
 

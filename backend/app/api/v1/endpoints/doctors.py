@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_
 from app.core.database import get_db
 from app.core.responses import success_response
 from app.core.dependencies import get_current_user, require_roles
@@ -21,7 +22,14 @@ def build_doctor_dashboard_data(doctor: Doctor, db: Session) -> dict:
     """Build comprehensive dashboard metrics and queues for a doctor."""
     all_doctor_visits = (
         db.query(OPDVisit)
-        .filter(OPDVisit.doctor_id == doctor.id)
+        .filter(
+            or_(
+                OPDVisit.doctor_id == doctor.id,
+                OPDVisit.doctor_id == doctor.user_id,
+                and_(OPDVisit.doctor_id.is_(None), OPDVisit.department_id == doctor.department_id),
+                OPDVisit.department_id == doctor.department_id,
+            )
+        )
         .order_by(OPDVisit.queue_token.asc(), OPDVisit.visit_date.desc())
         .all()
     )
@@ -161,6 +169,24 @@ def get_my_dashboard(
     doc = None
     if user_role == "doctor":
         doc = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+        if not doc:
+            doc = db.query(Doctor).join(User, Doctor.user_id == User.id).filter(User.email == current_user.email).first()
+        if not doc and current_user.email:
+            # Match by email prefix e.g. 'pulmonology@'
+            prefix = current_user.email.split("@")[0].lower()
+            doc = (
+                db.query(Doctor)
+                .join(User, Doctor.user_id == User.id)
+                .filter(
+                    or_(
+                        User.email.ilike(f"%{prefix}%"),
+                        Doctor.specialization.ilike(f"%{prefix}%"),
+                    )
+                )
+                .first()
+            )
+        if not doc and doctor_id:
+            doc = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     elif user_role == "admin":
         if doctor_id:
             doc = db.query(Doctor).filter(Doctor.id == doctor_id).first()

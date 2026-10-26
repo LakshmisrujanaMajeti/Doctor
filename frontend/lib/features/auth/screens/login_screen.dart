@@ -253,6 +253,66 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           'parent_spouse_name': 'Peddiraju',
           'parent_spouse_relation': 'S/o'
         },
+        {
+          'id': 'pat-venu-00010',
+          'uhid': 'UHID-2026-00010',
+          'full_name': 'Venu',
+          'phone': '9879879879',
+          'gender': 'MALE',
+          'age_years': 28,
+          'city': 'Puducherry',
+          'blood_group': 'B+',
+          'parent_spouse_name': 'Rao',
+          'parent_spouse_relation': 'S/o'
+        },
+        {
+          'id': 'pat-gayathri-00011',
+          'uhid': 'UHID-2026-00011',
+          'full_name': 'gayathri',
+          'phone': '6666666666',
+          'gender': 'FEMALE',
+          'age_years': 24,
+          'city': 'Puducherry',
+          'blood_group': 'A+',
+          'parent_spouse_name': 'Suresh',
+          'parent_spouse_relation': 'D/o'
+        },
+        {
+          'id': 'pat-daksha-00012',
+          'uhid': 'UHID-2026-00012',
+          'full_name': 'daksha',
+          'phone': '7777777779',
+          'gender': 'FEMALE',
+          'age_years': 22,
+          'city': 'Puducherry',
+          'blood_group': 'O+',
+          'parent_spouse_name': 'Kalyan',
+          'parent_spouse_relation': 'D/o'
+        },
+        {
+          'id': 'pat-nayak-00013',
+          'uhid': 'UHID-2026-00013',
+          'full_name': 'nayak',
+          'phone': '6545248151',
+          'gender': 'MALE',
+          'age_years': 25,
+          'city': 'Puducherry',
+          'blood_group': 'B+',
+          'parent_spouse_name': 'Nayak',
+          'parent_spouse_relation': 'S/o'
+        },
+        {
+          'id': 'pat-nayak-00014',
+          'uhid': 'UHID-2026-00014',
+          'full_name': 'nayak',
+          'phone': '6545248151',
+          'gender': 'MALE',
+          'age_years': 25,
+          'city': 'Puducherry',
+          'blood_group': 'B+',
+          'parent_spouse_name': 'Nayak',
+          'parent_spouse_relation': 'S/o'
+        },
       ];
 
       final match = known.firstWhere(
@@ -718,44 +778,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Front Desk Registration Policy Box
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.primaryTeal.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.primaryTeal.withOpacity(0.22)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        // Compressed concise registration note
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.local_hospital_rounded, color: AppColors.primaryTeal, size: 17),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Hospital Registration Policy',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryTeal,
-                    ),
+              const Icon(Icons.info_outline_rounded, color: AppColors.primaryTeal, size: 14),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'First visit? Front Desk registration required upon hospital arrival.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
                   ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Text(
-                '• New Patients: Registration is completed exclusively at the Hospital Front Desk / Central OPD Reception upon arrival.\n• Once registered, your unique UHID and mobile number grant instant access to your records anytime.',
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.35,
-                  color: isDark ? Colors.grey[300] : Colors.grey[800],
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
         // Patient Login Button
         OpdButton(

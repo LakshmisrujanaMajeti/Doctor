@@ -6,10 +6,14 @@ import '../../visits/models/visit_model.dart';
 import '../../visits/providers/visit_provider.dart';
 import '../../visits/repositories/visit_repository.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../doctors/models/doctor_model.dart';
+import '../../doctors/repositories/doctor_repository.dart';
 
 final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async {
   final dioClient = ref.watch(dioClientProvider);
   final currentUser = ref.watch(authProvider).user;
+  // Automatically re-evaluate whenever hospital visit list changes in real-time
+  ref.watch(visitListProvider);
 
   // 1. Fetch official doctor dashboard from backend (strictly isolated per doctor on backend)
   if (DioClient.isHostReachable) {
@@ -33,15 +37,31 @@ final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async
   final docName = currentUser?.fullName.toLowerCase() ?? '';
   final docId = currentUser?.id.toLowerCase() ?? '';
 
+  // Look up doctor profile from directory
+  final cachedDocs = DoctorRepository.cachedDoctors;
+  DoctorModel? myDocProfile;
+  for (final d in cachedDocs) {
+    if (d.userId.toLowerCase() == docId || d.id.toLowerCase() == docId) {
+      myDocProfile = d;
+      break;
+    }
+    if (docEmail.isNotEmpty && d.name.toLowerCase().contains(docEmail.split('@')[0])) {
+      myDocProfile = d;
+      break;
+    }
+  }
+
   final myVisits = allVisits.where((v) {
     if (currentUser == null) return false;
     final vDocId = v.doctorId.toLowerCase();
     final vDocName = v.doctorName?.toLowerCase() ?? '';
     final vDept = v.departmentName?.toLowerCase() ?? '';
+    final vDeptId = v.departmentId.toLowerCase();
 
-    // Direct ID match
-    if (vDocId.isNotEmpty && (vDocId == docId || vDocId.contains(docId) || docId.contains(vDocId))) {
-      return true;
+    // Direct ID match against user or doctor ID
+    if (vDocId.isNotEmpty) {
+      if (vDocId == docId || vDocId.contains(docId) || docId.contains(vDocId)) return true;
+      if (myDocProfile != null && (vDocId == myDocProfile.id.toLowerCase() || vDocId.contains(myDocProfile.id.toLowerCase()))) return true;
     }
 
     // Name match
@@ -53,7 +73,14 @@ final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async
       }
     }
 
-    // Department match based on doctor specialty
+    // Match doctor profile department
+    if (myDocProfile != null) {
+      if (vDept.isNotEmpty && myDocProfile.departmentName.toLowerCase().contains(vDept)) return true;
+      if (vDept.isNotEmpty && vDept.contains(myDocProfile.departmentName.toLowerCase())) return true;
+      if (vDeptId.isNotEmpty && vDeptId == myDocProfile.departmentId.toLowerCase()) return true;
+    }
+
+    // Department match based on doctor specialty email
     if (docEmail.contains('pulmon') && vDept.contains('pulmon')) return true;
     if (docEmail.contains('cardio') && vDept.contains('cardio')) return true;
     if (docEmail.contains('pediatric') && vDept.contains('pediatric')) return true;

@@ -21,15 +21,31 @@ class PatientService:
     def generate_uhid(db: Session) -> str:
         current_year = datetime.utcnow().year
         prefix = f"UHID-{current_year}-"
-        count = db.query(func.count(Patient.id)).filter(Patient.uhid.like(f"{prefix}%")).scalar() or 0
-        return f"{prefix}{str(count + 1).zfill(5)}"
+        existing_uhids = db.query(Patient.uhid).filter(Patient.uhid.like(f"{prefix}%")).all()
+        max_num = 0
+        for (u,) in existing_uhids:
+            if u:
+                parts = u.split("-")
+                if parts and parts[-1].isdigit():
+                    num = int(parts[-1])
+                    if num > max_num:
+                        max_num = num
+        return f"{prefix}{str(max_num + 1).zfill(5)}"
 
     @staticmethod
     def generate_hospital_reg_num(db: Session) -> str:
         current_year = datetime.utcnow().year
         prefix = f"REG-{current_year}-"
-        count = db.query(func.count(Patient.id)).filter(Patient.hospital_reg_num.like(f"{prefix}%")).scalar() or 0
-        return f"{prefix}{str(count + 1).zfill(5)}"
+        existing_regs = db.query(Patient.hospital_reg_num).filter(Patient.hospital_reg_num.like(f"{prefix}%")).all()
+        max_num = 0
+        for (r,) in existing_regs:
+            if r:
+                parts = r.split("-")
+                if parts and parts[-1].isdigit():
+                    num = int(parts[-1])
+                    if num > max_num:
+                        max_num = num
+        return f"{prefix}{str(max_num + 1).zfill(5)}"
 
     @staticmethod
     def check_duplicates(
@@ -172,8 +188,9 @@ class PatientService:
         uhid = PatientService.generate_uhid(db)
         while db.query(Patient).filter(Patient.uhid == uhid).first():
             prefix = f"UHID-{datetime.utcnow().year}-"
-            count = db.query(func.count(Patient.id)).filter(Patient.uhid.like(f"{prefix}%")).scalar() or 0
-            uhid = f"{prefix}{str(count + 2).zfill(5)}"
+            existing_uhids = db.query(Patient.uhid).filter(Patient.uhid.like(f"{prefix}%")).all()
+            max_num = max([int(u[0].split("-")[-1]) for u in existing_uhids if u[0] and u[0].split("-")[-1].isdigit()] or [0])
+            uhid = f"{prefix}{str(max_num + 1).zfill(5)}"
 
         reg_num = patient_in.hospital_reg_num or PatientService.generate_hospital_reg_num(db)
         barcode = patient_in.barcode_value or f"BAR-{uhid}"
@@ -223,39 +240,6 @@ class PatientService:
         db.commit()
         db.refresh(patient)
 
-        # Automatically issue 1 unique sequential OPD token for this registered patient
-        from app.models.department import Department
-        from app.models.doctor import Doctor
-        from app.services.visit_service import VisitService
-
-        dept = db.query(Department).filter(Department.code == "MED").first() or db.query(Department).filter(Department.is_active == True).first()
-        doc = db.query(Doctor).filter(Doctor.department_id == dept.id if dept else None, Doctor.is_available == True).first() or db.query(Doctor).first()
-
-        queue_tok = VisitService.get_next_queue_token(db, now.date())
-        visit_num = VisitService.generate_visit_number(db, queue_tok)
-
-        visit = OPDVisit(
-            patient_id=patient.id,
-            doctor_id=doc.id if doc else "default",
-            department_id=dept.id if dept else "default",
-            visit_date=now,
-            queue_token=queue_tok,
-            visit_number=visit_num,
-            triage_priority="NORMAL",
-            status="WAITING",
-            consultation_fee=500.0,
-            payment_status="PENDING",
-            notes="Initial OPD Registration Visit",
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(visit)
-        db.commit()
-        db.refresh(visit)
-
-        setattr(patient, "current_token", queue_tok)
-        setattr(patient, "current_visit_number", visit_num)
-
         # Audit
         db.add(
             AuditLog(
@@ -263,7 +247,7 @@ class PatientService:
                 action="CREATE_PATIENT",
                 entity_type="Patient",
                 entity_id=patient.id,
-                details_json=f'{{"uhid": "{patient.uhid}", "reg_num": "{patient.hospital_reg_num}", "name": "{patient.full_name}", "token": {queue_tok}}}',
+                details_json=f'{{"uhid": "{patient.uhid}", "reg_num": "{patient.hospital_reg_num}", "name": "{patient.full_name}"}}',
             )
         )
         db.commit()
@@ -272,7 +256,6 @@ class PatientService:
         try:
             from app.services.supabase_sync_service import SupabaseSyncService
             SupabaseSyncService.sync_patient(patient)
-            SupabaseSyncService.sync_visit(visit)
         except Exception as se:
             logger.debug(f"Supabase sync notice: {se}")
 

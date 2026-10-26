@@ -315,11 +315,11 @@ class PDFBookletService:
         bp_val = (
             f"{vitals_obj.systolic_bp}/{vitals_obj.diastolic_bp}"
             if (vitals_obj and getattr(vitals_obj, 'systolic_bp', None) and getattr(vitals_obj, 'diastolic_bp', None))
-            else (getattr(vitals_obj, 'blood_pressure', '120/80') if vitals_obj else '120/80')
+            else (getattr(vitals_obj, 'blood_pressure', '—') if vitals_obj else '—')
         )
-        height_val = f"{vitals_obj.height_cm}" if (vitals_obj and getattr(vitals_obj, 'height_cm', None)) else '170'
-        weight_val = f"{vitals_obj.weight_kg}" if (vitals_obj and getattr(vitals_obj, 'weight_kg', None)) else '65'
-        pulse_val = f"{vitals_obj.pulse_rate}" if (vitals_obj and getattr(vitals_obj, 'pulse_rate', None)) else '78'
+        height_val = f"{vitals_obj.height_cm}" if (vitals_obj and getattr(vitals_obj, 'height_cm', None)) else '—'
+        weight_val = f"{vitals_obj.weight_kg}" if (vitals_obj and getattr(vitals_obj, 'weight_kg', None)) else '—'
+        pulse_val = f"{vitals_obj.pulse_rate}" if (vitals_obj and getattr(vitals_obj, 'pulse_rate', None)) else '—'
 
         assess_data = [
             [Paragraph("<b>Presenting Complaint:</b>", label_style), Paragraph(complaints_text, val_style)],
@@ -358,14 +358,29 @@ class PDFBookletService:
         story.append(Paragraph("Form: SMVMCH/OP/OPIAF/Version1 • Continuous Patient Record", subtitle_style))
         story.append(Spacer(1, 14))
 
+        has_clinical = bool(visit and (getattr(visit, 'clinical_record', None) or (getattr(visit, 'notes', None) and visit.notes != 'Initial OPD Registration Visit')))
+        diag_val = (
+            (visit.clinical_record.diagnosis if (visit and getattr(visit, 'clinical_record', None) and getattr(visit.clinical_record, 'diagnosis', None)) else None)
+            or (visit.notes if visit and getattr(visit, 'notes', None) and visit.notes != 'Initial OPD Registration Visit' else None)
+            or "Pending Clinical Assessment"
+        )
+        prov_val = (
+            (visit.clinical_record.provisional_diagnosis if (visit and getattr(visit, 'clinical_record', None) and getattr(visit.clinical_record, 'provisional_diagnosis', None)) else None)
+            or diag_val
+        )
+        plan_val = (
+            (visit.clinical_record.treatment_plan if (visit and getattr(visit, 'clinical_record', None) and getattr(visit.clinical_record, 'treatment_plan', None)) else None)
+            or ("Awaiting attending doctor consultation" if not has_clinical else "Clinical consultation in progress")
+        )
+
         exam_data = [
-            [Paragraph("<b>RS (Respiratory System):</b>", label_style), Paragraph("B/L Air Entry Equal, Clear, No Added Sounds", val_style)],
-            [Paragraph("<b>CVS (Cardiovascular):</b>", label_style), Paragraph("S1, S2 Heard, No murmurs", val_style)],
-            [Paragraph("<b>O/E (On Examination):</b>", label_style), Paragraph("Pericoronitis 38 (Lower Left Third Molar)", val_style)],
-            [Paragraph("<b>Investigations Advised:</b>", label_style), Paragraph("Adv: IOPA 38 (Intraoral Periapical Radiograph)", val_style)],
-            [Paragraph("<b>Provisional Diagnosis:</b>", label_style), Paragraph("Acute Pericoronitis irt 38", val_style)],
-            [Paragraph("<b>Care Plan:</b>", label_style), Paragraph("Operculectomy / Extraction after acute symptoms subside with antibiotics", val_style)],
-            [Paragraph("<b>Final Diagnosis:</b>", label_style), Paragraph("Pericoronitis 38", val_style)],
+            [Paragraph("<b>RS (Respiratory System):</b>", label_style), Paragraph("B/L Air Entry Equal, Clear" if has_clinical else "Pending Doctor Exam", val_style)],
+            [Paragraph("<b>CVS (Cardiovascular):</b>", label_style), Paragraph("S1, S2 Heard, No murmurs" if has_clinical else "Pending Doctor Exam", val_style)],
+            [Paragraph("<b>O/E (On Examination):</b>", label_style), Paragraph(diag_val, val_style)],
+            [Paragraph("<b>Investigations Advised:</b>", label_style), Paragraph("As ordered by physician" if has_clinical else "None ordered yet", val_style)],
+            [Paragraph("<b>Provisional Diagnosis:</b>", label_style), Paragraph(prov_val, val_style)],
+            [Paragraph("<b>Care Plan:</b>", label_style), Paragraph(plan_val, val_style)],
+            [Paragraph("<b>Final Diagnosis:</b>", label_style), Paragraph(diag_val, val_style)],
         ]
         exam_table = Table(exam_data, colWidths=[180, 340])
         exam_table.setStyle(TableStyle([
@@ -382,15 +397,29 @@ class PDFBookletService:
         # ====================================================
         story.append(PageBreak())
         story.append(Paragraph("<b>TREATMENT PLAN (PRESCRIPTION)</b>", header_title_style))
-        story.append(Paragraph("Department of Dental Surgery & General Medicine • SMVMCH", subtitle_style))
+        story.append(Paragraph("Department of Outpatient Medicine • SMVMCH", subtitle_style))
         story.append(Spacer(1, 14))
 
-        rx_rows = [
-            [Paragraph("<b>Sl. No.</b>", label_style), Paragraph("<b>Drugs & Strength</b>", label_style), Paragraph("<b>Dosage Schedule</b>", label_style), Paragraph("<b>Duration</b>", label_style)],
-            [Paragraph("1", val_style), Paragraph("<b>T. Cefixime 200mg</b>", val_style), Paragraph("1 - 0 - 1 (Morning & Night)", val_style), Paragraph("3 days", val_style)],
-            [Paragraph("2", val_style), Paragraph("<b>T. Hifenac-P</b>", val_style), Paragraph("1 - 0 - 1 (After food)", val_style), Paragraph("3 days", val_style)],
-        ]
-        rx_table = Table(rx_rows, colWidths=[50, 200, 170, 100])
+        prescriptions = getattr(visit, 'prescriptions', []) if visit else []
+        if prescriptions:
+            rx_rows = [
+                [Paragraph("<b>Sl. No.</b>", label_style), Paragraph("<b>Drugs & Strength</b>", label_style), Paragraph("<b>Dosage Schedule</b>", label_style), Paragraph("<b>Duration</b>", label_style)],
+            ]
+            for i, p in enumerate(prescriptions, 1):
+                rx_rows.append([
+                    Paragraph(str(i), val_style),
+                    Paragraph(f"<b>{getattr(p, 'medication_name', 'Medicine')}</b> {getattr(p, 'dosage', '')}", val_style),
+                    Paragraph(getattr(p, 'frequency', '—'), val_style),
+                    Paragraph(getattr(p, 'duration', '—'), val_style),
+                ])
+            rx_table = Table(rx_rows, colWidths=[50, 200, 170, 100])
+        else:
+            rx_rows = [
+                [Paragraph("<b>Status</b>", label_style), Paragraph("<b>Prescription Details</b>", label_style)],
+                [Paragraph("No Active Rx", val_style), Paragraph("<i>No prescriptions recorded yet. Awaiting consulting doctor orders.</i>", val_style)],
+            ]
+            rx_table = Table(rx_rows, colWidths=[120, 400])
+
         rx_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E2E8F0')),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#64748B')),
@@ -402,9 +431,10 @@ class PDFBookletService:
         story.append(Spacer(1, 24))
 
         # Doctor Signature Box
+        doc_name = getattr(visit, 'doctor_name', None) or (visit.doctor.full_name if visit and getattr(visit, 'doctor', None) and getattr(visit.doctor, 'full_name', None) else "Attending Medical Officer")
         doc_sign_data = [
-            [Paragraph("<b>Review Date:</b> After 3 days", val_style), Paragraph("<b>Doctor's Name:</b> Dr. Anusha S", val_style)],
-            [Paragraph("<b>Date & Time:</b> 01/10/2026", val_style), Paragraph("<b>Verified Signature:</b> <i>Dr. Anusha S, M.D.</i> [VERIFIED]", label_style)],
+            [Paragraph("<b>Review Status:</b> Pending Consultation" if not prescriptions else "<b>Review Date:</b> As advised", val_style), Paragraph(f"<b>Doctor's Name:</b> {doc_name}", val_style)],
+            [Paragraph(f"<b>Date:</b> {now.strftime('%d/%m/%Y')}", val_style), Paragraph(f"<b>Digital Verification:</b> <i>{doc_name}</i> [PENDING]" if not prescriptions else f"<b>Verified Signature:</b> <i>{doc_name}</i> [VERIFIED]", label_style)],
         ]
         doc_sign_table = Table(doc_sign_data, colWidths=[250, 270])
         doc_sign_table.setStyle(TableStyle([
@@ -415,17 +445,23 @@ class PDFBookletService:
         story.append(doc_sign_table)
 
         # ====================================================
-        # PAGE 6: PHARMACY CASH BILL PB26280332
+        # PAGE 6: PHARMACY CASH BILL
         # ====================================================
         story.append(PageBreak())
         story.append(Paragraph("<b>SRI MANAKULA VINAYAGAR MEDICAL COLLEGE & HOSPITAL</b>", header_title_style))
-        story.append(Paragraph("PHARMACY UNIT-I (24 Hours) • CASH BILL / DUPLICATE BILL", subtitle_style))
+        story.append(Paragraph("PHARMACY UNIT-I (24 Hours) • CASH BILL / DISPENSING RECORD", subtitle_style))
         story.append(Paragraph("GST No: 34AAATM9599A1ZE • Kalitheerthalkuppam, Puducherry-605107 • Ph: 0413-2643000", ParagraphStyle('P2', parent=styles['Normal'], fontSize=8, alignment=1, textColor=colors.grey)))
         story.append(Spacer(1, 10))
 
+        bills = db.query(Bill).filter(Bill.patient_id == patient.id).all() if patient else []
+        pharmacy_bill = next((b for b in bills if "PHARM" in getattr(b, 'department_name', '').upper() or any(it.item_type == 'PHARMACY' for it in getattr(b, 'items', []))), None) or (bills[0] if bills else None)
+
+        bill_num = getattr(pharmacy_bill, 'invoice_number', 'PENDING')
+        bill_date_str = pharmacy_bill.billed_at.strftime('%d/%m/%Y') if (pharmacy_bill and getattr(pharmacy_bill, 'billed_at', None)) else now.strftime('%d/%m/%Y')
+
         bill_meta = [
-            [Paragraph(f"<b>Patient No:</b> {uhid}", val_style), Paragraph("<b>Bill No:</b> PB26280332", val_style)],
-            [Paragraph(f"<b>Name:</b> {patient.full_name}", val_style), Paragraph("<b>Date:</b> 01/10/2026", val_style)],
+            [Paragraph(f"<b>Patient No:</b> {uhid}", val_style), Paragraph(f"<b>Bill No:</b> {bill_num}", val_style)],
+            [Paragraph(f"<b>Name:</b> {patient.full_name}", val_style), Paragraph(f"<b>Date:</b> {bill_date_str}", val_style)],
             [Paragraph("<b>Category:</b> SPECIAL CATEGORY", val_style), Paragraph(f"<b>Staff:</b> {staff_str}", val_style)],
         ]
         bill_meta_table = Table(bill_meta, colWidths=[260, 260])
@@ -436,70 +472,59 @@ class PDFBookletService:
         story.append(bill_meta_table)
         story.append(Spacer(1, 8))
 
-        bill_items = [
-            [
-                Paragraph("<b>SNo.</b>", label_style),
-                Paragraph("<b>Description</b>", label_style),
-                Paragraph("<b>Batch</b>", label_style),
-                Paragraph("<b>ExpDate</b>", label_style),
-                Paragraph("<b>Qty</b>", label_style),
-                Paragraph("<b>Rate</b>", label_style),
-                Paragraph("<b>CGST%</b>", label_style),
-                Paragraph("<b>SGST%</b>", label_style),
-                Paragraph("<b>Amount (₹)</b>", label_style),
-            ],
-            [
-                Paragraph("1", val_style),
-                Paragraph("MAHACEF-200MG TABLET", val_style),
-                Paragraph("COAKZ001", val_style),
-                Paragraph("12/27", val_style),
-                Paragraph("6", val_style),
-                Paragraph("9.44", val_style),
-                Paragraph("2.5", val_style),
-                Paragraph("2.5", val_style),
-                Paragraph("56.63", val_style),
-            ],
-            [
-                Paragraph("2", val_style),
-                Paragraph("HIFENAC-P TABLET", val_style),
-                Paragraph("K2601285", val_style),
-                Paragraph("04/28", val_style),
-                Paragraph("6", val_style),
-                Paragraph("7.46", val_style),
-                Paragraph("2.5", val_style),
-                Paragraph("2.5", val_style),
-                Paragraph("44.74", val_style),
-            ],
-        ]
-        bill_table = Table(bill_items, colWidths=[30, 160, 65, 50, 30, 45, 45, 45, 50])
+        if pharmacy_bill and getattr(pharmacy_bill, 'items', None):
+            bill_items = [
+                [
+                    Paragraph("<b>SNo.</b>", label_style),
+                    Paragraph("<b>Description</b>", label_style),
+                    Paragraph("<b>Code</b>", label_style),
+                    Paragraph("<b>Qty</b>", label_style),
+                    Paragraph("<b>Rate</b>", label_style),
+                    Paragraph("<b>Amount (₹)</b>", label_style),
+                ]
+            ]
+            for idx, item in enumerate(pharmacy_bill.items, 1):
+                bill_items.append([
+                    Paragraph(str(idx), val_style),
+                    Paragraph(item.description, val_style),
+                    Paragraph(item.item_code or "PHARM", val_style),
+                    Paragraph(str(item.quantity), val_style),
+                    Paragraph(f"₹{item.unit_price:.2f}", val_style),
+                    Paragraph(f"₹{item.total_amount:.2f}", val_style),
+                ])
+            bill_table = Table(bill_items, colWidths=[30, 210, 80, 40, 70, 90])
+        else:
+            bill_items = [
+                [Paragraph("<b>Status</b>", label_style), Paragraph("<b>Pharmacy Dispensing Record</b>", label_style)],
+                [Paragraph("No Invoices", val_style), Paragraph("<i>No pharmacy invoices issued yet for this outpatient visit.</i>", val_style)],
+            ]
+            bill_table = Table(bill_items, colWidths=[120, 400])
+
         bill_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#64748B')),
             ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-            ('ALIGN', (4, 1), (-1, -1), 'RIGHT'),
             ('PADDING', (0, 0), (-1, -1), 5),
         ]))
         story.append(bill_table)
         story.append(Spacer(1, 10))
 
-        # Bill Totals Table
-        totals_data = [
-            [Paragraph("<b>Gross Amount:</b>", val_style), Paragraph("₹ 101.37", val_style)],
-            [Paragraph("<b>Discount:</b>", val_style), Paragraph("₹ 0.00", val_style)],
-            [Paragraph("<b>CGST (2.5%):</b>", val_style), Paragraph("₹ 2.54", val_style)],
-            [Paragraph("<b>SGST (2.5%):</b>", val_style), Paragraph("₹ 2.54", val_style)],
-            [Paragraph("<b>Total GST:</b>", val_style), Paragraph("₹ 5.07", val_style)],
-            [Paragraph("<b>NET PAYABLE AMOUNT:</b>", label_style), Paragraph("<b>₹ 106.50</b>", ParagraphStyle('Net', parent=styles['Normal'], fontSize=12, fontName=BASE_FONT_BOLD, textColor=colors.HexColor('#15803D')))],
-            [Paragraph("<b>Payment Status:</b>", label_style), Paragraph("<b>PAID IN FULL (CASH COUNTER)</b>", ParagraphStyle('Paid', parent=styles['Normal'], fontSize=9, fontName=BASE_FONT_BOLD, textColor=colors.HexColor('#0284C7')))],
-        ]
-        totals_table = Table(totals_data, colWidths=[360, 160])
-        totals_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
-            ('LINEBELOW', (0, 4), (-1, 4), 1, colors.HexColor('#94A3B8')),
-            ('PADDING', (0, 0), (-1, -1), 4),
-        ]))
-        story.append(totals_table)
+        if pharmacy_bill:
+            totals_data = [
+                [Paragraph("<b>Gross Amount:</b>", val_style), Paragraph(f"₹ {pharmacy_bill.subtotal:.2f}", val_style)],
+                [Paragraph("<b>Discount:</b>", val_style), Paragraph(f"₹ {pharmacy_bill.discount_amount:.2f}", val_style)],
+                [Paragraph("<b>Total GST:</b>", val_style), Paragraph(f"₹ {pharmacy_bill.total_tax_amount:.2f}", val_style)],
+                [Paragraph("<b>NET PAYABLE AMOUNT:</b>", label_style), Paragraph(f"<b>₹ {pharmacy_bill.total_amount:.2f}</b>", ParagraphStyle('Net', parent=styles['Normal'], fontSize=12, fontName=BASE_FONT_BOLD, textColor=colors.HexColor('#15803D')))],
+                [Paragraph("<b>Payment Status:</b>", label_style), Paragraph(f"<b>{pharmacy_bill.payment_status.upper()}</b>", ParagraphStyle('Paid', parent=styles['Normal'], fontSize=9, fontName=BASE_FONT_BOLD, textColor=colors.HexColor('#0284C7')))],
+            ]
+            totals_table = Table(totals_data, colWidths=[360, 160])
+            totals_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
+                ('LINEBELOW', (0, 2), (-1, 2), 1, colors.HexColor('#94A3B8')),
+                ('PADDING', (0, 0), (-1, -1), 4),
+            ]))
+            story.append(totals_table)
 
         # ====================================================
         # PAGE 7: CLINICAL LABORATORY INVESTIGATIONS MENU

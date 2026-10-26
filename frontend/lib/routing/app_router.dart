@@ -36,6 +36,7 @@ import '../features/patient_portal/screens/patient_portal_workspace_view.dart';
 import '../features/admin_portal/screens/hospital_admin_workspace_view.dart';
 import '../features/auth/screens/patient_token_access_screen.dart';
 import '../features/patients/screens/digital_opd_booklet_screen.dart';
+import '../features/history/screens/role_history_screen.dart';
 import '../routing/route_names.dart';
 import '../shared/screens/empty_screen.dart';
 import '../shared/screens/loading_screen.dart';
@@ -80,8 +81,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      // 3. Prevent direct public access to self-registration (handled exclusively at Reception)
-      if (path == '/profile-setup') {
+      // 3. Allow authenticated users to edit profile; prevent unauthenticated self-registration
+      if (path == '/profile-setup' && !isAuth) {
         return '/login';
       }
 
@@ -122,7 +123,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (isAuth) {
         final role = authState.user?.roleName.toLowerCase() ?? 'patient';
 
-        // Patients: View-only access to their portal, token, visits, booklet, invoices
+        // Patients: View-only access to their portal, token, visits, booklet, invoices, profile edit
         if (role == 'patient') {
           if (path == '/dashboard') {
             return '/patient/portal';
@@ -132,6 +133,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               path == '/queue' ||
               path == '/notifications' ||
               path == '/settings' ||
+              path == '/profile-setup' ||
+              path == '/history' ||
               (path.startsWith('/patients/') && path.endsWith('/booklet')) ||
               (path.startsWith('/visits/') && !path.contains('/consultation') && !path.contains('/vitals')) ||
               path.startsWith('/billing/invoice/') ||
@@ -503,6 +506,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           }
           return HospitalAdminWorkspaceView(initialTabIndex: tab);
         },
+      ),
+      GoRoute(
+        name: RouteNames.history,
+        path: '/history',
+        builder: (context, state) => const RoleHistoryScreen(),
       ),
 
       // Reusable System State Screens

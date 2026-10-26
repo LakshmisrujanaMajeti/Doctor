@@ -17,6 +17,9 @@ import '../../dashboard/providers/dashboard_provider.dart';
 import '../../admin_portal/providers/admin_portal_provider.dart';
 import '../../visits/providers/visit_provider.dart';
 import '../../visits/repositories/visit_repository.dart';
+import '../../doctors/repositories/doctor_repository.dart';
+import '../../doctors/models/doctor_model.dart';
+import '../../dashboard/providers/doctor_dashboard_provider.dart';
 
 
 class PatientRegistrationScreen extends ConsumerStatefulWidget {
@@ -569,23 +572,6 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
         idempotencyKey: _submissionController.currentIdempotencyKey,
       );
 
-      // Ensure 1 unique sequential OPD token is guaranteed for this newly registered patient
-      if (registered.currentToken == null) {
-        try {
-          final visit = await ref.read(visitRepositoryProvider).createVisit(
-            patientId: registered.id,
-            doctorId: 'doc-genmed',
-            departmentId: 'General Medicine',
-            patient: registered,
-          );
-          registered = registered.copyWith(
-            currentToken: visit.queueToken,
-            currentVisitNumber: visit.visitNumber,
-          );
-          PatientRepository.addPatient(registered);
-        } catch (_) {}
-      }
-
       ref.read(patientSearchQueryProvider.notifier).setQuery('');
       ref.invalidate(patientListProvider);
       ref.invalidate(dashboardStatsProvider);
@@ -629,16 +615,289 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
     return '${local.day.toString().padLeft(2, '0')} ${months[local.month - 1]} ${local.year}, $hour:$minute $ampm';
   }
 
+  void _showDepartmentAllotmentDialog(PatientModel patient) {
+    final depts = [
+      {'id': 'General Medicine', 'name': 'General Medicine', 'icon': Icons.medical_services_rounded},
+      {'id': 'Cardiology', 'name': 'Cardiology', 'icon': Icons.favorite_rounded},
+      {'id': 'Neurology', 'name': 'Neurology', 'icon': Icons.psychology_rounded},
+      {'id': 'Orthopaedics', 'name': 'Orthopaedics', 'icon': Icons.accessibility_new_rounded},
+      {'id': 'Paediatrics', 'name': 'Paediatrics', 'icon': Icons.child_care_rounded},
+      {'id': 'General Surgery', 'name': 'General Surgery', 'icon': Icons.healing_rounded},
+      {'id': 'Obstetrics & Gynaecology', 'name': 'Obstetrics & Gynaecology', 'icon': Icons.pregnant_woman_rounded},
+      {'id': 'Dermatology', 'name': 'Dermatology', 'icon': Icons.spa_rounded},
+      {'id': 'Ophthalmology', 'name': 'Ophthalmology', 'icon': Icons.visibility_rounded},
+      {'id': 'ENT (Otolaryngology)', 'name': 'ENT (Otolaryngology)', 'icon': Icons.hearing_rounded},
+      {'id': 'Dental Surgery', 'name': 'Dental Surgery', 'icon': Icons.sentiment_very_satisfied_rounded},
+      {'id': 'Psychiatry', 'name': 'Psychiatry', 'icon': Icons.mood_rounded},
+    ];
+
+    String selectedDeptId = 'General Medicine';
+    String? selectedDoctorId;
+    String selectedPriority = 'NORMAL';
+    final complaintCtrl = TextEditingController();
+    bool isIssuing = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final allDoctors = DoctorRepository.cachedDoctors;
+          final deptDoctors = allDoctors.where((d) =>
+            d.departmentName.toLowerCase().contains(selectedDeptId.toLowerCase()) ||
+            selectedDeptId.toLowerCase().contains(d.departmentName.toLowerCase()) ||
+            d.specialization.toLowerCase().contains(selectedDeptId.toLowerCase())
+          ).toList();
+
+          final availableDocs = deptDoctors.isNotEmpty ? deptDoctors : allDoctors;
+          if (selectedDoctorId == null || !availableDocs.any((d) => d.id == selectedDoctorId)) {
+            selectedDoctorId = availableDocs.first.id;
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryTeal.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.add_task_rounded, color: AppColors.primaryTeal, size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Allot Department & Issue Visit',
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              'Patient: ${patient.fullName} (${patient.uhid})',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  const Text('Select Clinical Department *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: selectedDeptId,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.grey.withValues(alpha: 0.08),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    items: depts.map((d) {
+                      return DropdownMenuItem<String>(
+                        value: d['id'] as String,
+                        child: Row(
+                          children: [
+                            Icon(d['icon'] as IconData, size: 18, color: AppColors.primaryBlue),
+                            const SizedBox(width: 8),
+                            Text(d['name'] as String, style: const TextStyle(fontSize: 13.5)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setSheetState(() {
+                          selectedDeptId = val;
+                          final newDeptDocs = allDoctors.where((d) =>
+                            d.departmentName.toLowerCase().contains(val.toLowerCase()) ||
+                            val.toLowerCase().contains(d.departmentName.toLowerCase()) ||
+                            d.specialization.toLowerCase().contains(val.toLowerCase())
+                          ).toList();
+                          selectedDoctorId = (newDeptDocs.isNotEmpty ? newDeptDocs.first : allDoctors.first).id;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Select Consulting Doctor *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: selectedDoctorId,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.grey.withValues(alpha: 0.08),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    items: availableDocs.map((doc) {
+                      return DropdownMenuItem<String>(
+                        value: doc.id,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.medical_services_rounded, size: 18, color: AppColors.primaryTeal),
+                            const SizedBox(width: 8),
+                            Text('${doc.name} (${doc.specialization})', style: const TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setSheetState(() => selectedDoctorId = val);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Chief Complaint / Problem', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: complaintCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Recurrent fever, chest pain, dental caries...',
+                      filled: true,
+                      fillColor: Colors.grey.withValues(alpha: 0.08),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Triage Priority', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('NORMAL (Green)'),
+                        selected: selectedPriority == 'NORMAL',
+                        selectedColor: AppColors.triageNormal.withValues(alpha: 0.2),
+                        onSelected: (s) {
+                          if (s) setSheetState(() => selectedPriority = 'NORMAL');
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('PRIORITY (Yellow)'),
+                        selected: selectedPriority == 'PRIORITY',
+                        selectedColor: AppColors.triagePriority.withValues(alpha: 0.2),
+                        onSelected: (s) {
+                          if (s) setSheetState(() => selectedPriority = 'PRIORITY');
+                        },
+                      ),
+                      ChoiceChip(
+                        label: const Text('EMERGENCY (Red)'),
+                        selected: selectedPriority == 'EMERGENCY',
+                        selectedColor: AppColors.triageEmergency.withValues(alpha: 0.2),
+                        onSelected: (s) {
+                          if (s) setSheetState(() => selectedPriority = 'EMERGENCY');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryTeal,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: isIssuing
+                          ? null
+                          : () async {
+                              setSheetState(() => isIssuing = true);
+                              try {
+                                final assignedDoc = allDoctors.firstWhere(
+                                  (d) => d.id == selectedDoctorId,
+                                  orElse: () => availableDocs.first,
+                                );
+
+                                final visit = await ref.read(visitRepositoryProvider).createVisit(
+                                  patientId: patient.id,
+                                  doctorId: assignedDoc.id,
+                                  doctorName: assignedDoc.name,
+                                  departmentId: assignedDoc.departmentId.isNotEmpty ? assignedDoc.departmentId : selectedDeptId,
+                                  departmentName: assignedDoc.departmentName.isNotEmpty ? assignedDoc.departmentName : selectedDeptId,
+                                  patient: patient,
+                                  triagePriority: selectedPriority,
+                                  consultationFee: assignedDoc.consultationFee,
+                                  notes: complaintCtrl.text.trim().isNotEmpty
+                                      ? complaintCtrl.text.trim()
+                                      : 'Allotted at registration to ${assignedDoc.name} (${assignedDoc.specialization})',
+                                );
+
+                                ref.invalidate(visitListProvider);
+                                ref.invalidate(dashboardStatsProvider);
+                                ref.invalidate(doctorDashboardProvider);
+
+                                if (mounted) {
+                                  Navigator.pop(sheetCtx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: AppColors.triageNormal,
+                                      content: Text('Issued Token #${visit.queueToken} for ${patient.fullName} assigned to ${assignedDoc.name}!'),
+                                    ),
+                                  );
+                                  context.push('/queue');
+                                }
+                              } catch (err) {
+                                setSheetState(() => isIssuing = false);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: Colors.red,
+                                      content: Text('Failed to issue visit: $err'),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      icon: isIssuing
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.check_circle_rounded),
+                      label: Text(
+                        isIssuing ? 'Issuing OPD Token...' : 'Assign Doctor & Generate Token',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showSuccessCard(PatientModel patient) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.check_circle, color: AppColors.triageNormal, size: 28),
-            const SizedBox(width: 8),
-            const Expanded(
+            Icon(Icons.check_circle, color: AppColors.triageNormal, size: 28),
+            SizedBox(width: 8),
+            Expanded(
               child: Text(
                 'Registration Completed',
                 style: TextStyle(fontSize: 18),
@@ -651,19 +910,19 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Patient ${patient.fullName} has been registered successfully.', style: const TextStyle(fontSize: 14)),
+            Text('Patient account for ${patient.fullName} has been created successfully with zero active visits.', style: const TextStyle(fontSize: 13.5)),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primaryTeal.withOpacity(0.08),
+                color: AppColors.primaryTeal.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.primaryTeal.withOpacity(0.3)),
+                border: Border.all(color: AppColors.primaryTeal.withValues(alpha: 0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Patient Unique UHID: ${patient.uhid}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryTeal, fontSize: 15)),
+                  Text('Patient UHID: ${patient.uhid}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryTeal, fontSize: 15)),
                   const SizedBox(height: 4),
                   Text('Hospital Reg No: ${patient.hospitalRegNum ?? "N/A"}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
@@ -671,16 +930,17 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                     children: [
                       const Icon(Icons.calendar_today_rounded, size: 13, color: AppColors.primaryTeal),
                       const SizedBox(width: 4),
-                      Text('Registration Date & Time: ${_formatDateTime(patient.registrationDate ?? patient.createdAt ?? DateTime.now())}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF1E3A8A))),
+                      Expanded(
+                        child: Text(
+                          'Registered: ${_formatDateTime(patient.registrationDate ?? patient.createdAt ?? DateTime.now())}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E3A8A)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text('Registered Mobile: ${patient.phone}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'The patient can use this unique UHID or registered mobile number to log in to the Patient Portal anytime.',
-                    style: TextStyle(fontSize: 11.5, color: AppColors.primaryTeal, fontWeight: FontWeight.w600),
-                  ),
+                  Text('Phone: ${patient.phone}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -693,7 +953,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
               Navigator.pop(ctx);
               _resetRegistrationForm();
             },
-            label: const Text('Register Another Patient'),
+            label: const Text('New Registration'),
           ),
           TextButton(
             onPressed: () {
@@ -702,13 +962,17 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             },
             child: const Text('Back to Patients'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryTeal),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryTeal,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.add_task_rounded, size: 16),
             onPressed: () {
               Navigator.pop(ctx);
-              context.push('/queue');
+              _showDepartmentAllotmentDialog(patient);
             },
-            child: const Text('View Live Queue', style: TextStyle(color: Colors.white)),
+            label: const Text('Allot Department & Issue Token'),
           ),
         ],
       ),
@@ -731,17 +995,20 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             }
           },
         ),
-        title: Text('OPD Registration (Step ${_tabController.index + 1} of 3)', style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text('OPD Registration • Step ${_tabController.index + 1}/3', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primaryTeal,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primaryTeal,
           indicatorWeight: 3,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontSize: 12),
           tabs: const [
-            Tab(icon: Icon(Icons.person), text: '1. Demographics'),
-            Tab(icon: Icon(Icons.contact_phone), text: '2. Contact & Addr'),
-            Tab(icon: Icon(Icons.medical_information), text: '3. Clinical & Emer'),
+            Tab(icon: Icon(Icons.person, size: 20), text: 'Demographics'),
+            Tab(icon: Icon(Icons.contact_phone, size: 20), text: 'Contact'),
+            Tab(icon: Icon(Icons.medical_information, size: 20), text: 'Clinical'),
           ],
         ),
       ),
@@ -759,24 +1026,26 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))],
-        ),
-        child: SafeArea(
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.white,
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))],
+          ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final isNarrow = constraints.maxWidth < 480;
 
               final nextButton = SizedBox(
-                height: 44,
+                height: 42,
                 child: _tabController.index < 2
                     ? ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryTeal,
                           foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: () {
@@ -809,7 +1078,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                         },
                         icon: const Icon(Icons.arrow_forward, size: 16, color: Colors.white),
                         label: Text(
-                          _tabController.index == 0 ? 'Next: Contact Info →' : 'Next: Clinical Info →',
+                          _tabController.index == 0 ? 'Next: Contact →' : 'Next: Clinical →',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       )
@@ -817,6 +1086,7 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryTeal,
                           foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: _isSaving ? null : _showReviewBeforeSubmit,
@@ -828,9 +1098,10 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
               );
 
               final duplicateBtn = SizedBox(
-                height: 44,
+                height: 42,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: _isCheckingDuplicate ? null : _checkDuplicateWorkflow,
@@ -843,9 +1114,10 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
 
               final backBtn = _tabController.index > 0
                   ? SizedBox(
-                      height: 44,
+                      height: 42,
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: () => _tabController.animateTo(_tabController.index - 1),

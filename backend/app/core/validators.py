@@ -4,9 +4,9 @@ from typing import Optional
 
 
 # Regex supporting English letters, Tamil Unicode characters (\u0B80-\u0BFF),
-# spaces, hyphens, apostrophes, and periods for initials.
+# spaces, hyphens, apostrophes, periods, and parentheses for qualifications/roles.
 PERSON_NAME_REGEX = re.compile(
-    r"^[a-zA-Z\u0B80-\u0BFF]+([ '\-\.]+[a-zA-Z\u0B80-\u0BFF]+)*\.?$",
+    r"^[a-zA-Z\u0B80-\u0BFF\s\.,'\-\(\)/]+$",
     re.UNICODE,
 )
 
@@ -95,11 +95,13 @@ def validate_indian_phone(
 
     digits = extract_10_digits(cleaned)
 
-    if len(digits) != 10:
-        raise ValueError(f"{field_name} must contain exactly 10 digits")
+    if len(digits) == 10:
+        return digits
 
-    if not PHONE_DIGITS_REGEX.match(digits):
-        raise ValueError(f"Enter a valid 10-digit Indian {field_name} (starts with 6-9)")
+    if not digits:
+        if is_required:
+            raise ValueError(f"{field_name} is required")
+        return None
 
     return digits
 

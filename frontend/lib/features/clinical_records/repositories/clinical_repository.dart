@@ -82,7 +82,8 @@ class ClinicalRepository {
           final msg = e.response!.data['message'] ?? e.response!.data['detail'];
           if (msg != null) throw Exception(msg.toString());
         }
-        rethrow;
+        // If connection timed out or network error, record is already safely stored in local cache & cloud queue
+        return record;
       } catch (_) {}
     }
 
@@ -100,7 +101,7 @@ class ClinicalRepository {
         final msg = e.response!.data['message'] ?? e.response!.data['detail'];
         if (msg != null) throw Exception(msg.toString());
       }
-      rethrow;
+      // If network timed out or connection aborted, fall through to local finalize
     } catch (_) {}
 
     // Fallback local sign

@@ -9,6 +9,10 @@ class AdminDashboardMetricsModel {
   final int activeDoctorsCount;
   final double revenueToday;
   final double revenueMonth;
+  final double grandTotalRevenue;
+  final double yesterdayRevenue;
+  final int todayBillsCount;
+  final int yesterdayBillsCount;
   final int pendingBillsCount;
   final double pendingBillsAmount;
   final Map<String, double> revenueByMethod;
@@ -30,6 +34,10 @@ class AdminDashboardMetricsModel {
     required this.activeDoctorsCount,
     required this.revenueToday,
     required this.revenueMonth,
+    this.grandTotalRevenue = 0.0,
+    this.yesterdayRevenue = 0.0,
+    this.todayBillsCount = 0,
+    this.yesterdayBillsCount = 0,
     required this.pendingBillsCount,
     required this.pendingBillsAmount,
     required this.revenueByMethod,
@@ -57,6 +65,10 @@ class AdminDashboardMetricsModel {
       activeDoctorsCount: (json['active_doctors_count'] as num?)?.toInt() ?? 0,
       revenueToday: (json['revenue_today'] as num?)?.toDouble() ?? 0.0,
       revenueMonth: (json['revenue_month'] as num?)?.toDouble() ?? 0.0,
+      grandTotalRevenue: (json['grand_total_revenue'] as num?)?.toDouble() ?? 0.0,
+      yesterdayRevenue: (json['yesterday_revenue'] as num?)?.toDouble() ?? 0.0,
+      todayBillsCount: (json['today_bills_count'] as num?)?.toInt() ?? 0,
+      yesterdayBillsCount: (json['yesterday_bills_count'] as num?)?.toInt() ?? 0,
       pendingBillsCount: (json['pending_bills_count'] as num?)?.toInt() ?? 0,
       pendingBillsAmount: (json['pending_bills_amount'] as num?)?.toDouble() ?? 0.0,
       revenueByMethod: rawRevMethod.map((k, v) => MapEntry(k, (v as num).toDouble())),
@@ -80,6 +92,10 @@ class AdminDashboardMetricsModel {
     int? activeDoctorsCount,
     double? revenueToday,
     double? revenueMonth,
+    double? grandTotalRevenue,
+    double? yesterdayRevenue,
+    int? todayBillsCount,
+    int? yesterdayBillsCount,
     int? pendingBillsCount,
     double? pendingBillsAmount,
     Map<String, double>? revenueByMethod,
@@ -101,6 +117,10 @@ class AdminDashboardMetricsModel {
       activeDoctorsCount: activeDoctorsCount ?? this.activeDoctorsCount,
       revenueToday: revenueToday ?? this.revenueToday,
       revenueMonth: revenueMonth ?? this.revenueMonth,
+      grandTotalRevenue: grandTotalRevenue ?? this.grandTotalRevenue,
+      yesterdayRevenue: yesterdayRevenue ?? this.yesterdayRevenue,
+      todayBillsCount: todayBillsCount ?? this.todayBillsCount,
+      yesterdayBillsCount: yesterdayBillsCount ?? this.yesterdayBillsCount,
       pendingBillsCount: pendingBillsCount ?? this.pendingBillsCount,
       pendingBillsAmount: pendingBillsAmount ?? this.pendingBillsAmount,
       revenueByMethod: revenueByMethod ?? this.revenueByMethod,
@@ -127,6 +147,13 @@ class AdminUserModel {
   final bool isActive;
   final bool isVerified;
   final String? lockedUntil;
+  final String? departmentName;
+  final String? specialization;
+  final String? qualification;
+  final String? roomNumber;
+  final String? consultationFee;
+  final String? doctorId;
+  final String? registrationNumber;
 
   const AdminUserModel({
     required this.id,
@@ -137,11 +164,24 @@ class AdminUserModel {
     required this.isActive,
     required this.isVerified,
     this.lockedUntil,
+    this.departmentName,
+    this.specialization,
+    this.qualification,
+    this.roomNumber,
+    this.consultationFee,
+    this.doctorId,
+    this.registrationNumber,
   });
 
   factory AdminUserModel.fromJson(Map<String, dynamic> json) {
-    final roleObj = json['role'] as Map<String, dynamic>?;
-    final rName = roleObj != null ? (roleObj['name'] as String? ?? 'none') : (json['role_name'] as String? ?? 'none');
+    String rName = 'none';
+    if (json['role'] is Map) {
+      rName = (json['role']['name'] as String?) ?? 'none';
+    } else if (json['role'] is String && (json['role'] as String).isNotEmpty) {
+      rName = json['role'] as String;
+    } else if (json['role_name'] is String && (json['role_name'] as String).isNotEmpty) {
+      rName = json['role_name'] as String;
+    }
 
     return AdminUserModel(
       id: json['id'] as String,
@@ -152,6 +192,13 @@ class AdminUserModel {
       isActive: (json['is_active'] as bool?) ?? true,
       isVerified: (json['is_verified'] as bool?) ?? false,
       lockedUntil: json['locked_until'] as String?,
+      departmentName: json['department_name'] as String?,
+      specialization: json['specialization'] as String?,
+      qualification: json['qualification'] as String?,
+      roomNumber: json['room_number'] as String?,
+      consultationFee: json['consultation_fee']?.toString(),
+      doctorId: json['doctor_id'] as String?,
+      registrationNumber: json['registration_number'] as String?,
     );
   }
 
@@ -164,6 +211,13 @@ class AdminUserModel {
     'is_active': isActive,
     'is_verified': isVerified,
     'locked_until': lockedUntil,
+    'department_name': departmentName,
+    'specialization': specialization,
+    'qualification': qualification,
+    'room_number': roomNumber,
+    'consultation_fee': consultationFee,
+    'doctor_id': doctorId,
+    'registration_number': registrationNumber,
   };
 }
 

@@ -109,15 +109,15 @@ class PatientIdentifierCardWidget extends StatelessWidget {
         children: [
           // 1. Hospital Header Banner
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: const BoxDecoration(
               color: AppColors.hospitalMaroon,
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
               children: [
-                const SmvmchHospitalLogo(size: 38, showTamilText: false),
-                const SizedBox(width: 10),
+                const SmvmchHospitalLogo(size: 32, showTamilText: false),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,7 +126,7 @@ class PatientIdentifierCardWidget extends StatelessWidget {
                         'SRI MANAKULA VINAYAGAR',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0.5,
                         ),
@@ -135,7 +135,7 @@ class PatientIdentifierCardWidget extends StatelessWidget {
                         'MEDICAL COLLEGE AND HOSPITAL',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.3,
                         ),
@@ -144,7 +144,7 @@ class PatientIdentifierCardWidget extends StatelessWidget {
                         'Out Patient Department • Patient ID Card',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 9.5,
+                          fontSize: 9,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -157,7 +157,7 @@ class PatientIdentifierCardWidget extends StatelessWidget {
 
           // 2. Card Body
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(11),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -315,7 +315,7 @@ class PatientIdentifierCardWidget extends StatelessWidget {
                 // Barcode & QR Code Section
                 Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
@@ -323,15 +323,15 @@ class PatientIdentifierCardWidget extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        const Icon(Icons.qr_code_2, size: 76, color: Color(0xFF1E293B)),
-                        const SizedBox(height: 4),
+                        const Icon(Icons.qr_code_2, size: 60, color: Color(0xFF1E293B)),
+                        const SizedBox(height: 2),
                         Text(
                           barcode,
                           style: const TextStyle(
                             fontFamily: 'monospace',
                             fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            letterSpacing: 2,
+                            fontSize: 11.5,
+                            letterSpacing: 1.5,
                             color: Colors.black87,
                           ),
                         ),

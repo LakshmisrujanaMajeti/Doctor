@@ -117,7 +117,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
           } else {
-            context.goNamed(RouteNames.dashboard);
+            final role = ref.read(authProvider).user?.roleName.toLowerCase() ?? 'patient';
+            context.go(role == 'patient' ? '/patient/portal' : '/dashboard');
           }
         }
         return;
@@ -299,7 +300,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                       ],
 
                       // Section 1: Personal Demographics
-                      _buildSectionHeader('1. Patient Identity & Demographics'),
+                      _buildSectionHeader(_isEditMode ? 'User Profile Information' : '1. Patient Identity & Demographics'),
                       const SizedBox(height: 10),
                       OpdTextField(
                         label: 'Full Legal Name *',
@@ -329,7 +330,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: OpdTextField(
-                              label: 'Email (Optional)',
+                              label: 'Email Address',
                               hint: 'name@example.com',
                               controller: _emailController,
                               readOnly: _isEditMode,
@@ -342,198 +343,222 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Age & Gender
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 130,
-                            child: OpdTextField(
-                              label: 'Age in Years *',
-                              hint: 'e.g. 35',
-                              controller: _ageController,
-                              prefixIcon: Icons.calendar_today_outlined,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(3),
-                              ],
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Age required' : null,
-                            ),
+                      if (_isEditMode) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryBlue.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.2)),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Gender *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: _genders.map((g) {
-                                    final isSelected = _selectedGender == g;
-                                    return Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                                        child: ChoiceChip(
-                                          label: Text(
-                                            g == 'MALE' ? 'Male' : (g == 'FEMALE' ? 'Female' : 'Other'),
-                                            style: TextStyle(
-                                              fontSize: 11.5,
-                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                              color: isSelected ? Colors.white : null,
-                                            ),
-                                          ),
-                                          selected: isSelected,
-                                          selectedColor: AppColors.primaryBlue,
-                                          onSelected: (val) {
-                                            if (val) setState(() => _selectedGender = g);
-                                          },
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.shield_outlined, size: 18, color: AppColors.primaryBlue),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Account Role: ${_existingRole.toUpperCase()}',
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primaryBlue),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
 
-                      // Blood Group Selection Chips
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Blood Group', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: _bloodGroups.map((bg) {
-                              final isSelected = _selectedBloodGroup == bg;
-                              return ChoiceChip(
-                                label: Text(
-                                  bg,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    color: isSelected ? Colors.white : null,
-                                  ),
-                                ),
-                                selected: isSelected,
-                                selectedColor: AppColors.triageEmergency,
-                                onSelected: (val) {
-                                  if (val) setState(() => _selectedBloodGroup = bg);
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Section 2: Guardian & Residential Information
-                      _buildSectionHeader('2. Guardian & Address Details'),
-                      const SizedBox(height: 10),
-
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 105,
-                            child: DropdownButtonFormField<String>(
-                              value: _parentRelation,
-                              isExpanded: true,
-                              items: _relations.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _parentRelation = val);
-                              },
-                              decoration: const InputDecoration(
-                                labelText: 'Relation *',
-                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      if (!_isEditMode) ...[
+                        // Age & Gender
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 130,
+                              child: OpdTextField(
+                                label: 'Age in Years *',
+                                hint: 'e.g. 35',
+                                controller: _ageController,
+                                prefixIcon: Icons.calendar_today_outlined,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(3),
+                                ],
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Age required' : null,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OpdTextField(
-                              label: 'Parent / Spouse / Guardian Name *',
-                              hint: 'e.g. SAMBASIVA RAO',
-                              controller: _parentSpouseController,
-                              prefixIcon: Icons.family_restroom_rounded,
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Guardian / Parent name is required' : null,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Gender *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: _genders.map((g) {
+                                      final isSelected = _selectedGender == g;
+                                      return Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                                          child: ChoiceChip(
+                                            label: Text(
+                                              g == 'MALE' ? 'Male' : (g == 'FEMALE' ? 'Female' : 'Other'),
+                                              style: TextStyle(
+                                                fontSize: 11.5,
+                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                color: isSelected ? Colors.white : null,
+                                              ),
+                                            ),
+                                            selected: isSelected,
+                                            selectedColor: AppColors.primaryBlue,
+                                            onSelected: (val) {
+                                              if (val) setState(() => _selectedGender = g);
+                                            },
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      OpdTextField(
-                        label: 'Residential Address *',
-                        hint: 'e.g. No. 14, Main Road, Kalitheerthalkuppam, Puducherry',
-                        controller: _addressController,
-                        prefixIcon: Icons.home_outlined,
-                        maxLines: 2,
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Residential address is mandatory' : null,
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Section 3: Emergency Contact
-                      _buildSectionHeader('3. Emergency Contact Details'),
-                      const SizedBox(height: 10),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OpdTextField(
-                              label: 'Emergency Contact Person *',
-                              hint: 'Contact Person / Relative',
-                              controller: _emergencyNameController,
-                              prefixIcon: Icons.contact_emergency_outlined,
-                              validator: (v) => (v == null || v.trim().isEmpty) ? 'Contact name required' : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OpdTextField(
-                              label: 'Emergency Phone (10 Digits) *',
-                              hint: 'e.g. 9876543210',
-                              controller: _emergencyPhoneController,
-                              prefixIcon: Icons.phone_outlined,
-                              keyboardType: TextInputType.phone,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(10),
-                              ],
-                              validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Emergency Contact Phone'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      DropdownButtonFormField<String>(
-                        value: _emergencyRelationController.text.isNotEmpty ? _emergencyRelationController.text : 'Spouse / Parent',
-                        items: const [
-                          DropdownMenuItem(value: 'Spouse / Parent', child: Text('Spouse / Parent')),
-                          DropdownMenuItem(value: 'Father / Mother', child: Text('Father / Mother')),
-                          DropdownMenuItem(value: 'Son / Daughter', child: Text('Son / Daughter')),
-                          DropdownMenuItem(value: 'Brother / Sister', child: Text('Brother / Sister')),
-                          DropdownMenuItem(value: 'Legal Guardian', child: Text('Legal Guardian')),
-                          DropdownMenuItem(value: 'Relative / Friend', child: Text('Relative / Friend')),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() => _emergencyRelationController.text = v);
-                          }
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Emergency Contact Relationship',
-                          prefixIcon: Icon(Icons.people_alt_outlined, color: AppColors.primaryBlue),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 14),
 
-                      // Section 4: Security Credentials
-                      _buildSectionHeader('4. Portal Security (Optional)'),
+                        // Blood Group Selection Chips
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Blood Group', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: _bloodGroups.map((bg) {
+                                final isSelected = _selectedBloodGroup == bg;
+                                return ChoiceChip(
+                                  label: Text(
+                                    bg,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected ? Colors.white : null,
+                                    ),
+                                  ),
+                                  selected: isSelected,
+                                  selectedColor: AppColors.triageEmergency,
+                                  onSelected: (val) {
+                                    if (val) setState(() => _selectedBloodGroup = bg);
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Section 2: Guardian & Residential Information
+                        _buildSectionHeader('2. Guardian & Address Details'),
+                        const SizedBox(height: 10),
+
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 105,
+                              child: DropdownButtonFormField<String>(
+                                value: _parentRelation,
+                                isExpanded: true,
+                                items: _relations.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _parentRelation = val);
+                                },
+                                decoration: const InputDecoration(
+                                  labelText: 'Relation *',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OpdTextField(
+                                label: 'Parent / Spouse / Guardian Name *',
+                                hint: 'e.g. SAMBASIVA RAO',
+                                controller: _parentSpouseController,
+                                prefixIcon: Icons.family_restroom_rounded,
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Guardian / Parent name is required' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        OpdTextField(
+                          label: 'Residential Address *',
+                          hint: 'e.g. No. 14, Main Road, Kalitheerthalkuppam, Puducherry',
+                          controller: _addressController,
+                          prefixIcon: Icons.home_outlined,
+                          maxLines: 2,
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Residential address is mandatory' : null,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Section 3: Emergency Contact
+                        _buildSectionHeader('3. Emergency Contact Details'),
+                        const SizedBox(height: 10),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OpdTextField(
+                                label: 'Emergency Contact Person *',
+                                hint: 'Contact Person / Relative',
+                                controller: _emergencyNameController,
+                                prefixIcon: Icons.contact_emergency_outlined,
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Contact name required' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OpdTextField(
+                                label: 'Emergency Phone (10 Digits) *',
+                                hint: 'e.g. 9876543210',
+                                controller: _emergencyPhoneController,
+                                prefixIcon: Icons.phone_outlined,
+                                keyboardType: TextInputType.phone,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(10),
+                                ],
+                                validator: (v) => InputSanitizer.validate10DigitPhone(v, isRequired: true, fieldName: 'Emergency Contact Phone'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        DropdownButtonFormField<String>(
+                          value: _emergencyRelationController.text.isNotEmpty ? _emergencyRelationController.text : 'Spouse / Parent',
+                          items: const [
+                            DropdownMenuItem(value: 'Spouse / Parent', child: Text('Spouse / Parent')),
+                            DropdownMenuItem(value: 'Father / Mother', child: Text('Father / Mother')),
+                            DropdownMenuItem(value: 'Son / Daughter', child: Text('Son / Daughter')),
+                            DropdownMenuItem(value: 'Brother / Sister', child: Text('Brother / Sister')),
+                            DropdownMenuItem(value: 'Legal Guardian', child: Text('Legal Guardian')),
+                            DropdownMenuItem(value: 'Relative / Friend', child: Text('Relative / Friend')),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => _emergencyRelationController.text = v);
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Emergency Contact Relationship',
+                            prefixIcon: Icon(Icons.people_alt_outlined, color: AppColors.primaryBlue),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // Section: Security Credentials
+                      _buildSectionHeader(_isEditMode ? 'Security Credentials (Password)' : '4. Portal Security (Optional)'),
                       const SizedBox(height: 10),
                       OpdTextField(
                         label: _isEditMode ? 'New Password (Optional)' : 'Portal Password (Optional)',

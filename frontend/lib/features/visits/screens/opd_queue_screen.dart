@@ -65,19 +65,23 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
         ),
         title: Row(
           children: [
-            const SmvmchHospitalLogo(size: 28),
-            const SizedBox(width: 10),
+            const SmvmchHospitalLogo(size: 26),
+            const SizedBox(width: 8),
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Live OPD Queue',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Sri Manakula Vinayagar Medical College & Hospital',
+                    'SMVMCH Puducherry',
                     style: TextStyle(fontSize: 10, color: Colors.grey),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -87,22 +91,22 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
         ),
         actions: [
           Container(
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            margin: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: AppColors.hospitalGreen.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.hospitalGreen.withOpacity(0.3)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.bolt_rounded, size: 14, color: AppColors.hospitalGreen),
-                SizedBox(width: 4),
+                Icon(Icons.bolt_rounded, size: 13, color: AppColors.hospitalGreen),
+                SizedBox(width: 2),
                 Text(
-                  'SYNC 5s',
+                  '5s',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.bold,
                     color: AppColors.hospitalGreen,
                   ),
@@ -111,12 +115,14 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.refresh_rounded, size: 20),
+            visualDensity: VisualDensity.compact,
             tooltip: 'Refresh Queue',
             onPressed: () => ref.invalidate(visitListProvider),
           ),
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 21),
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
+            visualDensity: VisualDensity.compact,
             tooltip: 'Logout',
             onPressed: () async {
               await ref.read(authProvider.notifier).logout();
@@ -125,7 +131,7 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
               }
             },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       floatingActionButton: isPatient
@@ -293,49 +299,10 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Header Row
+                              // Header Row: Patient Name & Details on left, Small Round Token on right
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Token Number
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.hospitalMaroon.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: AppColors.hospitalMaroon.withOpacity(0.25)),
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Text(
-                                          'TOKEN',
-                                          style: TextStyle(
-                                            fontSize: 8,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.hospitalMaroon,
-                                          ),
-                                        ),
-                                        Text(
-                                          visit.formattedToken,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 10.5,
-                                            color: AppColors.hospitalMaroon,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Seq #${visit.queueToken}',
-                                          style: TextStyle(
-                                            fontSize: 8.5,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,28 +311,81 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                           visit.patient?.fullName ?? 'Patient ${visit.visitNumber}',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w700,
-                                            fontSize: 16,
+                                            fontSize: 15.5,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 3),
                                         Text(
                                           '${visit.patient?.uhid ?? "UHID Pending"} • ${visit.departmentName}',
-                                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                                          style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            TriageChip(priority: visit.triagePriority),
+                                            StatusBadge(status: visit.status),
+                                          ],
                                         ),
                                       ],
                                     ),
                                   ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      TriageChip(priority: visit.triagePriority),
-                                      const SizedBox(height: 6),
-                                      StatusBadge(status: visit.status),
-                                    ],
+                                  const SizedBox(width: 10),
+                                  // Right Top: Small round token symbol as requested
+                                  Tooltip(
+                                    message: 'Queue Token #${visit.queueToken} (${visit.formattedToken})',
+                                    child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: AppColors.hospitalMaroon.withOpacity(0.08),
+                                        border: Border.all(
+                                          color: AppColors.hospitalMaroon.withOpacity(0.4),
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.hospitalMaroon.withOpacity(0.06),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            '#${visit.queueToken}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 13,
+                                              color: AppColors.hospitalMaroon,
+                                              height: 1.1,
+                                            ),
+                                          ),
+                                          const Text(
+                                            'TOKEN',
+                                            style: TextStyle(
+                                              fontSize: 6.5,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.3,
+                                              color: AppColors.hospitalMaroon,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
-                              const Divider(height: 24),
+                              const Divider(height: 20),
 
                               // Doctor & Vitals Info with responsive Wrap
                               Wrap(
@@ -407,7 +427,7 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                               ),
                               const SizedBox(height: 14),
 
-                              // Action Buttons Row
+                              // Action Buttons Row: Patient view-only, Staff full action row
                               if (isPatient)
                                 Row(
                                   children: [
@@ -450,7 +470,7 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                         ),
                                         onPressed: () => context.push('/visits/${visit.id}/vitals', extra: visit),
@@ -465,27 +485,30 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                           backgroundColor: AppColors.primaryTeal,
                                           foregroundColor: Colors.white,
                                           elevation: 0,
-                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                         ),
                                         onPressed: () => context.push('/visits/${visit.id}/consultation', extra: visit),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    OutlinedButton.icon(
-                                      icon: const Icon(Icons.auto_stories_rounded, size: 15, color: AppColors.hospitalMaroon),
-                                      label: const Text(
-                                        'Booklet',
-                                        style: TextStyle(color: AppColors.hospitalMaroon, fontWeight: FontWeight.bold),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Icons.auto_stories_rounded, size: 15, color: AppColors.hospitalMaroon),
+                                        label: const Text(
+                                          'Booklet',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(color: AppColors.hospitalMaroon, fontWeight: FontWeight.bold),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          side: const BorderSide(color: AppColors.hospitalMaroon),
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onPressed: () {
+                                          context.push('/patients/${visit.patientId}/booklet');
+                                        },
                                       ),
-                                      style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(color: AppColors.hospitalMaroon),
-                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      onPressed: () {
-                                        context.push('/patients/${visit.patientId}/booklet');
-                                      },
                                     ),
                                   ],
                                 ),

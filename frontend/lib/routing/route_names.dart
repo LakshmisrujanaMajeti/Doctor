@@ -32,6 +32,7 @@ class RouteNames {
   static const String patientTokenAccess = 'patientTokenAccess';
   static const String digitalOpdBooklet = 'digitalOpdBooklet';
   static const String adminPortal = 'adminPortal';
+  static const String history = 'history';
 
   // System State Screens
   static const String loading = 'loading';

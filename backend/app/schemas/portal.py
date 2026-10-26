@@ -187,6 +187,10 @@ class AdminDashboardMetrics(BaseSchema):
     # Financial Summary
     revenue_today: float
     revenue_month: float
+    grand_total_revenue: float = 0.0
+    yesterday_revenue: float = 0.0
+    today_bills_count: int = 0
+    yesterday_bills_count: int = 0
     pending_bills_count: int
     pending_bills_amount: float
     revenue_by_method: Dict[str, float]

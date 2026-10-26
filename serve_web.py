@@ -17,8 +17,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Resolution order for compiled web application
 CANDIDATES = [
-    os.path.join(BASE_DIR, "web_app"),
     os.path.join(BASE_DIR, "frontend", "build", "web"),
+    os.path.join(BASE_DIR, "web_app"),
     os.path.join(BASE_DIR, "desktop", "web"),
 ]
 

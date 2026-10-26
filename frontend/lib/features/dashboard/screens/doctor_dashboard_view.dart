@@ -7,6 +7,8 @@ import '../../../shared/widgets/triage_chip.dart';
 import '../models/doctor_dashboard_model.dart';
 import '../providers/doctor_dashboard_provider.dart';
 import '../../visits/models/visit_model.dart';
+import '../../patients/models/patient_model.dart';
+import '../../patients/widgets/patient_identifier_card_widget.dart';
 
 class DoctorDashboardView extends ConsumerStatefulWidget {
   const DoctorDashboardView({super.key});
@@ -294,6 +296,7 @@ class _DoctorDashboardViewState extends ConsumerState<DoctorDashboardView> with 
 
         return ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          onTap: () => _showPatientQuickDetails(context, v),
           leading: CircleAvatar(
             backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.12),
             child: Text(
@@ -319,6 +322,151 @@ class _DoctorDashboardViewState extends ConsumerState<DoctorDashboardView> with 
               isActionStart ? 'Start' : (isActionResume ? 'Resume' : 'View Sheet'),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPatientQuickDetails(BuildContext context, OPDVisitModel v) {
+    final pat = v.patient;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.12),
+                    child: Text(
+                      '#${v.queueToken}',
+                      style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primaryBlue, fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          pat?.fullName ?? 'Patient',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                        ),
+                        Text(
+                          '${pat?.uhid ?? "UHID"} • ${pat?.gender ?? ""} ${pat?.ageYears != null ? "• ${pat!.ageYears} Y" : ""}',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TriageChip(priority: v.triagePriority),
+                ],
+              ),
+              const Divider(height: 24),
+              if (pat?.hospitalRegNum != null && pat!.hospitalRegNum!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.badge_outlined, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text('Hospital Reg #: ${pat.hospitalRegNum}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              if (pat?.phone != null && pat!.phone.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.phone_outlined, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text('Contact: ${pat.phone}', style: const TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                ),
+              Row(
+                children: [
+                  const Icon(Icons.local_hospital_outlined, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Text('Department: ${v.departmentName ?? "General Medicine"}', style: const TextStyle(fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[850] : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Chief Complaint / Visit Notes:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Text(
+                      v.notes?.isNotEmpty == true ? v.notes! : 'No additional complaints noted at token issuance.',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  if (pat != null)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          PatientIdentifierCardWidget.showCardDialog(context, pat);
+                        },
+                        icon: const Icon(Icons.badge_rounded, size: 18),
+                        label: const Text('Patient Card'),
+                      ),
+                    ),
+                  if (pat != null) const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        context.push('/visits/${v.id}/consultation', extra: v);
+                      },
+                      icon: const Icon(Icons.medical_services_rounded, size: 18),
+                      label: const Text('Consultation Sheet'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },

@@ -435,7 +435,7 @@ class PatientRepository {
       rethrow;
     }
 
-    int maxUhidNum = 0;
+    int maxUhidNum = 14;
     for (final p in _localPatients) {
       if (p.uhid.startsWith('UHID-2026-')) {
         final numPart = int.tryParse(p.uhid.substring('UHID-2026-'.length));
