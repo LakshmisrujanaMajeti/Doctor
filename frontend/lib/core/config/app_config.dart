@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart';
 
 class AppConfig {
   static const String appName = 'SMVMCH OPD Connect';
-  static const String appVersion = '1.2.0';
+  static const String appVersion = '1.0.0';
 
   // Supabase Configuration provided by project
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://xxwidqatsxzsrulaxxal.supabase.co',
+    defaultValue: 'https://opjqnvcykfkqksopydxl.supabase.co',
   );
 
   static const String supabaseAnonKey = String.fromEnvironment(
@@ -26,7 +26,7 @@ class AppConfig {
   static String? customServerUrl;
 
   /// Default API base URL for FastAPI backend
-  /// Uses custom server URL if configured, 10.0.2.2 for Android emulators, 127.0.0.1 for desktop/iOS/web
+  /// Uses custom server URL if configured, 10.83.64.103 or 10.0.2.2 for Android devices, localhost for web/desktop
   static String get apiBaseUrl {
     if (customServerUrl != null && customServerUrl!.trim().isNotEmpty) {
       return customServerUrl!.trim();
@@ -35,21 +35,18 @@ class AppConfig {
     if (envUrl.isNotEmpty) return envUrl;
 
     if (kIsWeb) {
-      try {
-        final host = Uri.base.host.isNotEmpty ? Uri.base.host : '127.0.0.1';
-        final scheme = Uri.base.scheme.isNotEmpty ? Uri.base.scheme : 'http';
-        return '$scheme://$host:8000/api/v1';
-      } catch (_) {}
-      return 'http://127.0.0.1:8000/api/v1';
+      final host = Uri.base.host.isNotEmpty ? Uri.base.host : 'localhost';
+      return 'http://$host:8000/api/v1';
     }
     if (defaultTargetPlatform == TargetPlatform.android) {
+      // Connect to host machine on local Wi-Fi for physical Android devices; fallback to emulator loopback
       return 'http://192.168.29.193:8000/api/v1';
     }
     return 'http://localhost:8000/api/v1';
   }
 
-  /// Robust resilient network timeouts: prevents premature timeout while ensuring responsive mobile performance
-  static const Duration connectTimeout = Duration(seconds: 30);
-  static const Duration receiveTimeout = Duration(seconds: 45);
-  static const Duration sendTimeout = Duration(seconds: 30);
+  /// Ultra-fast responsive network timeouts: eliminates mobile hanging while ensuring robust connection
+  static const Duration connectTimeout = Duration(milliseconds: 2500);
+  static const Duration receiveTimeout = Duration(milliseconds: 4000);
+  static const Duration sendTimeout = Duration(milliseconds: 2500);
 }

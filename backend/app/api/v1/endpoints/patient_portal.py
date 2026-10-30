@@ -324,7 +324,7 @@ def get_patient_profile(
     active_token_status_str = None
     if active_visit:
         if active_visit.status in ["COMPLETED", "CANCELLED"]:
-            active_token_status_str = "Completed"
+            active_token_status_str = "Consultation Completed" if active_visit.status == "COMPLETED" else "Cancelled"
         else:
             ahead_count = db.query(func.count(OPDVisit.id)).filter(
                 OPDVisit.department_id == active_visit.department_id,
@@ -492,7 +492,7 @@ def get_patient_visits(
             "patient_id": v.patient_id,
             "patient_name": p.full_name if p else "Patient",
             "patient_uhid": p.uhid if p else "",
-            "doctor_name": d.full_name if d else "General Clinician",
+            "doctor_name": d.user.full_name if (d and d.user and d.user.full_name) else "General Clinician",
             "department_name": dept.name if dept else "General OPD",
             "visit_date": v.visit_date.isoformat(),
             "queue_token": v.queue_token,

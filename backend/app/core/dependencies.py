@@ -169,11 +169,14 @@ def verify_patient_access(patient_id: str, current_user: User, db: Session) -> N
                     Patient.uhid == patient_id,
                 )
             ).first()
-            if target_pat and current_user.phone and target_pat.phone:
-                u_digits = "".join(c for c in current_user.phone if c.isdigit())
-                p_digits = "".join(c for c in target_pat.phone if c.isdigit())
-                if u_digits and p_digits and (u_digits.endswith(p_digits[-10:]) or p_digits.endswith(u_digits[-10:])):
+            if target_pat:
+                if current_user.patient_id and target_pat.id == current_user.patient_id:
                     return
+                if current_user.phone and target_pat.phone:
+                    u_digits = "".join(c for c in current_user.phone if c.isdigit())
+                    p_digits = "".join(c for c in target_pat.phone if c.isdigit())
+                    if u_digits and p_digits and (u_digits.endswith(p_digits[-10:]) or p_digits.endswith(u_digits[-10:])):
+                        return
 
             # Check if target patient is a dependent of current user
             is_dependent = (

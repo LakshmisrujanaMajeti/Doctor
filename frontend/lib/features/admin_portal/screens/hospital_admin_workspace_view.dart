@@ -476,13 +476,22 @@ class _HospitalAdminWorkspaceViewState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.stars_rounded, size: 16, color: Colors.amber),
-                              SizedBox(width: 6),
-                              Text('Grand Total (All Patient Bills):', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                            ],
+                          const Expanded(
+                            child: Row(
+                              children: [
+                                Icon(Icons.stars_rounded, size: 16, color: Colors.amber),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Grand Total (All Patient Bills):',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             '₹${(metrics.grandTotalRevenue > 0 ? metrics.grandTotalRevenue : (metrics.revenueMonth > 0 ? metrics.revenueMonth : metrics.revenueToday)).toStringAsFixed(2)}',
                             style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Color(0xFF0D9488)),
@@ -493,13 +502,22 @@ class _HospitalAdminWorkspaceViewState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.today_rounded, size: 16, color: Colors.green),
-                              const SizedBox(width: 6),
-                              Text("Today's Bill Payments (${metrics.todayBillsCount} bills):", style: const TextStyle(fontSize: 14)),
-                            ],
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.today_rounded, size: 16, color: Colors.green),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    "Today's Bill Payments (${metrics.todayBillsCount} bills):",
+                                    style: const TextStyle(fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             '₹${metrics.revenueToday.toStringAsFixed(2)}',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
@@ -510,13 +528,22 @@ class _HospitalAdminWorkspaceViewState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.history_toggle_off_rounded, size: 16, color: Colors.indigo),
-                              const SizedBox(width: 6),
-                              Text("Yesterday's Bill Payments (${metrics.yesterdayBillsCount} bills):", style: const TextStyle(fontSize: 14)),
-                            ],
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.history_toggle_off_rounded, size: 16, color: Colors.indigo),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    "Yesterday's Bill Payments (${metrics.yesterdayBillsCount} bills):",
+                                    style: const TextStyle(fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             '₹${metrics.yesterdayRevenue.toStringAsFixed(2)}',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.indigo),
@@ -527,13 +554,22 @@ class _HospitalAdminWorkspaceViewState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.calendar_month_rounded, size: 16, color: Colors.blue),
-                              SizedBox(width: 6),
-                              Text('This Month Collections:', style: TextStyle(fontSize: 14)),
-                            ],
+                          const Expanded(
+                            child: Row(
+                              children: [
+                                Icon(Icons.calendar_month_rounded, size: 16, color: Colors.blue),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'This Month Collections:',
+                                    style: TextStyle(fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             '₹${metrics.revenueMonth.toStringAsFixed(2)}',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue),
@@ -544,13 +580,22 @@ class _HospitalAdminWorkspaceViewState
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Icon(Icons.pending_actions_rounded, size: 16, color: Colors.orange.shade800),
-                              SizedBox(width: 6),
-                              const Text('Unsettled Outstanding Bills:', style: TextStyle(fontSize: 14)),
-                            ],
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Icon(Icons.pending_actions_rounded, size: 16, color: Colors.orange.shade800),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text(
+                                    'Unsettled Outstanding Bills:',
+                                    style: TextStyle(fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             '₹${metrics.pendingBillsAmount.toStringAsFixed(2)} (${metrics.pendingBillsCount} bills)',
                             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade800),

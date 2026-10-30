@@ -49,11 +49,12 @@ class OPDVisitBase(BaseSchema):
 
 
 class OPDVisitCreate(OPDVisitBase):
-    pass
+    allow_additional_visit: bool = False
 
 
 class OPDVisitUpdate(BaseSchema):
     doctor_id: Optional[str] = None
+    department_id: Optional[str] = None
     triage_priority: Optional[str] = None
     status: Optional[str] = None # REGISTERED, TRIAGED, IN_CONSULTATION, COMPLETED, CANCELLED
     payment_status: Optional[str] = None # UNPAID, PAID

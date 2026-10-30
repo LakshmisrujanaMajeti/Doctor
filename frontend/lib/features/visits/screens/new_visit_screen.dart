@@ -329,14 +329,15 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
                     final matchingDoctors = doctors.where((d) =>
                         d.departmentName.toLowerCase() == _selectedDepartment.toLowerCase()).toList();
                     final availableDocs = matchingDoctors.isNotEmpty ? matchingDoctors : doctors;
+                    final effectiveDoctor = (_selectedDoctor != null && availableDocs.any((d) => d.id == _selectedDoctor!.id))
+                        ? availableDocs.firstWhere((d) => d.id == _selectedDoctor!.id)
+                        : (availableDocs.isNotEmpty ? availableDocs.first : null);
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         DropdownButtonFormField<DoctorModel>(
-                          value: _selectedDoctor != null && availableDocs.any((d) => d.id == _selectedDoctor!.id)
-                              ? _selectedDoctor
-                              : (availableDocs.isNotEmpty ? availableDocs.first : null),
+                          value: effectiveDoctor,
                           hint: const Text('Select Consulting Physician / Doctor'),
                           items: availableDocs.map((doc) => DropdownMenuItem(
                             value: doc,
@@ -356,7 +357,7 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
                             prefixIcon: Icon(Icons.medical_services_rounded),
                           ),
                         ),
-                        if (_selectedDoctor != null) ...[
+                        if (effectiveDoctor != null) ...[
                           const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -371,7 +372,7 @@ class _NewVisitScreenState extends ConsumerState<NewVisitScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    '${_selectedDoctor!.name} • ${_selectedDoctor!.qualification} • ${_selectedDoctor!.roomNumber}',
+                                    '${effectiveDoctor.name} • ${effectiveDoctor.qualification} • ${effectiveDoctor.roomNumber} • Consultation Fee: ₹${effectiveDoctor.consultationFee.toStringAsFixed(2)}',
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
                                   ),
                                 ),

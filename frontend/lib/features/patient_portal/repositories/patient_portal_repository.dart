@@ -4,6 +4,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../../patients/models/patient_model.dart';
+import '../../patients/repositories/patient_repository.dart';
 import '../models/patient_portal_models.dart';
 
 class PatientPortalRepository {
@@ -42,6 +43,12 @@ class PatientPortalRepository {
               (userPhone.isNotEmpty && p['phone'] == userPhone),
           orElse: () => null,
         );
+      }
+
+      if (targetPatientJson == null && localPatients.isNotEmpty) {
+        targetPatientJson = localPatients.first as Map<String, dynamic>;
+      } else if (targetPatientJson == null && PatientRepository.cachedPatients.isNotEmpty) {
+        targetPatientJson = PatientRepository.cachedPatients.first.toJson();
       }
 
       final patModel = targetPatientJson != null
@@ -160,6 +167,9 @@ class PatientPortalRepository {
       if (uid != null && uid.isNotEmpty) return uid;
       final uhid = userMap['uhid']?.toString();
       if (uhid != null && uhid.isNotEmpty) return uhid;
+    }
+    if (PatientRepository.cachedPatients.isNotEmpty) {
+      return PatientRepository.cachedPatients.first.id;
     }
     return null;
   }
@@ -307,6 +317,8 @@ class PatientPortalRepository {
     return [];
   }
 
+  static final List<SupportTicketModel> _localTickets = [];
+
   Future<SupportTicketModel> createSupportTicket({
     required String subject,
     required String category,
@@ -314,24 +326,52 @@ class PatientPortalRepository {
     String priority = 'NORMAL',
     String? dependentPatientId,
   }) async {
-    final response = await _dioClient.dio.post(
-      ApiEndpoints.patientPortalSupport,
-      data: {
-        'subject': subject,
-        'category': category,
-        'priority': priority,
-        'message': message,
-        'dependent_patient_id': dependentPatientId,
-      },
-    );
-    return SupportTicketModel.fromJson(response.data['data'] as Map<String, dynamic>);
+    try {
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.patientPortalSupport,
+        data: {
+          'subject': subject,
+          'category': category,
+          'priority': priority,
+          'message': message,
+          'dependent_patient_id': dependentPatientId,
+        },
+      ).timeout(const Duration(milliseconds: 2500));
+      final ticket = SupportTicketModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      _localTickets.insert(0, ticket);
+      return ticket;
+    } catch (_) {
+      final offlineTicket = SupportTicketModel(
+        id: 'tkt-${DateTime.now().millisecondsSinceEpoch}',
+        patientId: dependentPatientId ?? '',
+        patientName: 'Patient',
+        patientUhid: '',
+        subject: subject,
+        category: category,
+        priority: priority,
+        message: message,
+        status: 'OPEN',
+        createdAt: DateTime.now().toIso8601String(),
+      );
+      _localTickets.insert(0, offlineTicket);
+      return offlineTicket;
+    }
   }
 
   Future<List<SupportTicketModel>> getSupportTickets({String? patientId}) async {
-    final query = patientId != null ? {'patient_id': patientId} : null;
-    final response = await _dioClient.dio.get(ApiEndpoints.patientPortalSupport, queryParameters: query);
-    final list = (response.data['data'] as List?) ?? [];
-    return list.map((t) => SupportTicketModel.fromJson(t as Map<String, dynamic>)).toList();
+    try {
+      final query = patientId != null ? {'patient_id': patientId} : null;
+      final response = await _dioClient.dio
+          .get(ApiEndpoints.patientPortalSupport, queryParameters: query)
+          .timeout(const Duration(milliseconds: 2500));
+      final list = (response.data['data'] as List?) ?? [];
+      final fetched = list.map((t) => SupportTicketModel.fromJson(t as Map<String, dynamic>)).toList();
+      _localTickets.clear();
+      _localTickets.addAll(fetched);
+      return fetched;
+    } catch (_) {
+      return List.unmodifiable(_localTickets);
+    }
   }
 
   Future<Map<String, dynamic>> bookAppointmentSlot({
@@ -362,7 +402,7 @@ class PatientPortalRepository {
           'slot_time': slotTime,
           if (chiefComplaint != null && chiefComplaint.isNotEmpty) 'chief_complaint': chiefComplaint,
         },
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(milliseconds: 2500));
 
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'] as Map<String, dynamic>;

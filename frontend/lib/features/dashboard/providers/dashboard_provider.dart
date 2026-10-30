@@ -35,18 +35,39 @@ final dashboardStatsProvider = FutureProvider<DashboardStatsModel>((ref) async {
       ? DoctorRepository.cachedDoctors
       : DoctorRepository.defaultDoctors;
 
-  final totalPatients = allPatients.length >= 14 ? allPatients.length : 14;
+  final totalPatients = allPatients.length;
   final totalVisits = cachedVisits.length;
   final waiting = cachedVisits.where((v) => v.status == 'WAITING' || v.status == 'REGISTERED').length;
   final triaged = cachedVisits.where((v) => v.status == 'TRIAGED').length;
   final completed = cachedVisits.where((v) => v.status == 'COMPLETED').length;
   final activeDoctors = cachedDoctors.where((d) => d.isAvailable).length;
+  final deptCount = cachedDoctors.map((d) => d.departmentId).where((id) => id.isNotEmpty).toSet().length;
+
+  final now = DateTime.now();
+  final todayStart = DateTime(now.year, now.month, now.day);
+  final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+
+  final todayReg = allPatients.where((p) =>
+      (p.registrationDate != null && p.registrationDate!.isAfter(todayStart)) ||
+      (p.createdAt != null && p.createdAt!.isAfter(todayStart))).length;
+  final yestReg = allPatients.where((p) =>
+      (p.registrationDate != null && p.registrationDate!.isAfter(yesterdayStart) && p.registrationDate!.isBefore(todayStart)) ||
+      (p.createdAt != null && p.createdAt!.isAfter(yesterdayStart) && p.createdAt!.isBefore(todayStart))).length;
+
+  final todayVitals = cachedVisits.where((v) => (v.status == 'TRIAGED' || v.vitals != null) && v.visitDate.isAfter(todayStart)).length;
+  final yestVitals = cachedVisits.where((v) => (v.status == 'TRIAGED' || v.vitals != null) && v.visitDate.isAfter(yesterdayStart) && v.visitDate.isBefore(todayStart)).length;
+  final totalVitals = cachedVisits.where((v) => v.status == 'TRIAGED' || v.vitals != null).length;
 
   return DashboardStatsModel(
     totalPatients: totalPatients,
-    totalVisits: totalVisits > 0 ? totalVisits : 1,
-    activeDoctors: activeDoctors > 0 ? activeDoctors : 15,
-    departments: 14,
+    todayRegisteredPatients: todayReg,
+    yesterdayRegisteredPatients: yestReg,
+    todayTriagedVitals: todayVitals,
+    yesterdayTriagedVitals: yestVitals,
+    totalTriagedVitals: totalVitals,
+    totalVisits: totalVisits,
+    activeDoctors: activeDoctors > 0 ? activeDoctors : cachedDoctors.length,
+    departments: deptCount > 0 ? deptCount : 6,
     waiting: waiting,
     triaged: triaged,
     completed: completed,

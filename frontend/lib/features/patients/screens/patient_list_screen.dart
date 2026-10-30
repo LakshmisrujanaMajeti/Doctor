@@ -14,12 +14,27 @@ import '../providers/patient_provider.dart';
 import '../widgets/patient_identifier_card_widget.dart';
 import '../widgets/edit_patient_dialog.dart';
 
-class PatientListScreen extends ConsumerWidget {
+import '../../auth/providers/auth_provider.dart';
+
+class PatientListScreen extends ConsumerStatefulWidget {
   const PatientListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final patientsAsync = ref.watch(patientListProvider);
+  ConsumerState<PatientListScreen> createState() => _PatientListScreenState();
+}
+
+class _PatientListScreenState extends ConsumerState<PatientListScreen> {
+  bool _showOnlyMyPatients = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isDoctor = user?.roleName.toLowerCase() == 'doctor';
+
+    final patientsAsync = (isDoctor && _showOnlyMyPatients)
+        ? ref.watch(doctorAssignedPatientsProvider)
+        : ref.watch(patientListProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -34,11 +49,31 @@ class PatientListScreen extends ConsumerWidget {
             }
           },
         ),
-        title: const Text('Patient Directory & OPD Records', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isDoctor
+                  ? (_showOnlyMyPatients ? "My Assigned Patients" : "All Hospital Patients")
+                  : 'Patient Directory & OPD Records',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            if (isDoctor)
+              Text(
+                'OPD Cases Allotted to ${user?.fullName ?? "Doctor"}',
+                style: const TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(patientListProvider),
+            tooltip: 'Refresh Patients',
+            onPressed: () {
+              ref.invalidate(patientListProvider);
+              ref.invalidate(doctorAssignedPatientsProvider);
+            },
           ),
         ],
       ),
@@ -51,6 +86,7 @@ class PatientListScreen extends ConsumerWidget {
           await context.push('/patients/new');
           ref.read(patientSearchQueryProvider.notifier).setQuery('');
           ref.invalidate(patientListProvider);
+          ref.invalidate(doctorAssignedPatientsProvider);
           ref.invalidate(dashboardStatsProvider);
         },
       ),
@@ -58,12 +94,62 @@ class PatientListScreen extends ConsumerWidget {
         variant: MedicalBackgroundVariant.portal,
         child: Column(
           children: [
+            // Filter Selector for Doctors (Defaults strictly to Assigned Patients)
+            if (isDoctor)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: Colors.white.withOpacity(0.85),
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      selected: _showOnlyMyPatients,
+                      avatar: Icon(
+                        Icons.person_pin_rounded,
+                        size: 16,
+                        color: _showOnlyMyPatients ? Colors.white : AppColors.primaryTeal,
+                      ),
+                      label: const Text('My Patients (Assigned)'),
+                      selectedColor: AppColors.primaryTeal,
+                      labelStyle: TextStyle(
+                        color: _showOnlyMyPatients ? Colors.white : AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _showOnlyMyPatients = true);
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      selected: !_showOnlyMyPatients,
+                      avatar: Icon(
+                        Icons.people_outline_rounded,
+                        size: 16,
+                        color: !_showOnlyMyPatients ? Colors.white : AppColors.secondaryNavy,
+                      ),
+                      label: const Text('All Hospital Patients'),
+                      selectedColor: AppColors.secondaryNavy,
+                      labelStyle: TextStyle(
+                        color: !_showOnlyMyPatients ? Colors.white : AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      onSelected: (selected) {
+                        if (selected) setState(() => _showOnlyMyPatients = false);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
             // Search Bar
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
                 decoration: InputDecoration(
-                  hintText: 'Search by Name, UHID, Reg No, Phone, or Barcode...',
+                  hintText: isDoctor && _showOnlyMyPatients
+                      ? 'Search my patients by Name, UHID, Phone...'
+                      : 'Search by Name, UHID, Reg No, Phone, or Barcode...',
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear_rounded),
@@ -83,15 +169,26 @@ class PatientListScreen extends ConsumerWidget {
                 data: (patients) {
                   if (patients.isEmpty) {
                     return EmptyStateWidget(
-                      title: 'No Patients Found',
-                      message: 'Try searching with a different UHID or register a new patient.',
+                      title: isDoctor && _showOnlyMyPatients
+                          ? 'No Assigned Patients Found'
+                          : 'No Patients Found',
+                      message: isDoctor && _showOnlyMyPatients
+                          ? 'You currently have no OPD patients assigned in this view.'
+                          : 'Try searching with a different UHID or register a new patient.',
                       icon: Icons.person_search_rounded,
-                      actionLabel: 'Register Patient',
+                      actionLabel: isDoctor && _showOnlyMyPatients
+                          ? 'View All Patients'
+                          : 'Register Patient',
                       onAction: () async {
-                        await context.push('/patients/new');
-                        ref.read(patientSearchQueryProvider.notifier).setQuery('');
-                        ref.invalidate(patientListProvider);
-                        ref.invalidate(dashboardStatsProvider);
+                        if (isDoctor && _showOnlyMyPatients) {
+                          setState(() => _showOnlyMyPatients = false);
+                        } else {
+                          await context.push('/patients/new');
+                          ref.read(patientSearchQueryProvider.notifier).setQuery('');
+                          ref.invalidate(patientListProvider);
+                          ref.invalidate(doctorAssignedPatientsProvider);
+                          ref.invalidate(dashboardStatsProvider);
+                        }
                       },
                     );
                   }
@@ -99,8 +196,13 @@ class PatientListScreen extends ConsumerWidget {
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(patientListProvider);
+                    ref.invalidate(doctorAssignedPatientsProvider);
                     try {
-                      await ref.read(patientListProvider.future);
+                      if (isDoctor && _showOnlyMyPatients) {
+                        await ref.read(doctorAssignedPatientsProvider.future);
+                      } else {
+                        await ref.read(patientListProvider.future);
+                      }
                     } catch (_) {}
                   },
                   child: ListView.separated(
@@ -337,6 +439,15 @@ class PatientListScreen extends ConsumerWidget {
                 onTap: () {
                   Navigator.pop(ctx);
                   context.push('/visits/new', extra: patient);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.history_edu_rounded, color: AppColors.primaryBlue),
+                title: const Text('View All Visits & Medical History'),
+                subtitle: const Text('Review past consultations, diagnoses, vitals, prescriptions & bills'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push('/patients/${patient.id}/booklet');
                 },
               ),
               ListTile(

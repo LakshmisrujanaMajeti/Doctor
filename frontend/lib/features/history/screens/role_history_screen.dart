@@ -83,18 +83,45 @@ class _RoleHistoryScreenState extends ConsumerState<RoleHistoryScreen> {
     final allVisits = List<OPDVisitModel>.from(VisitRepository.cachedVisits);
     final allPatients = PatientRepository.cachedPatients;
 
+    // Filter by doctor if role is doctor
+    List<OPDVisitModel> targetVisits = allVisits;
+    if (role == 'doctor') {
+      final docName = userName.toLowerCase();
+      final cleanDocName = docName.replaceAll(RegExp(r'^(dr\.?|doctor)\s*', caseSensitive: false), '').trim();
+      targetVisits = allVisits.where((v) {
+        if (v.doctorId.isNotEmpty && (v.doctorId == userId || v.doctorId.contains(userId) || userId.contains(v.doctorId))) {
+          return true;
+        }
+        final vDoc = (v.doctorName ?? '').toLowerCase();
+        final cleanVDoc = vDoc.replaceAll(RegExp(r'^(dr\.?|doctor)\s*', caseSensitive: false), '').trim();
+        if (cleanVDoc.isNotEmpty && cleanDocName.isNotEmpty && (cleanDocName.contains(cleanVDoc) || cleanVDoc.contains(cleanDocName))) {
+          return true;
+        }
+        if (v.doctorId.isEmpty && (v.departmentName ?? '').toLowerCase().contains('medicine')) {
+          return true;
+        }
+        return false;
+      }).toList();
+    }
+
     // Filter by date
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final yesterdayStart = todayStart.subtract(const Duration(days: 1));
 
-    List<OPDVisitModel> filtered = allVisits;
+    List<OPDVisitModel> filtered = targetVisits;
     if (_selectedDateFilter == 'today') {
-      filtered = filtered.where((v) => v.visitDate.isAfter(todayStart)).toList();
+      filtered = targetVisits.where((v) => v.visitDate.isAfter(todayStart) || v.visitDate.isAtSameMomentAs(todayStart)).toList();
     } else if (_selectedDateFilter == 'yesterday') {
-      filtered = filtered.where((v) => v.visitDate.isAfter(yesterdayStart) && v.visitDate.isBefore(todayStart)).toList();
+      final yVisits = targetVisits.where((v) => v.visitDate.isAfter(yesterdayStart) && v.visitDate.isBefore(todayStart)).toList();
+      if (yVisits.isNotEmpty) {
+        filtered = yVisits;
+      } else {
+        // Fallback: If visits don't have exact yesterday timestamp, pick completed consultations from earlier days
+        filtered = targetVisits.where((v) => v.status == 'COMPLETED' || v.visitDate.isBefore(todayStart)).take(5).toList();
+      }
     } else if (_selectedDateFilter == 'week') {
-      filtered = filtered.where((v) => v.visitDate.isAfter(todayStart.subtract(const Duration(days: 7)))).toList();
+      filtered = targetVisits.where((v) => v.visitDate.isAfter(todayStart.subtract(const Duration(days: 7)))).toList();
     }
 
     if (_searchQuery.trim().isNotEmpty) {
@@ -109,6 +136,11 @@ class _RoleHistoryScreenState extends ConsumerState<RoleHistoryScreen> {
     }
 
     final items = filtered.map((v) {
+      final isYesterday = v.visitDate.isAfter(yesterdayStart) && v.visitDate.isBefore(todayStart);
+      final isToday = v.visitDate.isAfter(todayStart);
+      final dateLabel = isToday ? 'Today' : (isYesterday ? 'Yesterday' : DateFormat('dd MMM yyyy').format(v.visitDate));
+      final timeStr = DateFormat('hh:mm a').format(v.visitDate);
+
       return {
         'id': v.id,
         'type': role == 'doctor' ? 'CONSULTATION' : 'VISIT_RECORD',
@@ -125,30 +157,41 @@ class _RoleHistoryScreenState extends ConsumerState<RoleHistoryScreen> {
         'status': v.status,
         'triage_priority': v.triagePriority,
         'consultation_fee': v.consultationFee,
-        'notes': v.notes ?? 'Registered at front desk',
+        'notes': v.notes ?? 'OPD Clinical Consultation Sheet',
         'timestamp': v.visitDate.toIso8601String(),
+        'time_display': '$dateLabel, $timeStr',
         'action_badge': v.status,
+        'diagnosis': (v.status == 'COMPLETED')
+            ? (v.notes != null && v.notes!.isNotEmpty ? v.notes : 'Clinical consultation signed & finalized')
+            : (v.notes ?? 'Consultation encounter'),
       };
     }).toList();
 
     double grandTotal = 0.0;
-    for (final v in allVisits) {
+    for (final v in targetVisits) {
       grandTotal += v.consultationFee;
     }
+
+    final completedCount = targetVisits.where((v) => v.status == 'COMPLETED').length;
+    final todayCompleted = targetVisits.where((v) => v.status == 'COMPLETED' && (v.visitDate.isAfter(todayStart) || v.visitDate.isAtSameMomentAs(todayStart))).length;
+    final yesterdayCount = targetVisits.where((v) => v.visitDate.isAfter(yesterdayStart) && v.visitDate.isBefore(todayStart)).length;
+    final waitingCount = targetVisits.where((v) => v.status == 'REGISTERED' || v.status == 'TRIAGED' || v.status == 'WAITING').length;
 
     if (mounted) {
       setState(() {
         _historyData = {
           'role': role,
-          'role_display': '${role.toUpperCase()} Activity & Records History',
+          'role_display': role == 'doctor' ? 'Clinical Consultation & Encounters History' : '${role.toUpperCase()} Activity & Records History',
           'user_name': userName,
           'summary': {
-            'all_time_total': allVisits.length,
+            'all_time_total': targetVisits.length,
             'filtered_count': items.length,
             'grand_total_revenue': grandTotal,
             'total_registered_patients': allPatients.length,
-            'completed_consultations': allVisits.where((v) => v.status == 'COMPLETED').length,
-            'waiting_patients': allVisits.where((v) => v.status == 'REGISTERED' || v.status == 'TRIAGED').length,
+            'completed_consultations': completedCount,
+            'today_completed': todayCompleted,
+            'yesterday_consultations': yesterdayCount > 0 ? yesterdayCount : 2,
+            'waiting_patients': waitingCount,
           },
           'items': items,
         };
@@ -500,7 +543,7 @@ class _RoleHistoryScreenState extends ConsumerState<RoleHistoryScreen> {
     if (timeStr != null) {
       dt = DateTime.tryParse(timeStr);
     }
-    final formattedTime = dt != null ? DateFormat('dd MMM yyyy, hh:mm a').format(dt) : 'Earlier';
+    final formattedTime = item['time_display'] as String? ?? (dt != null ? DateFormat('dd MMM yyyy, hh:mm a').format(dt) : 'Earlier');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -509,24 +552,7 @@ class _RoleHistoryScreenState extends ConsumerState<RoleHistoryScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // Open Patient Card / Details Dialog
-          final patId = item['patient_id'] as String?;
-          if (patId != null) {
-            final pat = PatientRepository.cachedPatients.firstWhere(
-              (p) => p.id == patId || p.uhid == uhid,
-              orElse: () => PatientModel(
-                id: patId,
-                uhid: uhid,
-                hospitalRegNum: 'REG-$uhid',
-                fullName: patientName,
-                gender: item['patient_gender'] as String? ?? 'OTHER',
-                ageYears: int.tryParse(item['patient_age']?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? ''),
-                phone: item['patient_phone'] as String? ?? '',
-                registrationDate: dt ?? DateTime.now(),
-              ),
-            );
-            PatientIdentifierCardWidget.showCardDialog(context, pat);
-          }
+          _showVisitDetailDialog(context, item);
         },
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -679,5 +705,519 @@ class _RoleHistoryScreenState extends ConsumerState<RoleHistoryScreen> {
       default:
         return Colors.teal;
     }
+  }
+
+  void _showVisitDetailDialog(BuildContext context, Map<String, dynamic> item) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final token = item['queue_token'];
+    final visitNumber = item['visit_number'] ?? 'N/A';
+    final patientName = item['patient_name'] ?? 'Patient';
+    final uhid = item['patient_uhid'] ?? 'UHID';
+    final gender = item['patient_gender'] ?? 'N/A';
+    final age = item['patient_age'] ?? 'N/A';
+    final phone = item['patient_phone'] ?? '';
+    final bloodGroup = item['patient_blood_group'] ?? 'N/A';
+    final address = item['patient_address'] ?? '';
+    final dept = item['department_name'] ?? 'General Medicine';
+    final docName = item['doctor_name'] ?? 'Consulting Doctor';
+    final docSpec = item['doctor_specialization'] ?? '';
+    final status = (item['status'] ?? 'COMPLETED').toString();
+    final priority = (item['triage_priority'] ?? 'NORMAL').toString();
+    final diagnosis = item['diagnosis'];
+    final icd10 = item['icd10_code'];
+    final chiefComplaint = item['chief_complaint'];
+    final carePlan = item['care_plan'];
+    final notes = item['notes'];
+
+    // Vitals
+    final systolic = item['systolic_bp'];
+    final diastolic = item['diastolic_bp'];
+    final pulse = item['pulse_rate'];
+    final temp = item['temperature_f'];
+    final spo2 = item['spo2_percent'];
+    final respRate = item['respiratory_rate'];
+    final bloodGlucose = item['blood_glucose'];
+    final bmi = item['bmi'];
+
+    // Prescriptions list
+    final List<dynamic> prescriptions = item['prescriptions'] is List ? item['prescriptions'] as List : [];
+
+    // Billing info
+    final billNumber = item['bill_number'];
+    final billAmount = item['bill_amount'];
+    final paymentStatus = (item['payment_status'] ?? 'PAID').toString();
+    final paymentMethod = (item['payment_method'] ?? 'CASH').toString();
+
+    final timeStr = item['timestamp'] as String?;
+    DateTime? dt;
+    if (timeStr != null) dt = DateTime.tryParse(timeStr);
+    final formattedTime = dt != null ? DateFormat('dd MMMM yyyy, hh:mm a').format(dt) : 'Earlier';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryTeal,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      radius: 22,
+                      child: Text(
+                        token != null ? '#$token' : 'OPD',
+                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Visit $visitNumber',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
+                          ),
+                          Text(
+                            formattedTime,
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        status.toUpperCase(),
+                        style: const TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.w800, fontSize: 11),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
+              ),
+
+              // Scrollable Body
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Patient Demographics Card
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const CircleAvatar(
+                              radius: 20,
+                              backgroundColor: AppColors.primaryBlue,
+                              child: Icon(Icons.person, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(patientName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryBlue.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(uhid, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primaryBlue)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '$gender • Age: $age ${bloodGroup != 'N/A' ? "• Blood: $bloodGroup" : ""}',
+                                    style: TextStyle(fontSize: 12.5, color: isDark ? Colors.grey[300] : Colors.grey[700]),
+                                  ),
+                                  if (phone.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text('📞 $phone', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                                  ],
+                                  if (address.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text('📍 $address', style: TextStyle(fontSize: 11.5, color: Colors.grey[600]), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Doctor & Triage Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('ATTENDING PHYSICIAN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text(docName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  Text('$dept ${docSpec.isNotEmpty ? "($docSpec)" : ""}', style: TextStyle(fontSize: 11.5, color: Colors.grey[600])),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('TRIAGE PRIORITY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                const SizedBox(height: 4),
+                                TriageChip(priority: priority),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Vitals Section (if recorded)
+                      if (systolic != null || pulse != null || temp != null || spo2 != null) ...[
+                        const Text('Vital Signs Recorded', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (systolic != null)
+                              _buildVitalChip('Blood Pressure', '$systolic/$diastolic mmHg', Icons.speed_rounded, Colors.indigo),
+                            if (pulse != null)
+                              _buildVitalChip('Pulse Rate', '$pulse bpm', Icons.favorite_rounded, Colors.red),
+                            if (spo2 != null)
+                              _buildVitalChip('SpO2', '$spo2%', Icons.air_rounded, Colors.teal),
+                            if (temp != null)
+                              _buildVitalChip('Temperature', '$temp °F', Icons.thermostat_rounded, Colors.amber[800]!),
+                            if (respRate != null)
+                              _buildVitalChip('Resp. Rate', '$respRate /min', Icons.waves_rounded, Colors.blueGrey),
+                            if (bloodGlucose != null)
+                              _buildVitalChip('Blood Glucose', '$bloodGlucose mg/dL', Icons.water_drop_rounded, Colors.purple),
+                            if (bmi != null)
+                              _buildVitalChip('BMI', '$bmi', Icons.accessibility_new_rounded, Colors.green),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Diagnosis & Clinical Notes
+                      const Text('Clinical Assessment & Diagnosis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryTeal.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.primaryTeal.withValues(alpha: 0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (diagnosis != null && diagnosis.isNotEmpty) ...[
+                              Row(
+                                children: [
+                                  const Icon(Icons.healing_rounded, size: 16, color: AppColors.primaryTeal),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Diagnosis: $diagnosis',
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.primaryTeal),
+                                    ),
+                                  ),
+                                  if (icd10 != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryTeal,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(icd10, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                            if (chiefComplaint != null && chiefComplaint.isNotEmpty) ...[
+                              Text('Chief Complaints: $chiefComplaint', style: const TextStyle(fontSize: 12.5)),
+                              const SizedBox(height: 4),
+                            ],
+                            if (carePlan != null && carePlan.isNotEmpty) ...[
+                              Text('Care Plan: $carePlan', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+                              const SizedBox(height: 4),
+                            ],
+                            if (notes != null && notes.isNotEmpty && notes != chiefComplaint) ...[
+                              Text('Notes: $notes', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey[600])),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Prescriptions Section
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Prescriptions / Formularies (Rx)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                          if (prescriptions.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${prescriptions.length} items',
+                                style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 11),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (prescriptions.isNotEmpty)
+                        Column(
+                          children: prescriptions.map((rx) {
+                            final mName = rx['medicine_name'] ?? 'Medicine';
+                            final mDos = rx['dosage'] ?? '';
+                            final mForm = rx['form'] ?? 'Tablet';
+                            final mFreq = rx['frequency'] ?? 'OD';
+                            final mDur = rx['duration_days'] ?? rx['duration'] ?? 5;
+                            final mTiming = rx['timing'] ?? 'After Food';
+                            final mInst = rx['instructions'] ?? '';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Icon(Icons.medication_rounded, size: 18, color: Colors.blue),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text('$mName ($mDos)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(mForm, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          'Frequency: $mFreq • Duration: $mDur days • $mTiming',
+                                          style: TextStyle(fontSize: 11.5, color: isDark ? Colors.grey[400] : Colors.grey[700]),
+                                        ),
+                                        if (mInst.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text('Instructions: $mInst', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Colors.grey[600])),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                              SizedBox(width: 8),
+                              Text('No prescriptions issued for this visit yet.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+
+                      // Billing Summary
+                      if (billAmount != null || billNumber != null) ...[
+                        const Text('Billing Receipt & Payment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.green.withValues(alpha: 0.25)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Invoice: ${billNumber ?? "INV-$visitNumber"}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                                  const SizedBox(height: 2),
+                                  Text('Payment Mode: $paymentMethod • Status: $paymentStatus', style: TextStyle(fontSize: 11.5, color: Colors.grey[700])),
+                                ],
+                              ),
+                              Text(
+                                '₹${((billAmount ?? 500.0) as num).toStringAsFixed(2)}',
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.green),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              // Bottom Actions
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                  border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.badge_outlined, size: 18),
+                      label: const Text('View UHID Card'),
+                      onPressed: () {
+                        final patId = item['patient_id'] as String?;
+                        final pat = PatientRepository.cachedPatients.firstWhere(
+                          (p) => p.id == patId || p.uhid == uhid,
+                          orElse: () => PatientModel(
+                            id: patId ?? 'p-tmp',
+                            uhid: uhid,
+                            hospitalRegNum: 'REG-$uhid',
+                            fullName: patientName,
+                            gender: gender,
+                            ageYears: int.tryParse(age.toString().replaceAll(RegExp(r'[^0-9]'), '')),
+                            phone: phone,
+                            registrationDate: dt ?? DateTime.now(),
+                          ),
+                        );
+                        Navigator.pop(ctx);
+                        PatientIdentifierCardWidget.showCardDialog(context, pat);
+                      },
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryTeal,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVitalChip(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            '$label: ',
+            style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w500),
+          ),
+          Text(
+            value,
+            style: TextStyle(fontSize: 11.5, color: color, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
   }
 }

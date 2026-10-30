@@ -279,7 +279,15 @@ class PatientService:
 
     @staticmethod
     def get_patient_by_id(db: Session, patient_id: str) -> Patient:
-        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        clean_id = (patient_id or "").strip()
+        patient = db.query(Patient).filter(
+            or_(
+                Patient.id == clean_id,
+                Patient.uhid == clean_id,
+                Patient.uhid.ilike(clean_id),
+                Patient.hospital_reg_num == clean_id,
+            )
+        ).first()
         if not patient:
             raise NotFoundException(f"Patient with ID '{patient_id}' not found")
         PatientService.attach_patient_tokens(db, [patient])

@@ -27,5 +27,10 @@ final visitListProvider = FutureProvider<List<OPDVisitModel>>((ref) async {
 final patientVisitsProvider = FutureProvider.family<List<OPDVisitModel>, String>((ref, patientId) async {
   final repository = ref.watch(visitRepositoryProvider);
   final all = await repository.getVisits();
-  return all.where((v) => v.patientId == patientId).toList();
+  final target = patientId.trim().toLowerCase();
+  return all.where((v) =>
+      v.patientId.toLowerCase() == target ||
+      (v.patient?.uhid.toLowerCase() == target) ||
+      (v.patient?.id.toLowerCase() == target)
+  ).toList();
 });

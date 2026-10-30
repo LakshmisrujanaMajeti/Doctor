@@ -20,6 +20,7 @@ import '../../auth/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../visits/models/visit_model.dart';
 import '../../visits/providers/visit_provider.dart';
+import '../../visits/widgets/reassign_doctor_dialog.dart';
 import '../models/dashboard_stats.dart';
 import '../providers/dashboard_provider.dart';
 import 'doctor_dashboard_view.dart';
@@ -991,19 +992,21 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             onTap: () => context.push('/queue'),
           ),
           StatMetricCard(
+            title: 'Vitals Filled Today',
+            value: stats.todayTriagedVitals.toString(),
+            icon: Icons.favorite_rounded,
+            color: const Color(0xFFE11D48),
+            subtitle: stats.yesterdayTriagedVitals > 0
+                ? 'Yesterday: ${stats.yesterdayTriagedVitals}'
+                : 'Nursing Vitals Recorded',
+            onTap: () => setState(() => _currentTabIndex = 3),
+          ),
+          StatMetricCard(
             title: 'Triaged & Ready',
             value: stats.triaged.toString(),
             icon: Icons.check_circle_outline_rounded,
             color: AppColors.accentTeal,
             subtitle: 'To Doctor',
-            onTap: () => context.push('/queue'),
-          ),
-          StatMetricCard(
-            title: 'Total Visits',
-            value: stats.totalVisits.toString(),
-            icon: Icons.assignment_turned_in_rounded,
-            color: AppColors.primaryBlue,
-            subtitle: "Today's Intake",
             onTap: () => context.push('/queue'),
           ),
           StatMetricCard(
@@ -1212,6 +1215,16 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             onTap: () => context.push('/patients'),
           ),
           StatMetricCard(
+            title: 'Today Registered',
+            value: stats.todayRegisteredPatients.toString(),
+            icon: Icons.person_add_alt_1_rounded,
+            color: const Color(0xFF0D9488),
+            subtitle: stats.yesterdayRegisteredPatients > 0
+                ? 'Yesterday: ${stats.yesterdayRegisteredPatients}'
+                : 'New Intake Today',
+            onTap: () => context.push('/patients'),
+          ),
+          StatMetricCard(
             title: "Today's Tokens",
             value: stats.totalVisits.toString(),
             icon: Icons.confirmation_number_rounded,
@@ -1225,14 +1238,6 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
             icon: Icons.airline_seat_recline_normal_rounded,
             color: AppColors.triagePriority,
             subtitle: 'Queue Active',
-            onTap: () => context.push('/queue'),
-          ),
-          StatMetricCard(
-            title: 'Completed',
-            value: stats.completed.toString(),
-            icon: Icons.check_circle_rounded,
-            color: AppColors.statusCompleted,
-            subtitle: 'Visits Concluded',
             onTap: () => context.push('/queue'),
           ),
         ]);
@@ -1827,7 +1832,8 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              '${v.patient?.uhid ?? "UHID Pending"} • ${v.departmentName}',
+                              '${v.patient?.uhid ?? "UHID Pending"} • ${v.departmentName}'
+                              '${(v.doctorName != null && v.doctorName!.trim().isNotEmpty && v.doctorName != 'Dr. Specialist') ? ' • ${v.doctorName}' : ''}',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isDark
@@ -1837,13 +1843,68 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            if (v.doctorName != null && v.doctorName!.trim().isNotEmpty && v.doctorName != 'Dr. Specialist') ...[
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.medical_services_outlined,
+                                    size: 13,
+                                    color: isDark ? Colors.tealAccent.shade100 : AppColors.primaryTeal,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      'Assigned: ${v.doctorName}',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.tealAccent.shade100 : AppColors.primaryTeal,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 6),
                             Wrap(
                               spacing: 6,
                               runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 TriageChip(priority: v.triagePriority, compact: true),
                                 StatusBadge(status: v.status),
+                                if (role == 'receptionist' || role == 'admin' || role == 'nurse') ...[
+                                  InkWell(
+                                    borderRadius: BorderRadius.circular(6),
+                                    onTap: () => showReassignDoctorDialog(context, ref, v),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withOpacity(0.14),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.amber.shade800.withOpacity(0.35)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.swap_horiz_rounded, size: 12.5, color: Colors.amber.shade900),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            'Reassign Doctor',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.amber.shade900,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ],

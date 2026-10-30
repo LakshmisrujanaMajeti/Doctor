@@ -67,4 +67,14 @@ class DoctorModel {
     'consultation_fee': consultationFee,
     'is_available': isAvailable,
   };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DoctorModel &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

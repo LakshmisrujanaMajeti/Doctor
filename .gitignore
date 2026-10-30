@@ -65,3 +65,7 @@ desktop/web/
 .agents/
 skills-lock.json
 storage/
+scratch/
+backend/scratch/
+backups/
+scripts/*.json

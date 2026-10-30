@@ -27,7 +27,6 @@ def build_doctor_dashboard_data(doctor: Doctor, db: Session) -> dict:
                 OPDVisit.doctor_id == doctor.id,
                 OPDVisit.doctor_id == doctor.user_id,
                 and_(OPDVisit.doctor_id.is_(None), OPDVisit.department_id == doctor.department_id),
-                OPDVisit.department_id == doctor.department_id,
             )
         )
         .order_by(OPDVisit.queue_token.asc(), OPDVisit.visit_date.desc())

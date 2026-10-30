@@ -434,7 +434,7 @@ class PDFBookletService:
         doc_name = getattr(visit, 'doctor_name', None) or (visit.doctor.full_name if visit and getattr(visit, 'doctor', None) and getattr(visit.doctor, 'full_name', None) else "Attending Medical Officer")
         doc_sign_data = [
             [Paragraph("<b>Review Status:</b> Pending Consultation" if not prescriptions else "<b>Review Date:</b> As advised", val_style), Paragraph(f"<b>Doctor's Name:</b> {doc_name}", val_style)],
-            [Paragraph(f"<b>Date:</b> {now.strftime('%d/%m/%Y')}", val_style), Paragraph(f"<b>Digital Verification:</b> <i>{doc_name}</i> [PENDING]" if not prescriptions else f"<b>Verified Signature:</b> <i>{doc_name}</i> [VERIFIED]", label_style)],
+            [Paragraph(f"<b>Date:</b> {datetime.now().strftime('%d/%m/%Y')}", val_style), Paragraph(f"<b>Digital Verification:</b> <i>{doc_name}</i> [PENDING]" if not prescriptions else f"<b>Verified Signature:</b> <i>{doc_name}</i> [VERIFIED]", label_style)],
         ]
         doc_sign_table = Table(doc_sign_data, colWidths=[250, 270])
         doc_sign_table.setStyle(TableStyle([

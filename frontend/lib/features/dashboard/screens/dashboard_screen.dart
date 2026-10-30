@@ -265,7 +265,7 @@ class DashboardScreen extends ConsumerWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Live OPD Status: ${stats.totalSignups > 0 ? stats.totalSignups : stats.totalPatients} Registered Sign-ups • ${stats.totalSignins > 0 ? stats.totalSignins : (stats.activeSessions > 0 ? stats.activeSessions : 1)} Active Logins Today • ${stats.departments} Clinics Live',
+                          'Live OPD Status: ${stats.totalPatients} Registered Patients • ${stats.activeDoctors} Active Doctors • ${stats.departments} Clinics Live',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

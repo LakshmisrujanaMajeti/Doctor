@@ -6,8 +6,12 @@ import '../../../shared/widgets/opd_button.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/triage_chip.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../doctors/repositories/doctor_repository.dart';
+import '../../dashboard/providers/doctor_dashboard_provider.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 import '../models/visit_model.dart';
 import '../providers/visit_provider.dart';
+import '../widgets/reassign_doctor_dialog.dart';
 
 class VisitDetailScreen extends ConsumerWidget {
   final String visitId;
@@ -133,7 +137,7 @@ class VisitDetailScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Department Queue #${currentVisit.queueToken} • ${currentVisit.departmentName ?? "Outpatient Clinic"}',
+                                    'Department Queue #${currentVisit.queueToken} • ${currentVisit.departmentName ?? "Outpatient Clinic"}' + ((currentVisit.doctorName != null && currentVisit.doctorName!.trim().isNotEmpty && currentVisit.doctorName != 'Dr. Specialist') ? ' • ${currentVisit.doctorName}' : ''),
                                     style: const TextStyle(color: Colors.grey, fontSize: 13),
                                   ),
                                 ],
@@ -292,6 +296,14 @@ class VisitDetailScreen extends ConsumerWidget {
                       }
                     },
                   ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'Reassign Doctor / Department',
+                    icon: Icons.swap_horiz_rounded,
+                    width: double.infinity,
+                    color: Colors.amber.shade800,
+                    onPressed: () => _showReassignDialog(context, ref, currentVisit),
+                  ),
                 ],
 
                 // 4. Pharmacist Role: Dispensary Verification & Prescriptions
@@ -398,6 +410,14 @@ class VisitDetailScreen extends ConsumerWidget {
                       }
                     },
                   ),
+                  const SizedBox(height: 12),
+                  OpdButton(
+                    label: 'Reassign Doctor / Department',
+                    icon: Icons.swap_horiz_rounded,
+                    width: double.infinity,
+                    color: Colors.amber.shade800,
+                    onPressed: () => _showReassignDialog(context, ref, currentVisit),
+                  ),
                 ],
               ],
             ),
@@ -405,6 +425,10 @@ class VisitDetailScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _showReassignDialog(BuildContext context, WidgetRef ref, OPDVisitModel visit) {
+    showReassignDoctorDialog(context, ref, visit);
   }
 
   Widget _infoRow(IconData icon, String label, String value) {

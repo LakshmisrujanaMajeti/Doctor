@@ -11,7 +11,9 @@ import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/widgets/triage_chip.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../models/visit_model.dart';
 import '../providers/visit_provider.dart';
+import '../widgets/reassign_doctor_dialog.dart';
 
 class OpdQueueScreen extends ConsumerStatefulWidget {
   const OpdQueueScreen({super.key});
@@ -318,7 +320,7 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                         ),
                                         const SizedBox(height: 3),
                                         Text(
-                                          '${visit.patient?.uhid ?? "UHID Pending"} • ${visit.departmentName}',
+                                          '${visit.patient?.uhid ?? "UHID Pending"} • ${visit.departmentName}' + ((visit.doctorName != null && visit.doctorName!.trim().isNotEmpty && visit.doctorName != 'Dr. Specialist') ? ' • ${visit.doctorName}' : ''),
                                           style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -400,8 +402,8 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                       const Icon(Icons.person_pin_rounded, size: 16, color: Colors.grey),
                                       const SizedBox(width: 6),
                                       Text(
-                                        visit.doctorName ?? 'Consulting Doctor',
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                        'Allotted Doctor: ${visit.doctorName ?? "Consulting Doctor"}',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.hospitalMaroon),
                                         softWrap: true,
                                       ),
                                     ],

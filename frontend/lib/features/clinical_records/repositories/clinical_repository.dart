@@ -153,91 +153,135 @@ class ClinicalRepository {
     String recordId, {
     required String reason,
     required Map<String, dynamic> updateFields,
+    ClinicalRecordModel? fallbackCurrent,
   }) async {
-    try {
-      final payload = Map<String, dynamic>.from(updateFields);
-      payload['amendment_reason'] = reason;
+    if (DioClient.isHostReachable) {
+      try {
+        final payload = Map<String, dynamic>.from(updateFields);
+        payload['amendment_reason'] = reason;
 
-      final res = await _dioClient.dio.post(
-        ApiEndpoints.amendClinicalRecord(recordId),
-        data: payload,
-      );
-      if (res.data['status'] == 'success') {
-        return ClinicalRecordModel.fromJson(res.data['data'] as Map<String, dynamic>);
-      }
-    } on DioException catch (e) {
-      if (e.response != null && e.response?.data is Map) {
-        final msg = e.response!.data['message'] ?? e.response!.data['detail'];
-        if (msg != null) throw Exception(msg.toString());
-      }
-      rethrow;
-    } catch (_) {}
+        final res = await _dioClient.dio.post(
+          ApiEndpoints.amendClinicalRecord(recordId),
+          data: payload,
+        );
+        if (res.data != null && res.data['status'] == 'success') {
+          final amended = ClinicalRecordModel.fromJson(res.data['data'] as Map<String, dynamic>);
+          _localRecords[amended.visitId] = amended;
+          _localRecords[amended.id] = amended;
+          _localRecords[recordId] = amended;
+          return amended;
+        }
+      } on DioException catch (e) {
+        if (e.response != null && e.response?.data is Map) {
+          final statusCode = e.response?.statusCode;
+          final msg = e.response!.data['message'] ?? e.response!.data['detail'];
+          // Only throw if backend returned an explicit client validation error
+          if (msg != null && (statusCode == 400 || statusCode == 422)) {
+            throw Exception(msg.toString());
+          }
+        }
+        // Connection timeout, connection error, server unreachable: fall through to local fallback
+      } catch (_) {}
+    }
 
     // Fallback local amend
+    ClinicalRecordModel? current;
+    String matchedKey = recordId;
     for (final entry in _localRecords.entries) {
       if (entry.value.id == recordId || entry.key == recordId) {
-        final current = entry.value;
-        final amendment = ClinicalAmendmentModel(
-          id: 'amend-${DateTime.now().millisecondsSinceEpoch}',
-          clinicalRecordId: current.id,
-          amendedByUserId: 'current-doctor',
-          amendedAt: DateTime.now(),
-          reason: reason,
-          previousSnapshotJson: '{"version": ${current.version}, "status": "${current.status}"}',
-        );
-
-        final amended = ClinicalRecordModel(
-          id: current.id,
-          visitId: current.visitId,
-          patientId: current.patientId,
-          doctorId: current.doctorId,
-          presentingComplaint: updateFields['presenting_complaint'] as String? ?? current.presentingComplaint,
-          historyOfPresentIllness: updateFields['history_of_present_illness'] as String? ?? current.historyOfPresentIllness,
-          allergies: updateFields['allergies'] as String? ?? current.allergies,
-          pastMedicalHistory: updateFields['past_medical_history'] as String? ?? current.pastMedicalHistory,
-          priorHospitalization: updateFields['prior_hospitalization'] as String? ?? current.priorHospitalization,
-          hypertensionHistory: updateFields['hypertension_history'] as String? ?? current.hypertensionHistory,
-          diabetesHistory: updateFields['diabetes_history'] as String? ?? current.diabetesHistory,
-          asthmaHistory: updateFields['asthma_history'] as String? ?? current.asthmaHistory,
-          tuberculosisHistory: updateFields['tuberculosis_history'] as String? ?? current.tuberculosisHistory,
-          smokingHistory: updateFields['smoking_history'] as String? ?? current.smokingHistory,
-          alcoholHistory: updateFields['alcohol_history'] as String? ?? current.alcoholHistory,
-          familyHistory: updateFields['family_history'] as String? ?? current.familyHistory,
-          generalExamination: updateFields['general_examination'] as String? ?? current.generalExamination,
-          respiratoryExamination: updateFields['respiratory_examination'] as String? ?? current.respiratoryExamination,
-          cardiovascularExamination: updateFields['cardiovascular_examination'] as String? ?? current.cardiovascularExamination,
-          gastrointestinalExamination: updateFields['gastrointestinal_examination'] as String? ?? current.gastrointestinalExamination,
-          cnsExamination: updateFields['cns_examination'] as String? ?? current.cnsExamination,
-          otherExaminationFindings: updateFields['other_examination_findings'] as String? ?? current.otherExaminationFindings,
-          provisionalDiagnosis: updateFields['provisional_diagnosis'] as String? ?? current.provisionalDiagnosis,
-          finalDiagnosis: updateFields['final_diagnosis'] as String? ?? current.finalDiagnosis,
-          icd10Code: updateFields['icd10_code'] as String? ?? current.icd10Code,
-          carePlan: updateFields['care_plan'] as String? ?? current.carePlan,
-          investigationsRequested: updateFields['investigations_requested'] as String? ?? current.investigationsRequested,
-          dietaryAdvice: updateFields['dietary_advice'] as String? ?? current.dietaryAdvice,
-          followUpDate: updateFields['follow_up_date'] as String? ?? current.followUpDate,
-          referralDepartment: updateFields['referral_department'] as String? ?? current.referralDepartment,
-          status: 'AMENDED',
-          version: current.version + 1,
-          amendmentReason: reason,
-          signedAt: current.signedAt,
-          amendments: [amendment, ...current.amendments],
-        );
-        _localRecords[entry.key] = amended;
-        return amended;
+        current = entry.value;
+        matchedKey = entry.key;
+        break;
       }
+    }
+    current ??= fallbackCurrent;
+
+    if (current != null) {
+      final amendment = ClinicalAmendmentModel(
+        id: 'amend-${DateTime.now().millisecondsSinceEpoch}',
+        clinicalRecordId: current.id,
+        amendedByUserId: 'current-doctor',
+        amendedAt: DateTime.now(),
+        reason: reason,
+        previousSnapshotJson: '{"version": ${current.version}, "status": "${current.status}"}',
+      );
+
+      final amended = ClinicalRecordModel(
+        id: current.id,
+        visitId: current.visitId,
+        patientId: current.patientId,
+        doctorId: current.doctorId,
+        presentingComplaint: updateFields['presenting_complaint'] as String? ?? current.presentingComplaint,
+        historyOfPresentIllness: updateFields['history_of_present_illness'] as String? ?? current.historyOfPresentIllness,
+        allergies: updateFields['allergies'] as String? ?? current.allergies,
+        pastMedicalHistory: updateFields['past_medical_history'] as String? ?? current.pastMedicalHistory,
+        priorHospitalization: updateFields['prior_hospitalization'] as String? ?? current.priorHospitalization,
+        hypertensionHistory: updateFields['hypertension_history'] as String? ?? current.hypertensionHistory,
+        diabetesHistory: updateFields['diabetes_history'] as String? ?? current.diabetesHistory,
+        asthmaHistory: updateFields['asthma_history'] as String? ?? current.asthmaHistory,
+        tuberculosisHistory: updateFields['tuberculosis_history'] as String? ?? current.tuberculosisHistory,
+        smokingHistory: updateFields['smoking_history'] as String? ?? current.smokingHistory,
+        alcoholHistory: updateFields['alcohol_history'] as String? ?? current.alcoholHistory,
+        familyHistory: updateFields['family_history'] as String? ?? current.familyHistory,
+        generalExamination: updateFields['general_examination'] as String? ?? current.generalExamination,
+        respiratoryExamination: updateFields['respiratory_examination'] as String? ?? current.respiratoryExamination,
+        cardiovascularExamination: updateFields['cardiovascular_examination'] as String? ?? current.cardiovascularExamination,
+        gastrointestinalExamination: updateFields['gastrointestinal_examination'] as String? ?? current.gastrointestinalExamination,
+        cnsExamination: updateFields['cns_examination'] as String? ?? current.cnsExamination,
+        otherExaminationFindings: updateFields['other_examination_findings'] as String? ?? current.otherExaminationFindings,
+        provisionalDiagnosis: updateFields['provisional_diagnosis'] as String? ?? current.provisionalDiagnosis,
+        finalDiagnosis: updateFields['final_diagnosis'] as String? ?? current.finalDiagnosis,
+        icd10Code: updateFields['icd10_code'] as String? ?? current.icd10Code,
+        carePlan: updateFields['care_plan'] as String? ?? current.carePlan,
+        investigationsRequested: updateFields['investigations_requested'] as String? ?? current.investigationsRequested,
+        dietaryAdvice: updateFields['dietary_advice'] as String? ?? current.dietaryAdvice,
+        followUpDate: updateFields['follow_up_date'] as String? ?? current.followUpDate,
+        referralDepartment: updateFields['referral_department'] as String? ?? current.referralDepartment,
+        status: 'AMENDED',
+        version: current.version + 1,
+        amendmentReason: reason,
+        signedAt: current.signedAt,
+        amendments: [amendment, ...current.amendments],
+      );
+
+      _localRecords[matchedKey] = amended;
+      _localRecords[current.id] = amended;
+      _localRecords[current.visitId] = amended;
+
+      // Sync amendment to Supabase Cloud
+      SupabaseService.upsertClinicalRecord({
+        'id': amended.id,
+        'visit_id': amended.visitId,
+        'patient_id': amended.patientId,
+        'doctor_id': amended.doctorId,
+        'status': 'AMENDED',
+        'version': amended.version,
+        'amendment_reason': reason,
+        'final_diagnosis': amended.finalDiagnosis,
+        'care_plan': amended.carePlan,
+      }).catchError((_) => false);
+
+      return amended;
     }
     throw Exception('Record not found to amend');
   }
 
   Future<List<ClinicalAmendmentModel>> getAmendments(String recordId) async {
-    try {
-      final res = await _dioClient.dio.get(ApiEndpoints.clinicalAmendments(recordId));
-      if (res.data['status'] == 'success') {
-        final list = res.data['data'] as List<dynamic>;
-        return list.map((item) => ClinicalAmendmentModel.fromJson(item as Map<String, dynamic>)).toList();
+    if (DioClient.isHostReachable) {
+      try {
+        final res = await _dioClient.dio.get(ApiEndpoints.clinicalAmendments(recordId));
+        if (res.data != null && res.data['status'] == 'success') {
+          final list = res.data['data'] as List<dynamic>;
+          return list.map((item) => ClinicalAmendmentModel.fromJson(item as Map<String, dynamic>)).toList();
+        }
+      } catch (_) {}
+    }
+
+    for (final rec in _localRecords.values) {
+      if (rec.id == recordId || rec.visitId == recordId) {
+        return rec.amendments;
       }
-    } catch (_) {}
+    }
 
     return [];
   }

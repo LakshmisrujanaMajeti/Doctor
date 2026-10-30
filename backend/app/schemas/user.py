@@ -1,7 +1,8 @@
+from datetime import date
 from typing import Optional, List
 from pydantic import EmailStr, field_validator
 from app.schemas.common import BaseSchema
-from app.core.validators import validate_person_name, validate_indian_phone
+from app.core.validators import validate_person_name, validate_indian_phone, validate_date_of_birth
 
 
 class PermissionRead(BaseSchema):
@@ -22,6 +23,7 @@ class UserBase(BaseSchema):
     email: EmailStr
     full_name: str
     phone: Optional[str] = None
+    date_of_birth: Optional[date] = None
     is_active: bool = True
     is_verified: bool = False
 
@@ -32,6 +34,10 @@ class UserBase(BaseSchema):
     @field_validator("phone")
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         return validate_indian_phone(v, "Phone Number", required=False)
+
+    @field_validator("date_of_birth")
+    def validate_dob(cls, v: Optional[date]) -> Optional[date]:
+        return validate_date_of_birth(v, "Date of Birth", is_required=False)
 
 
 class UserCreate(UserBase):

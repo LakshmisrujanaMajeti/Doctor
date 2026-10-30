@@ -16,66 +16,24 @@ class PatientRepository {
 
   static List<PatientModel> get cachedPatients => List.unmodifiable(_localPatients);
 
-  static int _uhidNumber(String uhid) {
-    final matches = RegExp(r'\d+').allMatches(uhid);
-    if (matches.isNotEmpty) {
-      return int.tryParse(matches.last.group(0)!) ?? 0;
-    }
-    return 0;
-  }
-
-  static void _deduplicateLocalPatients() {
-    final mapByPhone = <String, PatientModel>{};
-    final mapByUhid = <String, PatientModel>{};
-    final unique = <PatientModel>[];
-
-    for (final p in _localPatients) {
-      final cleanPhone = p.phone.replaceAll(RegExp(r'\D'), '');
-      final last10 = cleanPhone.length >= 10 ? cleanPhone.substring(cleanPhone.length - 10) : cleanPhone;
-      final uhid = p.uhid.trim().toUpperCase();
-
-      if (last10.isNotEmpty && mapByPhone.containsKey(last10)) {
-        final existing = mapByPhone[last10]!;
-        final pNum = _uhidNumber(p.uhid);
-        final existingNum = _uhidNumber(existing.uhid);
-        // Prefer official database record (e.g. UHID-2026-00001 with smaller number)
-        if (pNum > 0 && (existingNum == 0 || pNum < existingNum)) {
-          mapByPhone[last10] = p;
-          final idx = unique.indexWhere((item) => item.id == existing.id || item.uhid == existing.uhid);
-          if (idx != -1) {
-            unique[idx] = p;
-          }
-        }
-        continue;
-      }
-
-      if (uhid.isNotEmpty && mapByUhid.containsKey(uhid)) {
-        continue;
-      }
-
-      if (last10.isNotEmpty) mapByPhone[last10] = p;
-      if (uhid.isNotEmpty) mapByUhid[uhid] = p;
-      unique.add(p);
-    }
-
-    _localPatients.clear();
-    _localPatients.addAll(unique);
-  }
-
   static void initializeCache(List<PatientModel> patients) {
     _localPatients.clear();
     _localPatients.addAll(patients);
-    _deduplicateLocalPatients();
     _isLoaded = true;
   }
 
-  static void addPatient(PatientModel patient) {
-    _localPatients.removeWhere((p) => p.id == patient.id || p.uhid == patient.uhid);
-    _localPatients.insert(0, patient);
-    _deduplicateLocalPatients();
+  static void addPatient(PatientModel p) {
+    _localPatients.removeWhere((item) => item.id == p.id || item.uhid == p.uhid);
+    _localPatients.insert(0, p);
   }
 
   PatientRepository(this._dioClient);
+
+  static bool isSyntheticPatient(PatientModel p) {
+    // All patients registered in PostgreSQL/Supabase with legitimate UHIDs are genuine.
+    // Never flag or discard real hospital registrations.
+    return false;
+  }
 
   Future<void> _loadCacheIfNeeded() async {
     if (_localPatients.isEmpty) {
@@ -85,15 +43,18 @@ class PatientRepository {
           final list = jsonDecode(raw) as List<dynamic>;
           _localPatients.addAll(list.map((m) => PatientModel.fromJson(m as Map<String, dynamic>)));
           // Purge any legacy demo or seed patients from old test builds
+          final beforeCount = _localPatients.length;
           _localPatients.removeWhere((p) =>
               p.uhid == 'C407662' ||
               p.id == 'pat-c407662' ||
-              p.fullName.toLowerCase().contains('ravi prasanth'));
+              p.fullName.toLowerCase().contains('ravi prasanth') ||
+              isSyntheticPatient(p));
+          if (_localPatients.length != beforeCount) {
+            await _saveCache();
+          }
         }
       } catch (_) {}
     }
-    _deduplicateLocalPatients();
-    await _saveCache();
     _isLoaded = true;
   }
 
@@ -106,71 +67,28 @@ class PatientRepository {
 
   /// Instant Stale-While-Revalidate: returns cached patients in 0-1ms,
   /// then asynchronously updates from Supabase Cloud and backend without blocking the UI.
-  /// When [forceRefresh] is true, queries the backend directly and updates the cache.
-  Future<List<PatientModel>> getPatients({String? query, bool forceRefresh = false}) async {
+  Future<List<PatientModel>> getPatients({String? query}) async {
     await _loadCacheIfNeeded();
 
-    // If forceRefresh requested and online, fetch directly from backend
-    if (forceRefresh && DioClient.isHostReachable) {
-      try {
-        final res = await _dioClient.dio.get(
-          ApiEndpoints.patients,
-          queryParameters: query != null && query.isNotEmpty ? {'query': query} : null,
-          options: Options(headers: {'Cache-Control': 'no-cache'}),
-        );
-
-        final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
-        if (raw is Map && raw['status'] == 'success') {
-          final list = raw['data'] as List<dynamic>;
-          final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
-          if (query == null || query.isEmpty) {
-            _localPatients.clear();
-            _localPatients.addAll(fetched);
-            _deduplicateLocalPatients();
-            await _saveCache();
-          }
-          return _filterPatients(fetched, query);
-        }
-      } catch (_) {}
-    }
-
-    // 1. If searching and online, fetch real-time search results directly from backend
-    if (query != null && query.trim().isNotEmpty && DioClient.isHostReachable) {
-      try {
-        final res = await _dioClient.dio.get(
-          ApiEndpoints.patients,
-          queryParameters: {'query': query.trim()},
-        );
-
-        final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
-        if (raw is Map && raw['status'] == 'success') {
-          final list = raw['data'] as List<dynamic>;
-          final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
-          if (fetched.isNotEmpty) {
-            return fetched;
-          }
-        }
-      } catch (_) {}
-    }
-
-    // 2. If we have cached patients, return filtered results immediately (0ms) and background sync
-    if (_localPatients.isNotEmpty && !forceRefresh) {
+    // 1. If we have cached patients, return immediately (0ms) and background sync
+    if (_localPatients.isNotEmpty) {
       _syncPatientsFromCloud(query);
       return _filterPatients(_localPatients, query);
     }
 
-    // 3. Cold first run with empty local storage: fetch from Supabase Cloud (works everywhere)
+    // 2. Cold first run with empty local storage: fetch from Supabase Cloud (works everywhere)
     try {
       final supaList = await SupabaseService.fetchPatients();
-      if (supaList.isNotEmpty) {
+      final cleanList = supaList.where((p) => !isSyntheticPatient(p)).toList();
+      if (cleanList.isNotEmpty) {
         _localPatients.clear();
-        _localPatients.addAll(supaList);
+        _localPatients.addAll(cleanList);
         await _saveCache();
-        return _filterPatients(supaList, query);
+        return _filterPatients(cleanList, query);
       }
     } catch (_) {}
 
-    // 4. Fallback to Dio backend if reachable
+    // 3. Fallback to Dio backend if reachable
     try {
       final res = await _dioClient.dio.get(
         ApiEndpoints.patients,
@@ -180,7 +98,10 @@ class PatientRepository {
       final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
       if (raw is Map && raw['status'] == 'success') {
         final list = raw['data'] as List<dynamic>;
-        final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
+        final fetched = list
+            .map((item) => PatientModel.fromJson(item as Map<String, dynamic>))
+            .where((p) => !isSyntheticPatient(p))
+            .toList();
         if (query == null || query.isEmpty) {
           _localPatients.clear();
           _localPatients.addAll(fetched);
@@ -197,19 +118,23 @@ class PatientRepository {
     Future.microtask(() async {
       try {
         final supaList = await SupabaseService.fetchPatients();
-        if (supaList.isNotEmpty) {
-          final existingIds = _localPatients.map((p) => p.id).toSet();
-          final existingUhids = _localPatients.map((p) => p.uhid).toSet();
-          bool hasNew = false;
-          for (final sp in supaList) {
-            if (!existingIds.contains(sp.id) && !existingUhids.contains(sp.uhid)) {
+        final cleanList = supaList.where((p) => !isSyntheticPatient(p)).toList();
+        if (cleanList.isNotEmpty) {
+          final cloudIds = cleanList.map((p) => p.id).toSet();
+          final cloudUhids = cleanList.map((p) => p.uhid).toSet();
+
+          bool hasChanges = false;
+          for (final sp in cleanList) {
+            final idx = _localPatients.indexWhere((p) => p.id == sp.id || p.uhid == sp.uhid);
+            if (idx != -1) {
+              _localPatients[idx] = sp;
+              hasChanges = true;
+            } else {
               _localPatients.add(sp);
-              hasNew = true;
+              hasChanges = true;
             }
           }
-          if (hasNew) {
-            await _saveCache();
-          }
+          if (hasChanges) await _saveCache();
         }
       } catch (_) {}
 
@@ -223,25 +148,23 @@ class PatientRepository {
           final dynamic raw = res.data is String ? jsonDecode(res.data as String) : res.data;
           if (raw is Map && raw['status'] == 'success') {
             final list = raw['data'] as List<dynamic>;
-            final fetched = list.map((item) => PatientModel.fromJson(item as Map<String, dynamic>)).toList();
-            if (query == null || query.isEmpty) {
-              for (final p in fetched) {
-                final cleanPhone = p.phone.replaceAll(RegExp(r'\D'), '');
-                final last10 = cleanPhone.length >= 10 ? cleanPhone.substring(cleanPhone.length - 10) : cleanPhone;
-                final idx = _localPatients.indexWhere((existing) {
-                  final exPhone = existing.phone.replaceAll(RegExp(r'\D'), '');
-                  final exLast10 = exPhone.length >= 10 ? exPhone.substring(exPhone.length - 10) : exPhone;
-                  return (last10.isNotEmpty && exLast10 == last10) || existing.uhid == p.uhid || existing.id == p.id;
-                });
-                if (idx != -1) {
-                  _localPatients[idx] = p;
-                } else {
-                  _localPatients.add(p);
-                }
+            final fetched = list
+                .map((item) => PatientModel.fromJson(item as Map<String, dynamic>))
+                .where((p) => !isSyntheticPatient(p))
+                .toList();
+
+            bool hasChanges = false;
+            for (final fp in fetched) {
+              final idx = _localPatients.indexWhere((p) => p.id == fp.id || p.uhid == fp.uhid);
+              if (idx != -1) {
+                _localPatients[idx] = fp;
+                hasChanges = true;
+              } else {
+                _localPatients.add(fp);
+                hasChanges = true;
               }
-              _deduplicateLocalPatients();
-              await _saveCache();
             }
+            if (hasChanges) await _saveCache();
           }
         } catch (_) {}
       }
@@ -267,7 +190,6 @@ class PatientRepository {
     }
 
     return source.where((p) =>
-      (queryNum != null && p.currentToken == queryNum) ||
       p.fullName.toLowerCase().contains(q) ||
       p.uhid.toLowerCase().contains(q) ||
       (p.hospitalRegNum != null && p.hospitalRegNum!.toLowerCase().contains(q)) ||
@@ -276,7 +198,6 @@ class PatientRepository {
       matchingVisitPatientIds.contains(p.id)
     ).toList();
   }
-
 
   Future<DuplicateCheckResult> checkDuplicates({
     required String phone,
@@ -299,13 +220,7 @@ class PatientRepository {
 
     // Local check fallback
     final candidates = <DuplicateCandidateModel>[];
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    final last10 = cleanPhone.length >= 10 ? cleanPhone.substring(cleanPhone.length - 10) : cleanPhone;
-
     for (final p in _localPatients) {
-      final pPhone = p.phone.replaceAll(RegExp(r'\D'), '');
-      final pLast10 = pPhone.length >= 10 ? pPhone.substring(pPhone.length - 10) : pPhone;
-
       if (hospitalRegNum != null && p.hospitalRegNum == hospitalRegNum) {
         candidates.add(DuplicateCandidateModel(
           id: p.id,
@@ -318,8 +233,8 @@ class PatientRepository {
           parentSpouseName: p.parentSpouseName,
           matchReason: 'Identical Hospital Reg No',
         ));
-      } else if (last10.isNotEmpty && pLast10 == last10) {
-        final isNameMatch = fullName != null && p.fullName.toLowerCase().trim() == fullName.toLowerCase().trim();
+      } else if (p.phone == phone) {
+        final isNameMatch = fullName != null && p.fullName.toLowerCase() == fullName.toLowerCase();
         candidates.add(DuplicateCandidateModel(
           id: p.id,
           uhid: p.uhid,
@@ -351,50 +266,23 @@ class PatientRepository {
     String? idempotencyKey,
   }) async {
     await _loadCacheIfNeeded();
-
-    final cleanDigits = patient.phone.replaceAll(RegExp(r'\D'), '');
-    final last10 = cleanDigits.length >= 10 ? cleanDigits.substring(cleanDigits.length - 10) : cleanDigits;
-    final cleanEmail = patient.email?.trim().toLowerCase();
-
-    // 1. Strict duplicate check against existing patients in local cache
-    for (final p in _localPatients) {
-      final pDigits = p.phone.replaceAll(RegExp(r'\D'), '');
-      final pLast10 = pDigits.length >= 10 ? pDigits.substring(pDigits.length - 10) : pDigits;
-      if (last10.isNotEmpty && pLast10 == last10) {
-        throw Exception(
-          'A patient with mobile number "${patient.phone}" is already registered in the hospital database (UHID: ${p.uhid}, Name: ${p.fullName}). Duplicate mobile numbers are strictly not allowed.',
-        );
-      }
-      if (patient.uhid.isNotEmpty && p.uhid.trim().toUpperCase() == patient.uhid.trim().toUpperCase()) {
-        throw Exception(
-          'A patient with UHID "${patient.uhid}" is already registered in the hospital database (Name: ${p.fullName}). Duplicate UHIDs are not allowed.',
-        );
-      }
-      if (cleanEmail != null && cleanEmail.isNotEmpty && p.email != null && p.email!.trim().toLowerCase() == cleanEmail) {
-        throw Exception(
-          'A patient with email address "$cleanEmail" is already registered in the hospital database (UHID: ${p.uhid}, Name: ${p.fullName}). Duplicate emails are not allowed.',
-        );
-      }
-    }
-
-    final headers = <String, dynamic>{
-      if (idempotencyKey != null && idempotencyKey.isNotEmpty)
-        'X-Idempotency-Key': idempotencyKey,
-    };
-
     try {
+      final headers = <String, dynamic>{};
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+        headers['X-Idempotency-Key'] = idempotencyKey;
+      }
+
       final res = await _dioClient.dio.post(
         ApiEndpoints.patients,
         queryParameters: {'allow_duplicate': allowDuplicate},
-        options: Options(headers: headers),
         data: patient.toJson(),
+        options: headers.isNotEmpty ? Options(headers: headers) : null,
       );
 
       if (res.data['status'] == 'success') {
         final registered = PatientModel.fromJson(res.data['data'] as Map<String, dynamic>);
         _localPatients.removeWhere((p) => p.id == registered.id || p.uhid == registered.uhid);
         _localPatients.insert(0, registered);
-        _deduplicateLocalPatients();
         await _saveCache();
         SupabaseService.upsertPatient(registered).catchError((_) => false);
         return registered;
@@ -403,8 +291,8 @@ class PatientRepository {
       if (e.response != null && e.response?.data is Map) {
         final msg = e.response!.data['message'] ?? e.response!.data['detail'];
         final strMsg = msg?.toString() ?? '';
-        // If it's a duplicate warning or conflict error, rethrow so user sees the message
-        if (e.response?.statusCode == 409 || strMsg.contains('Accidental duplicate prevented') || strMsg.toLowerCase().contains('already exists') || strMsg.toLowerCase().contains('duplicate')) {
+        // If it's a duplicate warning, preserve and throw so the UI duplicate dialog opens
+        if (strMsg.contains('Accidental duplicate prevented') || strMsg.contains('duplicate')) {
           throw Exception(strMsg);
         }
 
@@ -416,13 +304,11 @@ class PatientRepository {
               final retryRes = await _dioClient.dio.post(
                 ApiEndpoints.patients,
                 queryParameters: {'allow_duplicate': allowDuplicate},
-                options: Options(headers: headers),
                 data: patient.toJson(),
               );
               if (retryRes.data['status'] == 'success') {
                 final registered = PatientModel.fromJson(retryRes.data['data'] as Map<String, dynamic>);
                 _localPatients.insert(0, registered);
-                _deduplicateLocalPatients();
                 await _saveCache();
                 SupabaseService.upsertPatient(registered).catchError((_) => false);
                 return registered;
@@ -431,22 +317,22 @@ class PatientRepository {
           }
         }
       }
-    } catch (_) {
-      rethrow;
-    }
+    } catch (_) {}
 
-    int maxUhidNum = 14;
+    // Fallback local registration with monotonic max UHID/REG sequence
+    int maxUhidNum = 0;
     for (final p in _localPatients) {
-      if (p.uhid.startsWith('UHID-2026-')) {
-        final numPart = int.tryParse(p.uhid.substring('UHID-2026-'.length));
-        if (numPart != null && numPart > maxUhidNum) {
-          maxUhidNum = numPart;
+      final parts = p.uhid.split('-');
+      if (parts.isNotEmpty) {
+        final n = int.tryParse(parts.last);
+        if (n != null && n > maxUhidNum) {
+          maxUhidNum = n;
         }
       }
     }
-    final nextUhidNum = maxUhidNum + 1;
-    final generatedUhid = 'UHID-2026-${nextUhidNum.toString().padLeft(5, '0')}';
-    final generatedReg = 'REG-2026-${nextUhidNum.toString().padLeft(5, '0')}';
+    final nextNum = maxUhidNum + 1;
+    final generatedUhid = 'UHID-${DateTime.now().year}-${nextNum.toString().padLeft(5, '0')}';
+    final generatedReg = 'REG-${DateTime.now().year}-${nextNum.toString().padLeft(5, '0')}';
     final newPat = PatientModel(
       id: patient.id.isNotEmpty ? patient.id : 'pat-${DateTime.now().millisecondsSinceEpoch}',
       uhid: patient.uhid.isNotEmpty ? patient.uhid : generatedUhid,

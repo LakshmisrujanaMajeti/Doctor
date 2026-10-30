@@ -215,6 +215,70 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
     );
   }
 
+  Future<void> _selectDateOfBirth() async {
+    final now = DateTime.now();
+    DateTime? initDate;
+    if (_dobController.text.trim().isNotEmpty) {
+      initDate = DateTime.tryParse(_dobController.text.trim());
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: (initDate != null && !initDate.isAfter(now)) ? initDate : now,
+      firstDate: DateTime(1900),
+      lastDate: now,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryTeal,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _dobController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        int years = now.year - picked.year;
+        int months = now.month - picked.month;
+        if (now.day < picked.day) months--;
+        if (months < 0) {
+          years--;
+          months += 12;
+        }
+        _ageYearsController.text = years >= 0 ? years.toString() : '0';
+        _ageMonthsController.text = months >= 0 ? months.toString() : '0';
+      });
+    }
+  }
+
+  void _onAgeChanged() {
+    final text = _ageYearsController.text.trim();
+    if (text.isNotEmpty) {
+      final years = int.tryParse(text);
+      if (years != null && years >= 0 && years <= 130) {
+        final months = int.tryParse(_ageMonthsController.text.trim()) ?? 0;
+        final now = DateTime.now();
+        int birthYear = now.year - years;
+        int birthMonth = now.month - months;
+        if (birthMonth <= 0) {
+          birthYear--;
+          birthMonth += 12;
+        }
+        final approxDob = DateTime(birthYear, birthMonth.clamp(1, 12), now.day.clamp(1, 28));
+        if (!approxDob.isAfter(now)) {
+          setState(() {
+            _dobController.text = "${approxDob.year}-${approxDob.month.toString().padLeft(2, '0')}-${approxDob.day.toString().padLeft(2, '0')}";
+          });
+        }
+      }
+    }
+  }
+
   Future<void> _handleSave() async {
     // 1. Guard against duplicate rapid clicks
     if (!_submissionController.begin()) return;
@@ -383,6 +447,30 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                     Row(
                       children: [
                         Expanded(
+                          flex: 2,
+                          child: InkWell(
+                            onTap: _selectDateOfBirth,
+                            child: IgnorePointer(
+                              child: OPDTextField(
+                                controller: _dobController,
+                                label: 'Date of Birth (Past/Today only)',
+                                hint: 'YYYY-MM-DD',
+                                prefixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+                                validator: (v) {
+                                  if (v != null && v.trim().isNotEmpty) {
+                                    final d = DateTime.tryParse(v.trim());
+                                    if (d != null && d.isAfter(DateTime.now())) {
+                                      return 'Cannot be in the future';
+                                    }
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
                           child: OPDTextField(
                             controller: _ageYearsController,
                             label: 'Age (Years)',
@@ -393,6 +481,7 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                               LengthLimitingTextInputFormatter(3),
                             ],
                             validator: (v) => FieldValidators.validateAge(v, isRequired: false),
+                            onChanged: (_) => _onAgeChanged(),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -407,9 +496,14 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                               LengthLimitingTextInputFormatter(2),
                             ],
                             validator: (v) => FieldValidators.validateAgeMonths(v),
+                            onChanged: (_) => _onAgeChanged(),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             value: _gender,
@@ -418,17 +512,19 @@ class _EditPatientDialogState extends ConsumerState<EditPatientDialog> {
                             onChanged: (v) => setState(() => _gender = v ?? 'MALE'),
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _bloodGroup,
+                            decoration: const InputDecoration(labelText: 'Blood Group', isDense: true, border: OutlineInputBorder()),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('Not Tested / Unknown')),
+                              ..._bloodGroups.map((bg) => DropdownMenuItem(value: bg, child: Text(bg))),
+                            ],
+                            onChanged: (v) => setState(() => _bloodGroup = v),
+                          ),
+                        ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _bloodGroup,
-                      decoration: const InputDecoration(labelText: 'Blood Group', isDense: true, border: OutlineInputBorder()),
-                      items: [
-                        const DropdownMenuItem(value: null, child: Text('Not Tested / Unknown')),
-                        ..._bloodGroups.map((bg) => DropdownMenuItem(value: bg, child: Text(bg))),
-                      ],
-                      onChanged: (v) => setState(() => _bloodGroup = v),
                     ),
 
                     const SizedBox(height: 24),

@@ -72,9 +72,14 @@ class FieldValidators {
       return null;
     }
 
-    final clean = extract10Digits(value);
+    final trimmed = value.trim();
+    if (RegExp(r'[a-zA-Z]').hasMatch(trimmed)) {
+      return '$fieldName must contain only numbers (cannot contain letters)';
+    }
 
-    // Reject non-numeric characters without silently stripping them
+    final clean = extract10Digits(trimmed);
+
+    // Reject non-numeric characters
     if (!RegExp(r'^\d+$').hasMatch(clean)) {
       return '$fieldName must contain only numbers';
     }

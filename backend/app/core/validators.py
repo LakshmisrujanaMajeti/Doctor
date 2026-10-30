@@ -84,24 +84,27 @@ def validate_indian_phone(
     if required is not None:
         is_required = required
 
-    if v is None or not v.strip():
+    if v is None or not str(v).strip():
         if is_required:
             raise ValueError(f"{field_name} is required")
         return None
 
-    cleaned = v.strip()
+    cleaned = str(v).strip()
     if cleaned.startswith("+1555") or cleaned.startswith("555"):
         return cleaned
 
+    if any(ch.isalpha() for ch in cleaned):
+        raise ValueError(f"{field_name} cannot contain letters")
+
     digits = extract_10_digits(cleaned)
 
-    if len(digits) == 10:
-        return digits
+    if len(digits) != 10:
+        raise ValueError(f"{field_name} must be exactly 10 digits")
 
-    if not digits:
-        if is_required:
-            raise ValueError(f"{field_name} is required")
-        return None
+    if not PHONE_DIGITS_REGEX.match(digits):
+        raise ValueError(
+            f"Enter a valid 10-digit Indian {field_name.lower()} (must start with 6, 7, 8, or 9)"
+        )
 
     return digits
 
@@ -179,10 +182,18 @@ def validate_date_of_birth(
     is_required: bool = False,
 ) -> Optional[date]:
     """Validates date of birth (cannot be in the future, <= 130 years)."""
-    if v is None:
+    if v is None or (isinstance(v, str) and not v.strip()):
         if is_required:
             raise ValueError(f"{field_name} is required")
         return None
+
+    if isinstance(v, str):
+        try:
+            v = datetime.strptime(v.strip(), "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError(f"{field_name} must be in YYYY-MM-DD format")
+    elif isinstance(v, datetime):
+        v = v.date()
 
     today = date.today()
     if v > today:

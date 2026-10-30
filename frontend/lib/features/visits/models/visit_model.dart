@@ -1,5 +1,6 @@
 import '../models/vitals_model.dart';
 import '../../patients/models/patient_model.dart';
+import '../../doctors/repositories/doctor_repository.dart';
 
 class OPDVisitModel {
   final String id;
@@ -67,8 +68,29 @@ class OPDVisitModel {
       final docMap = json['doctor'];
       if (docMap['user'] != null && docMap['user'] is Map) {
         docName = docMap['user']['full_name'] as String?;
+      } else if (docMap['full_name'] != null) {
+        docName = docMap['full_name'] as String?;
+      } else if (docMap['name'] != null) {
+        docName = docMap['name'] as String?;
       } else {
         docName = docMap['qualification'] as String?;
+      }
+    }
+    if ((docName == null || docName.isEmpty) && json['doctor_name'] != null) {
+      docName = json['doctor_name'] as String?;
+    }
+
+    final docId = json['doctor_id'] as String? ?? '';
+
+    // If docName is missing or generic, resolve from DoctorRepository
+    if (docName == null || docName.isEmpty || docName == 'Dr. Specialist') {
+      if (docId.isNotEmpty) {
+        try {
+          final matched = DoctorRepository.cachedDoctors.where((d) => d.id == docId || d.userId == docId).toList();
+          if (matched.isNotEmpty) {
+            docName = matched.first.name;
+          }
+        } catch (_) {}
       }
     }
 
@@ -76,12 +98,25 @@ class OPDVisitModel {
     if (json['department'] != null && json['department'] is Map) {
       deptName = json['department']['name'] as String?;
     }
+    if ((deptName == null || deptName.isEmpty) && json['department_name'] != null) {
+      deptName = json['department_name'] as String?;
+    }
+    if (deptName == null || deptName.isEmpty || deptName == 'General Medicine') {
+      if (docId.isNotEmpty) {
+        try {
+          final matched = DoctorRepository.cachedDoctors.where((d) => d.id == docId || d.userId == docId).toList();
+          if (matched.isNotEmpty && matched.first.departmentName.isNotEmpty) {
+            deptName = matched.first.departmentName;
+          }
+        } catch (_) {}
+      }
+    }
 
     return OPDVisitModel(
       id: json['id'] as String? ?? '',
       visitNumber: json['visit_number'] as String? ?? '',
       patientId: json['patient_id'] as String? ?? '',
-      doctorId: json['doctor_id'] as String? ?? '',
+      doctorId: docId,
       departmentId: json['department_id'] as String? ?? '',
       queueToken: json['queue_token'] as int? ?? 0,
       triagePriority: json['triage_priority'] as String? ?? 'NORMAL',

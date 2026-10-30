@@ -10,6 +10,8 @@ import '../../features/doctors/repositories/doctor_repository.dart';
 import '../../features/admin_portal/models/admin_portal_models.dart';
 import '../../features/admin_portal/repositories/admin_portal_repository.dart';
 
+import 'initial_hospital_data.dart';
+
 /// Pre-warms in-memory repository caches at application startup.
 /// Ensures all screens, KPI dashboards, queues, and directories load in 0-1ms.
 class RepositoryCacheWarmer {
@@ -30,50 +32,72 @@ class RepositoryCacheWarmer {
       final rawVisits = results[1];
       final rawStaff = results[2];
 
-      // Check if legacy seeding data has been purged
-      final hasCleared = await SecureStorageService.hasClearedSeedData();
-      if (!hasCleared) {
-        await SecureStorageService.clearAllSeedData();
-        PatientRepository.initializeCache([]);
-        VisitRepository.initializeCache([]);
-      } else {
-        // 1. Warm Patients Cache (genuine newly registered patients only)
-        if (rawPatients != null && rawPatients.isNotEmpty) {
-          try {
-            final list = jsonDecode(rawPatients) as List<dynamic>;
-            final patients = list
-                .map((m) => PatientModel.fromJson(m as Map<String, dynamic>))
-                .where((p) =>
-                    p.uhid != 'C407662' &&
-                    p.id != 'pat-c407662' &&
-                    !p.fullName.toLowerCase().contains('ravi prasanth'))
-                .toList();
-            PatientRepository.initializeCache(patients);
-          } catch (e) {
-            debugPrint('Warm patients error: $e');
-          }
-        } else {
-          PatientRepository.initializeCache([]);
+      // 1. Warm Patients Cache
+      List<PatientModel> patients = [];
+      if (rawPatients != null && rawPatients.isNotEmpty) {
+        try {
+          final list = jsonDecode(rawPatients) as List<dynamic>;
+          patients = list
+              .map((m) => PatientModel.fromJson(m as Map<String, dynamic>))
+              .where((p) =>
+                  p.uhid != 'C407662' &&
+                  p.id != 'pat-c407662' &&
+                  !p.fullName.toLowerCase().contains('ravi prasanth') &&
+                  !_isSyntheticPatient(p))
+              .toList();
+        } catch (e) {
+          debugPrint('Warm patients error: $e');
         }
+      }
 
-        // 2. Warm Visits Cache
-        if (rawVisits != null && rawVisits.isNotEmpty) {
-          try {
-            final list = jsonDecode(rawVisits) as List<dynamic>;
-            final visits = list
-                .map((m) => OPDVisitModel.fromJson(m as Map<String, dynamic>))
-                .where((v) =>
-                    !v.id.contains('c407662') &&
-                    !(v.patient?.fullName.toLowerCase().contains('ravi prasanth') ?? false) &&
-                    v.patient?.uhid != 'C407662')
-                .toList();
-            VisitRepository.initializeCache(visits);
-          } catch (e) {
-            debugPrint('Warm visits error: $e');
-          }
-        } else {
-          VisitRepository.initializeCache([]);
+      // Fallback to bundled hospital seed data if local storage empty (e.g. fresh APK install)
+      if (patients.isEmpty) {
+        try {
+          final map = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
+          final list = (map['patients'] as List?) ?? [];
+          patients = list.map((m) => PatientModel.fromJson(m as Map<String, dynamic>)).toList();
+        } catch (e) {
+          debugPrint('Initial patients parse error: $e');
         }
+      }
+
+      if (patients.isNotEmpty) {
+        PatientRepository.initializeCache(patients);
+        await SecureStorageService.savePatientsJson(jsonEncode(patients.map((p) => p.toJson()).toList()));
+      }
+
+      // 2. Warm Visits Cache
+      List<OPDVisitModel> visits = [];
+      if (rawVisits != null && rawVisits.isNotEmpty) {
+        try {
+          final list = jsonDecode(rawVisits) as List<dynamic>;
+          visits = list
+              .map((m) => OPDVisitModel.fromJson(m as Map<String, dynamic>))
+              .where((v) =>
+                  !v.id.contains('c407662') &&
+                  !(v.patient?.fullName.toLowerCase().contains('ravi prasanth') ?? false) &&
+                  v.patient?.uhid != 'C407662' &&
+                  !_isSyntheticVisit(v))
+              .toList();
+        } catch (e) {
+          debugPrint('Warm visits error: $e');
+        }
+      }
+
+      // Fallback to bundled hospital seed visits if local storage empty
+      if (visits.isEmpty) {
+        try {
+          final map = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
+          final list = (map['visits'] as List?) ?? [];
+          visits = list.map((m) => OPDVisitModel.fromJson(m as Map<String, dynamic>)).toList();
+        } catch (e) {
+          debugPrint('Initial visits parse error: $e');
+        }
+      }
+
+      if (visits.isNotEmpty) {
+        VisitRepository.initializeCache(visits);
+        await SecureStorageService.saveVisitsJson(jsonEncode(visits.map((v) => v.toJson()).toList()));
       }
 
       // 3. Warm Doctors & Staff Cache
@@ -117,4 +141,7 @@ class RepositoryCacheWarmer {
       debugPrint('Cache prewarm note: $e');
     }
   }
+
+  static bool _isSyntheticPatient(PatientModel p) => false;
+  static bool _isSyntheticVisit(OPDVisitModel v) => false;
 }

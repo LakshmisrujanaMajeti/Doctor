@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_
 
@@ -16,16 +16,143 @@ from app.models.department import Department
 from app.models.clinical import ClinicalRecord
 from app.models.billing import Bill, PaymentTransaction
 from app.models.laboratory import LabOrder
-from app.models.prescription import Prescription
+from app.models.prescription import Prescription, PrescriptionItem
 from app.models.audit import AuditLog
 
 router = APIRouter()
 
 
+def _build_search_and_patient_filter(search: Optional[str] = None, patient_id: Optional[str] = None):
+    """
+    Constructs reusable SQLAlchemy filter expressions for searching by Patient ID,
+    UHID, Hospital Registration Number, Phone, Name, or Queue Token.
+    """
+    conditions = []
+    if patient_id and patient_id.strip():
+        pid = patient_id.strip()
+        conditions.append(
+            or_(
+                OPDVisit.patient_id == pid,
+                Patient.id == pid,
+                Patient.uhid.ilike(f"%{pid}%"),
+                Patient.hospital_reg_num.ilike(f"%{pid}%"),
+                Patient.phone.ilike(f"%{pid}%"),
+            )
+        )
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        raw_term = search.strip()
+        clean_num = raw_term.lstrip("#").strip()
+        token_num = int(clean_num) if clean_num.isdigit() else None
+
+        or_terms = [
+            Patient.full_name.ilike(term),
+            Patient.uhid.ilike(term),
+            Patient.hospital_reg_num.ilike(term),
+            Patient.id.ilike(term),
+            OPDVisit.patient_id.ilike(term),
+            Patient.phone.ilike(term),
+            OPDVisit.visit_number.ilike(term),
+            OPDVisit.notes.ilike(term),
+        ]
+        if token_num is not None:
+            or_terms.append(OPDVisit.queue_token == token_num)
+
+        conditions.append(or_(*or_terms))
+
+    return conditions
+
+
+def _serialize_visit_item(v: OPDVisit, db: Session, pat: Optional[Patient] = None) -> Dict[str, Any]:
+    """Helper to convert an OPDVisit into a rich, structured appointment history object."""
+    if not pat:
+        pat = v.patient
+
+    cr = db.query(ClinicalRecord).filter(ClinicalRecord.visit_id == v.id).first()
+    bill = db.query(Bill).filter(Bill.visit_id == v.id).first()
+    vit = db.query(VitalSigns).filter(VitalSigns.visit_id == v.id).first()
+    pr = db.query(Prescription).filter(Prescription.visit_id == v.id).first()
+
+    # Prescriptions list
+    prescriptions_list = []
+    if pr and pr.items:
+        for item in pr.items:
+            prescriptions_list.append({
+                "id": item.id,
+                "medicine_name": item.medicine_name,
+                "dosage": item.dosage,
+                "form": item.form,
+                "timing": item.timing,
+                "frequency": item.frequency,
+                "duration_days": item.duration_days,
+                "instructions": item.instructions,
+            })
+
+    doc_user = v.doctor.user if (v.doctor and v.doctor.user) else None
+    doctor_name = doc_user.full_name if doc_user else "Consulting Physician"
+    doc_spec = v.doctor.specialization if v.doctor else "General Medicine"
+    dept_name = v.department.name if v.department else "General Medicine"
+
+    vitals_summary = (
+        f"BP: {vit.systolic_bp}/{vit.diastolic_bp} mmHg • Pulse: {vit.pulse_rate} • SpO2: {vit.spo2_percent}%"
+        if (vit and vit.systolic_bp)
+        else ("Vitals recorded" if vit else "Vitals pending triage")
+    )
+
+    return {
+        "id": v.id,
+        "visit_id": v.id,
+        "type": "CONSULTATION" if v.status == "COMPLETED" else "APPOINTMENT",
+        "title": f"Visit {v.visit_number} • Token #{v.queue_token} - {dept_name}",
+        "patient_id": v.patient_id,
+        "patient_name": pat.full_name if pat else "Patient",
+        "patient_uhid": pat.uhid if pat else "UHID",
+        "patient_reg_num": pat.hospital_reg_num if pat else "REG-N/A",
+        "patient_phone": pat.phone if pat else "",
+        "patient_gender": pat.gender if pat else "N/A",
+        "patient_age": f"{pat.age_years} Y" if pat and pat.age_years else "N/A",
+        "patient_blood_group": pat.blood_group if pat else "N/A",
+        "patient_address": pat.address if pat else "",
+        "visit_number": v.visit_number,
+        "queue_token": v.queue_token,
+        "department_id": v.department_id,
+        "department_name": dept_name,
+        "doctor_id": v.doctor_id,
+        "doctor_name": doctor_name,
+        "doctor_specialization": doc_spec,
+        "status": v.status,
+        "triage_priority": v.triage_priority,
+        "consultation_fee": float(v.consultation_fee or 500.0),
+        "payment_status": v.payment_status or (bill.payment_status if bill else "PAID"),
+        "payment_method": bill.payment_method if bill else "CASH",
+        "bill_number": bill.invoice_number if bill else f"INV-{v.queue_token:04d}",
+        "bill_amount": float(bill.paid_amount) if (bill and bill.paid_amount) else float(v.consultation_fee or 500.0),
+        "diagnosis": (cr.final_diagnosis or cr.provisional_diagnosis) if cr else ("Consultation Note" if v.notes else "General Checkup"),
+        "icd10_code": cr.icd10_code if cr else None,
+        "chief_complaint": cr.presenting_complaint if cr else v.notes,
+        "care_plan": cr.care_plan if cr else None,
+        "notes": v.notes,
+        "vitals_summary": vitals_summary,
+        "systolic_bp": vit.systolic_bp if vit else None,
+        "diastolic_bp": vit.diastolic_bp if vit else None,
+        "pulse_rate": vit.pulse_rate if vit else None,
+        "temperature_f": vit.temperature_f if vit else None,
+        "spo2_percent": vit.spo2_percent if vit else None,
+        "respiratory_rate": vit.respiratory_rate if vit else None,
+        "blood_glucose": vit.blood_glucose_mg_dl if vit else None,
+        "bmi": vit.bmi if vit else None,
+        "prescriptions": prescriptions_list,
+        "timestamp": v.visit_date.isoformat() if v.visit_date else None,
+        "action_badge": "Completed" if v.status == "COMPLETED" else ("In Progress" if v.status == "IN_CONSULTATION" else v.status),
+    }
+
+
 @router.get("/my-history", summary="Role-Based Activity & Records History From Start to Now")
 def get_role_history(
     date_filter: Optional[str] = Query("all", description="all, today, yesterday, week, month"),
-    search: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, description="Search by Patient ID, UHID, Reg No, Name, Phone, Token, Visit #"),
+    patient_id: Optional[str] = Query(None, description="Filter specifically by Patient UUID, UHID, or Reg Number"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -33,7 +160,7 @@ def get_role_history(
 ):
     """
     Returns complete, personalized activity and operational history tailored to the logged-in user's role.
-    Shows records from starting till now with search, date filters, and aggregated summary counters.
+    Shows records from starting till now with search, patient ID filter, date filters, and aggregated summary counters.
     """
     user_role = (current_user.role.name if current_user.role else "patient").lower()
     today_start = datetime.combine(date.today(), datetime.min.time())
@@ -55,7 +182,7 @@ def get_role_history(
     elif date_filter == "month":
         start_dt = month_start
 
-    search_term = f"%{search.strip()}%" if search and search.strip() else None
+    search_filters = _build_search_and_patient_filter(search=search, patient_id=patient_id)
 
     # ==========================================
     # 1. DOCTOR HISTORY
@@ -85,41 +212,13 @@ def get_role_history(
         if end_dt:
             q = q.filter(OPDVisit.visit_date < end_dt)
 
-        if search_term:
-            q = q.filter(
-                or_(
-                    Patient.full_name.ilike(search_term),
-                    Patient.uhid.ilike(search_term),
-                    OPDVisit.visit_number.ilike(search_term),
-                )
-            )
+        for f in search_filters:
+            q = q.filter(f)
 
         total_records = q.count()
         visits = q.order_by(OPDVisit.visit_date.desc(), OPDVisit.queue_token.desc()).offset(skip).limit(limit).all()
 
-        history_items = []
-        for v in visits:
-            pat = v.patient
-            cr = db.query(ClinicalRecord).filter(ClinicalRecord.visit_id == v.id).first()
-            history_items.append({
-                "id": v.id,
-                "type": "CONSULTATION",
-                "title": f"Consultation Token #{v.queue_token} - {v.status}",
-                "patient_id": v.patient_id,
-                "patient_name": pat.full_name if pat else "Patient",
-                "patient_uhid": pat.uhid if pat else "UHID",
-                "patient_gender": pat.gender if pat else "N/A",
-                "patient_age": f"{pat.age_years} Y" if pat and pat.age_years else "N/A",
-                "visit_number": v.visit_number,
-                "queue_token": v.queue_token,
-                "department_name": v.department.name if v.department else "General Medicine",
-                "status": v.status,
-                "triage_priority": v.triage_priority,
-                "diagnosis": (cr.final_diagnosis or cr.provisional_diagnosis) if cr else None,
-                "chief_complaint": cr.presenting_complaint if cr else v.notes,
-                "timestamp": v.visit_date.isoformat() if v.visit_date else None,
-                "action_badge": "Completed" if v.status == "COMPLETED" else ("In Progress" if v.status == "IN_CONSULTATION" else "Waiting"),
-            })
+        history_items = [_serialize_visit_item(v, db) for v in visits]
 
         # Aggregated stats
         base_doc_q = db.query(OPDVisit)
@@ -163,44 +262,13 @@ def get_role_history(
         if end_dt:
             q = q.filter(OPDVisit.visit_date < end_dt)
 
-        if search_term:
-            q = q.filter(
-                or_(
-                    Patient.full_name.ilike(search_term),
-                    Patient.uhid.ilike(search_term),
-                    Patient.phone.ilike(search_term),
-                    OPDVisit.visit_number.ilike(search_term),
-                )
-            )
+        for f in search_filters:
+            q = q.filter(f)
 
         total_records = q.count()
         visits = q.order_by(OPDVisit.visit_date.desc(), OPDVisit.queue_token.desc()).offset(skip).limit(limit).all()
 
-        history_items = []
-        for v in visits:
-            pat = v.patient
-            doc_user = v.doctor.user if v.doctor else None
-            history_items.append({
-                "id": v.id,
-                "type": "REGISTRATION_AND_TOKEN",
-                "title": f"Token #{v.queue_token} Issued - {v.visit_number}",
-                "patient_id": v.patient_id,
-                "patient_name": pat.full_name if pat else "Patient",
-                "patient_uhid": pat.uhid if pat else "UHID",
-                "patient_phone": pat.phone if pat else "",
-                "patient_gender": pat.gender if pat else "N/A",
-                "patient_age": f"{pat.age_years} Y" if pat and pat.age_years else "N/A",
-                "visit_number": v.visit_number,
-                "queue_token": v.queue_token,
-                "department_name": v.department.name if v.department else "General Medicine",
-                "doctor_name": doc_user.full_name if doc_user else "OPD Physician",
-                "status": v.status,
-                "triage_priority": v.triage_priority,
-                "consultation_fee": float(v.consultation_fee or 500.0),
-                "notes": v.notes,
-                "timestamp": v.visit_date.isoformat() if v.visit_date else None,
-                "action_badge": "Token Issued",
-            })
+        history_items = [_serialize_visit_item(v, db) for v in visits]
 
         total_patients = db.query(Patient).count()
         today_patients = db.query(Patient).filter(Patient.created_at >= today_start).count()
@@ -238,14 +306,8 @@ def get_role_history(
         if end_dt:
             q = q.filter(VitalSigns.recorded_at < end_dt)
 
-        if search_term:
-            q = q.filter(
-                or_(
-                    Patient.full_name.ilike(search_term),
-                    Patient.uhid.ilike(search_term),
-                    OPDVisit.visit_number.ilike(search_term),
-                )
-            )
+        for f in search_filters:
+            q = q.filter(f)
 
         total_records = q.count()
         vitals_list = q.order_by(VitalSigns.recorded_at.desc()).offset(skip).limit(limit).all()
@@ -253,37 +315,8 @@ def get_role_history(
         history_items = []
         for vit in vitals_list:
             v = vit.visit
-            pat = v.patient if v else None
-            bp_str = f"{vit.systolic_bp}/{vit.diastolic_bp} mmHg" if vit.systolic_bp and vit.diastolic_bp else "N/A"
-            pulse_str = f"{vit.pulse_rate} bpm" if vit.pulse_rate else "N/A"
-            spo2_str = f"{vit.spo2_percent}%" if vit.spo2_percent else "N/A"
-            temp_str = f"{vit.temperature_f} °F" if vit.temperature_f else "N/A"
-
-            history_items.append({
-                "id": vit.id,
-                "type": "TRIAGE_VITALS",
-                "title": f"Triage Assessment - BP: {bp_str} • SpO2: {spo2_str}",
-                "visit_id": vit.visit_id,
-                "visit_number": v.visit_number if v else "N/A",
-                "queue_token": v.queue_token if v else None,
-                "patient_id": pat.id if pat else None,
-                "patient_name": pat.full_name if pat else "Patient",
-                "patient_uhid": pat.uhid if pat else "UHID",
-                "patient_gender": pat.gender if pat else "N/A",
-                "patient_age": f"{pat.age_years} Y" if pat and pat.age_years else "N/A",
-                "triage_priority": v.triage_priority if v else "NORMAL",
-                "systolic_bp": vit.systolic_bp,
-                "diastolic_bp": vit.diastolic_bp,
-                "pulse_rate": vit.pulse_rate,
-                "temperature_f": vit.temperature_f,
-                "spo2_percent": vit.spo2_percent,
-                "respiratory_rate": vit.respiratory_rate,
-                "blood_glucose": vit.blood_glucose_mg_dl,
-                "bmi": vit.bmi,
-                "notes": vit.notes,
-                "timestamp": vit.recorded_at.isoformat() if vit.recorded_at else None,
-                "action_badge": v.triage_priority if v else "NORMAL",
-            })
+            if v:
+                history_items.append(_serialize_visit_item(v, db, pat=v.patient))
 
         total_triaged = db.query(VitalSigns).count()
         today_triaged = db.query(VitalSigns).filter(VitalSigns.recorded_at >= today_start).count()
@@ -311,45 +344,41 @@ def get_role_history(
     # 4. BILLING / CASHIER HISTORY
     # ==========================================
     elif user_role == "billing":
-        q = db.query(Bill).join(Patient, Bill.patient_id == Patient.id, isouter=True)
+        q = db.query(Bill).join(Patient, Bill.patient_id == Patient.id, isouter=True).join(OPDVisit, Bill.visit_id == OPDVisit.id, isouter=True)
         if start_dt:
             q = q.filter(Bill.billed_at >= start_dt)
         if end_dt:
             q = q.filter(Bill.billed_at < end_dt)
 
-        if search_term:
-            q = q.filter(
-                or_(
-                    Bill.bill_number.ilike(search_term),
-                    Patient.full_name.ilike(search_term),
-                    Patient.uhid.ilike(search_term),
-                )
-            )
+        for f in search_filters:
+            q = q.filter(f)
 
         total_records = q.count()
         bills = q.order_by(Bill.billed_at.desc()).offset(skip).limit(limit).all()
 
         history_items = []
         for b in bills:
-            pat = b.patient
-            v = b.visit
-            history_items.append({
-                "id": b.id,
-                "type": "BILLING_RECEIPT",
-                "title": f"Invoice #{b.bill_number} - ₹{float(b.paid_amount or 0.0):.2f} ({b.payment_status})",
-                "bill_number": b.bill_number,
-                "patient_id": b.patient_id,
-                "patient_name": pat.full_name if pat else "Patient",
-                "patient_uhid": pat.uhid if pat else "UHID",
-                "visit_number": v.visit_number if v else "N/A",
-                "total_amount": float(b.total_amount or 0.0),
-                "paid_amount": float(b.paid_amount or 0.0),
-                "pending_amount": float(b.pending_amount or 0.0),
-                "payment_status": b.payment_status,
-                "payment_method": b.payment_method or "CASH",
-                "timestamp": b.billed_at.isoformat() if b.billed_at else None,
-                "action_badge": b.payment_status,
-            })
+            if b.visit:
+                history_items.append(_serialize_visit_item(b.visit, db, pat=b.patient))
+            else:
+                pat = b.patient
+                history_items.append({
+                    "id": b.id,
+                    "type": "BILLING_RECEIPT",
+                    "title": f"Invoice #{b.invoice_number} - ₹{float(b.paid_amount or 0.0):.2f} ({b.payment_status})",
+                    "bill_number": b.invoice_number,
+                    "patient_id": b.patient_id,
+                    "patient_name": pat.full_name if pat else "Patient",
+                    "patient_uhid": pat.uhid if pat else "UHID",
+                    "visit_number": "N/A",
+                    "total_amount": float(b.total_amount or 0.0),
+                    "paid_amount": float(b.paid_amount or 0.0),
+                    "pending_amount": float(b.outstanding_balance or 0.0),
+                    "payment_status": b.payment_status,
+                    "payment_method": b.payment_method or "CASH",
+                    "timestamp": b.billed_at.isoformat() if b.billed_at else None,
+                    "action_badge": b.payment_status,
+                })
 
         # Financial summaries
         all_bills_paid = db.query(func.sum(Bill.paid_amount)).filter(Bill.paid_amount > 0).scalar() or 0.0
@@ -380,7 +409,6 @@ def get_role_history(
     # 5. PATIENT VISIT & HEALTHCARE HISTORY (PAST & PRESENT)
     # ==========================================
     elif user_role == "patient":
-        # Resolve patient record
         patient = None
         if current_user.patient_id:
             patient = db.query(Patient).filter(Patient.id == current_user.patient_id).first()
@@ -397,45 +425,13 @@ def get_role_history(
         if end_dt:
             q = q.filter(OPDVisit.visit_date < end_dt)
 
-        if search_term:
-            q = q.filter(
-                or_(
-                    OPDVisit.visit_number.ilike(search_term),
-                    OPDVisit.notes.ilike(search_term),
-                )
-            )
+        for f in search_filters:
+            q = q.filter(f)
 
         total_records = q.count()
         visits = q.order_by(OPDVisit.visit_date.desc(), OPDVisit.queue_token.desc()).offset(skip).limit(limit).all()
 
-        history_items = []
-        for v in visits:
-            doc_user = v.doctor.user if v.doctor else None
-            cr = db.query(ClinicalRecord).filter(ClinicalRecord.visit_id == v.id).first()
-            bill = db.query(Bill).filter(Bill.visit_id == v.id).first()
-            vit = db.query(VitalSigns).filter(VitalSigns.visit_id == v.id).first()
-            vitals_str = f"BP: {vit.systolic_bp}/{vit.diastolic_bp} • SpO2: {vit.spo2_percent}%" if vit and vit.systolic_bp else "Vitals recorded"
-
-            history_items.append({
-                "id": v.id,
-                "type": "PATIENT_HOSPITAL_VISIT",
-                "title": f"Visit {v.visit_number} • Token #{v.queue_token} - {v.department.name if v.department else 'OPD'}",
-                "patient_id": v.patient_id,
-                "patient_name": patient.full_name if patient else current_user.full_name,
-                "patient_uhid": patient.uhid if patient else "UHID",
-                "visit_number": v.visit_number,
-                "queue_token": v.queue_token,
-                "department_name": v.department.name if v.department else "General Medicine",
-                "doctor_name": doc_user.full_name if doc_user else "Consulting Doctor",
-                "status": v.status,
-                "triage_priority": v.triage_priority,
-                "vitals_summary": vitals_str,
-                "diagnosis": (cr.final_diagnosis or cr.provisional_diagnosis) if cr else "Routine Consultation",
-                "bill_status": bill.payment_status if bill else "PAID",
-                "bill_amount": float(bill.paid_amount) if bill and bill.paid_amount else float(v.consultation_fee or 500.0),
-                "timestamp": v.visit_date.isoformat() if v.visit_date else None,
-                "action_badge": v.status,
-            })
+        history_items = [_serialize_visit_item(v, db, pat=patient) for v in visits]
 
         completed_count = db.query(OPDVisit).filter(OPDVisit.patient_id == patient.id, OPDVisit.status == "COMPLETED").count() if patient else 0
         active_count = db.query(OPDVisit).filter(OPDVisit.patient_id == patient.id, OPDVisit.status.in_(["REGISTERED", "TRIAGED", "IN_CONSULTATION"])).count() if patient else 0
@@ -462,50 +458,19 @@ def get_role_history(
     # 6. ADMIN / MASTER COMPREHENSIVE HISTORY
     # ==========================================
     else:
-        # Admin or other roles: Comprehensive master history
         q = db.query(OPDVisit).join(Patient, OPDVisit.patient_id == Patient.id, isouter=True)
         if start_dt:
             q = q.filter(OPDVisit.visit_date >= start_dt)
         if end_dt:
             q = q.filter(OPDVisit.visit_date < end_dt)
 
-        if search_term:
-            q = q.filter(
-                or_(
-                    Patient.full_name.ilike(search_term),
-                    Patient.uhid.ilike(search_term),
-                    OPDVisit.visit_number.ilike(search_term),
-                )
-            )
+        for f in search_filters:
+            q = q.filter(f)
 
         total_records = q.count()
         visits = q.order_by(OPDVisit.visit_date.desc(), OPDVisit.queue_token.desc()).offset(skip).limit(limit).all()
 
-        history_items = []
-        for v in visits:
-            pat = v.patient
-            doc_user = v.doctor.user if v.doctor else None
-            cr = db.query(ClinicalRecord).filter(ClinicalRecord.visit_id == v.id).first()
-            bill = db.query(Bill).filter(Bill.visit_id == v.id).first()
-            history_items.append({
-                "id": v.id,
-                "type": "HOSPITAL_VISIT_LIFECYCLE",
-                "title": f"Visit {v.visit_number} • Token #{v.queue_token}",
-                "patient_id": v.patient_id,
-                "patient_name": pat.full_name if pat else "Patient",
-                "patient_uhid": pat.uhid if pat else "UHID",
-                "visit_number": v.visit_number,
-                "queue_token": v.queue_token,
-                "department_name": v.department.name if v.department else "General Medicine",
-                "doctor_name": doc_user.full_name if doc_user else "Physician",
-                "status": v.status,
-                "triage_priority": v.triage_priority,
-                "diagnosis": (cr.final_diagnosis or cr.provisional_diagnosis) if cr else None,
-                "bill_status": bill.payment_status if bill else "UNBILLED",
-                "bill_amount": float(bill.paid_amount) if bill and bill.paid_amount else float(v.consultation_fee or 500.0),
-                "timestamp": v.visit_date.isoformat() if v.visit_date else None,
-                "action_badge": v.status,
-            })
+        history_items = [_serialize_visit_item(v, db) for v in visits]
 
         all_bills_paid = db.query(func.sum(Bill.paid_amount)).filter(Bill.paid_amount > 0).scalar() or 0.0
         all_tx_paid = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED").scalar() or 0.0
@@ -531,3 +496,127 @@ def get_role_history(
             },
             message="Master hospital history retrieved"
         )
+
+
+@router.get("/patient/{patient_identifier}", summary="Get Full Appointment and Medical History by Patient ID/UHID/Phone")
+def get_patient_appointment_history(
+    patient_identifier: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Lookup a patient by Patient UUID, UHID, Hospital Registration Number, or Phone,
+    and return their complete historical appointments, clinical diagnoses, vitals,
+    prescriptions, and billing transactions.
+    """
+    clean_id = (patient_identifier or "").strip()
+    if not clean_id:
+        raise HTTPException(status_code=400, detail="Patient identifier is required")
+
+    # Find the patient
+    patient = db.query(Patient).filter(
+        or_(
+            Patient.id == clean_id,
+            Patient.uhid == clean_id,
+            Patient.uhid.ilike(f"%{clean_id}%"),
+            Patient.hospital_reg_num == clean_id,
+            Patient.hospital_reg_num.ilike(f"%{clean_id}%"),
+            Patient.phone == clean_id,
+            Patient.barcode_value == clean_id,
+        )
+    ).first()
+
+    if not patient:
+        # Try numeric matching
+        clean_digits = "".join(filter(str.isdigit, clean_id))
+        if len(clean_digits) >= 10:
+            patient = db.query(Patient).filter(Patient.phone.ilike(f"%{clean_digits[-10:]}%")).first()
+
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Patient with identifier '{patient_identifier}' not found in hospital registry",
+        )
+
+    # Fetch all appointments/visits for this patient
+    visits = (
+        db.query(OPDVisit)
+        .filter(OPDVisit.patient_id == patient.id)
+        .order_by(OPDVisit.visit_date.desc(), OPDVisit.created_at.desc())
+        .all()
+    )
+
+    appointment_items = [_serialize_visit_item(v, db, pat=patient) for v in visits]
+
+    total_visits = len(visits)
+    completed_visits = sum(1 for v in visits if v.status == "COMPLETED")
+    ongoing_visits = sum(1 for v in visits if v.status in ["REGISTERED", "TRIAGED", "IN_CONSULTATION"])
+    total_spent = sum(float(v.consultation_fee or 500.0) for v in visits if v.status == "COMPLETED")
+
+    return success_response(
+        data={
+            "patient": {
+                "id": patient.id,
+                "uhid": patient.uhid,
+                "hospital_reg_num": patient.hospital_reg_num,
+                "full_name": patient.full_name,
+                "gender": patient.gender,
+                "age_years": patient.age_years,
+                "phone": patient.phone,
+                "email": patient.email,
+                "blood_group": patient.blood_group,
+                "address": patient.address,
+                "city": patient.city,
+                "state": patient.state,
+                "postal_code": patient.postal_code,
+                "registration_date": patient.registration_date.isoformat() if patient.registration_date else None,
+            },
+            "summary": {
+                "total_appointments": total_visits,
+                "completed_appointments": completed_visits,
+                "ongoing_appointments": ongoing_visits,
+                "total_fees_paid": total_spent,
+            },
+            "appointments": appointment_items,
+        },
+        message=f"Appointment and clinical history for {patient.full_name} ({patient.uhid}) retrieved successfully",
+    )
+
+
+@router.get("/appointments", summary="List All Patient Appointments and Visits")
+def list_appointments_history(
+    patient_id: Optional[str] = Query(None, description="Patient UUID, UHID, or Reg Number"),
+    doctor_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Search and retrieve appointment history across all registered hospital visits.
+    """
+    q = db.query(OPDVisit).join(Patient, OPDVisit.patient_id == Patient.id, isouter=True)
+
+    if doctor_id:
+        q = q.filter(OPDVisit.doctor_id == doctor_id)
+    if status:
+        q = q.filter(OPDVisit.status == status.upper())
+
+    search_filters = _build_search_and_patient_filter(search=search, patient_id=patient_id)
+    for f in search_filters:
+        q = q.filter(f)
+
+    total_records = q.count()
+    visits = q.order_by(OPDVisit.visit_date.desc(), OPDVisit.queue_token.desc()).offset(skip).limit(limit).all()
+
+    items = [_serialize_visit_item(v, db) for v in visits]
+
+    return success_response(
+        data={
+            "total": total_records,
+            "items": items,
+        },
+        message="Appointments history retrieved successfully",
+    )

@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/opd_constants.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../visits/models/visit_model.dart';
+import '../../visits/providers/visit_provider.dart';
 import '../models/prescription_model.dart';
 import '../providers/prescription_provider.dart';
 
@@ -444,6 +445,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
       await ref.read(prescriptionRepositoryProvider).createPrescription(rx);
       ref.invalidate(prescriptionListProvider(widget.visitId));
+      ref.invalidate(visitListProvider);
 
       setState(() {
         _newItems.clear();
@@ -563,6 +565,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
                         items: itemsToAmend,
                       );
                   ref.invalidate(prescriptionListProvider(widget.visitId));
+                  ref.invalidate(visitListProvider);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(

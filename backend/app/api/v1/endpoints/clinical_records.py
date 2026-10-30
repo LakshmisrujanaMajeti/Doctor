@@ -138,6 +138,17 @@ def create_clinical_record(
         db.commit()
         db.refresh(record)
 
+        if target_status == "FINALIZED":
+            try:
+                from app.services.notification_service import NotificationService
+                NotificationService.notify_consultation_completed(
+                    db=db,
+                    visit=visit,
+                    doctor_name=current_user.full_name,
+                )
+            except Exception:
+                pass
+
     # Audit
     db.add(
         AuditLog(
@@ -193,6 +204,17 @@ def sign_clinical_record(
     )
     db.commit()
     db.refresh(record)
+
+    if visit:
+        try:
+            from app.services.notification_service import NotificationService
+            NotificationService.notify_consultation_completed(
+                db=db,
+                visit=visit,
+                doctor_name=current_user.full_name,
+            )
+        except Exception:
+            pass
 
     return success_response(
         data=ClinicalRecordRead.model_validate(record).model_dump(),

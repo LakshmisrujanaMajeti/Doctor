@@ -41,11 +41,20 @@ class OpdDatePickerField extends StatelessWidget {
         InkWell(
           onTap: () async {
             final now = DateTime.now();
+            final effectiveLastDate = lastDate ?? now;
+            final effectiveFirstDate = firstDate ?? DateTime(1900);
+            DateTime effectiveInitial = selectedDate ?? (now.isAfter(effectiveLastDate) ? effectiveLastDate : now);
+            if (effectiveInitial.isAfter(effectiveLastDate)) {
+              effectiveInitial = effectiveLastDate;
+            }
+            if (effectiveInitial.isBefore(effectiveFirstDate)) {
+              effectiveInitial = effectiveFirstDate;
+            }
             final picked = await showDatePicker(
               context: context,
-              initialDate: selectedDate ?? now,
-              firstDate: firstDate ?? DateTime(1920),
-              lastDate: lastDate ?? DateTime(2035),
+              initialDate: effectiveInitial,
+              firstDate: effectiveFirstDate,
+              lastDate: effectiveLastDate,
               builder: (context, child) {
                 return Theme(
                   data: Theme.of(context).copyWith(

@@ -182,8 +182,23 @@ def create_prescription(
             )
             db.add(rx_item)
 
+        if target_status == "SIGNED":
+            visit.status = "COMPLETED"
+            db.add(visit)
+
         db.commit()
         db.refresh(rx)
+
+        if target_status == "SIGNED":
+            try:
+                from app.services.notification_service import NotificationService
+                NotificationService.notify_consultation_completed(
+                    db=db,
+                    visit=visit,
+                    doctor_name=current_user.full_name,
+                )
+            except Exception:
+                pass
         rx_data = PrescriptionRead.model_validate(rx).model_dump()
         resp_body = {
             "status": "success",
@@ -237,8 +252,25 @@ def sign_prescription(
     rx.signed_by_user_id = current_user.id
     rx.signed_at = datetime.utcnow()
 
+    visit = db.query(OPDVisit).filter(OPDVisit.id == rx.visit_id).first()
+    if visit and visit.status != "COMPLETED":
+        visit.status = "COMPLETED"
+        db.add(visit)
+
     db.commit()
     db.refresh(rx)
+
+    if visit:
+        try:
+            from app.services.notification_service import NotificationService
+            NotificationService.notify_consultation_completed(
+                db=db,
+                visit=visit,
+                doctor_name=current_user.full_name,
+            )
+        except Exception:
+            pass
+
     return success_response(
         data=PrescriptionRead.model_validate(rx).model_dump(),
         message="Prescription signed and finalized successfully"

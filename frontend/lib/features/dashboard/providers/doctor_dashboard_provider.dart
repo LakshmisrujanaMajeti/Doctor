@@ -18,7 +18,9 @@ final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async
   // 1. Fetch official doctor dashboard from backend (strictly isolated per doctor on backend)
   if (DioClient.isHostReachable) {
     try {
-      final response = await dioClient.dio.get(ApiEndpoints.doctorMyDashboard);
+      final response = await dioClient.dio
+          .get(ApiEndpoints.doctorMyDashboard)
+          .timeout(const Duration(milliseconds: 1500));
       if (response.data is Map && response.data['status'] == 'success') {
         return DoctorDashboardModel.fromJson(response.data['data'] as Map<String, dynamic>);
       }
@@ -45,9 +47,14 @@ final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async
       myDocProfile = d;
       break;
     }
-    if (docEmail.isNotEmpty && d.name.toLowerCase().contains(docEmail.split('@')[0])) {
-      myDocProfile = d;
-      break;
+    final emailPrefix = docEmail.isNotEmpty ? docEmail.split('@')[0] : '';
+    if (emailPrefix.isNotEmpty) {
+      if (d.name.toLowerCase().contains(emailPrefix) ||
+          d.departmentName.toLowerCase().contains(emailPrefix) ||
+          d.specialization.toLowerCase().contains(emailPrefix)) {
+        myDocProfile = d;
+        break;
+      }
     }
   }
 
@@ -62,9 +69,11 @@ final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async
     if (vDocId.isNotEmpty) {
       if (vDocId == docId || vDocId.contains(docId) || docId.contains(vDocId)) return true;
       if (myDocProfile != null && (vDocId == myDocProfile.id.toLowerCase() || vDocId.contains(myDocProfile.id.toLowerCase()))) return true;
+      // If visit is explicitly assigned to another doctor, do not steal it
+      return false;
     }
 
-    // Name match
+    // Direct Doctor Name match
     if (vDocName.isNotEmpty && docName.isNotEmpty) {
       final cleanV = vDocName.replaceAll(RegExp(r'^(dr\.?|doctor)\s*', caseSensitive: false), '').trim();
       final cleanU = docName.replaceAll(RegExp(r'^(dr\.?|doctor)\s*', caseSensitive: false), '').trim();
@@ -73,27 +82,12 @@ final doctorDashboardProvider = FutureProvider<DoctorDashboardModel>((ref) async
       }
     }
 
-    // Match doctor profile department
-    if (myDocProfile != null) {
+    // Only if unassigned to a specific doctor: match department
+    if (vDocId.isEmpty && myDocProfile != null) {
       if (vDept.isNotEmpty && myDocProfile.departmentName.toLowerCase().contains(vDept)) return true;
       if (vDept.isNotEmpty && vDept.contains(myDocProfile.departmentName.toLowerCase())) return true;
       if (vDeptId.isNotEmpty && vDeptId == myDocProfile.departmentId.toLowerCase()) return true;
     }
-
-    // Department match based on doctor specialty email
-    if (docEmail.contains('pulmon') && vDept.contains('pulmon')) return true;
-    if (docEmail.contains('cardio') && vDept.contains('cardio')) return true;
-    if (docEmail.contains('pediatric') && vDept.contains('pediatric')) return true;
-    if (docEmail.contains('ortho') && vDept.contains('ortho')) return true;
-    if (docEmail.contains('derma') && vDept.contains('derma')) return true;
-    if (docEmail.contains('gastro') && vDept.contains('gastro')) return true;
-    if (docEmail.contains('neuro') && vDept.contains('neuro')) return true;
-    if (docEmail.contains('onco') && vDept.contains('onco')) return true;
-    if (docEmail.contains('nephro') && vDept.contains('nephro')) return true;
-    if (docEmail.contains('gynec') && vDept.contains('gynec')) return true;
-    if (docEmail.contains('dent') && vDept.contains('dent')) return true;
-    if (docEmail.contains('ent') && vDept.contains('ent')) return true;
-    if (docEmail == 'doctor@smvmch.ac.in' && (vDept.contains('general') || vDept.isEmpty)) return true;
 
     return false;
   }).toList();

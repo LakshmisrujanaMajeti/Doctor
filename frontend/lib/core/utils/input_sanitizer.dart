@@ -84,22 +84,32 @@ class InputSanitizer {
     return digits;
   }
 
-  /// Check whether phone contains exactly 10 digits
+  /// Check whether phone contains exactly 10 digits starting with 6-9
   static bool isValid10DigitPhone(String? input) {
     if (input == null) return false;
-    final digits = extract10DigitPhone(input);
-    return RegExp(r'^\d{10}$').hasMatch(digits);
+    final trimmed = input.trim();
+    if (RegExp(r'[a-zA-Z]').hasMatch(trimmed)) return false;
+    final digits = extract10DigitPhone(trimmed);
+    return RegExp(r'^[6-9]\d{9}$').hasMatch(digits);
   }
 
-  /// Validate phone number to ensure exactly 10 digits
+  /// Validate phone number to ensure exactly 10 digits starting with 6-9
   static String? validate10DigitPhone(String? input, {bool isRequired = true, String? fieldName}) {
     final label = fieldName ?? 'Phone number';
     if (input == null || input.trim().isEmpty) {
       if (isRequired) return '$label is required';
       return null;
     }
-    if (!isValid10DigitPhone(input)) {
+    final trimmed = input.trim();
+    if (RegExp(r'[a-zA-Z]').hasMatch(trimmed)) {
+      return '$label cannot contain letters';
+    }
+    final digits = extract10DigitPhone(trimmed);
+    if (digits.length != 10) {
       return '$label must be exactly 10 digits';
+    }
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) {
+      return 'Enter a valid 10-digit Indian $label (starts with 6-9)';
     }
     return null;
   }

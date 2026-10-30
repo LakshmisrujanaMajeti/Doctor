@@ -15,11 +15,11 @@ from app.core.responses import success_response
 from app.core.dependencies import require_roles, get_current_user
 from app.core.exceptions import NotFoundException, ForbiddenException, BadRequestException
 from app.models.patient import Patient
-from app.models.visit import OPDVisit
+from app.models.visit import OPDVisit, VitalSigns
 from app.models.doctor import Doctor
 from app.models.department import Department
 from app.models.audit import AuditLog
-from app.models.user import User, Role, Permission, RefreshTokenSession
+from app.models.user import User, Role, Permission
 from app.models.billing import Bill, BillItem, PaymentTransaction
 from app.models.pharmacy import MedicineInventory
 from app.models.laboratory import LabOrder
@@ -55,59 +55,41 @@ def get_admin_stats(
     db: Session = Depends(get_db),
 ):
     today_start = datetime.combine(date.today(), datetime.min.time())
-    
-    # Patient Footfall & Visits
-    total_patients = db.query(func.count(Patient.id)).scalar() or 0
-    today_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.visit_date >= today_start).scalar() or 0
-    total_visits = db.query(func.count(OPDVisit.id)).scalar() or 0
-    effective_visits = today_visits if today_visits > 0 else total_visits
+    yesterday_start = today_start - timedelta(days=1)
 
+    total_patients = db.query(func.count(Patient.id)).scalar() or 0
+    today_registered = db.query(func.count(Patient.id)).filter(Patient.created_at >= today_start).scalar() or 0
+    yesterday_registered = db.query(func.count(Patient.id)).filter(Patient.created_at >= yesterday_start, Patient.created_at < today_start).scalar() or 0
+
+    today_triaged_vitals = db.query(func.count(VitalSigns.id)).filter(VitalSigns.recorded_at >= today_start).scalar() or 0
+    yesterday_triaged_vitals = db.query(func.count(VitalSigns.id)).filter(VitalSigns.recorded_at >= yesterday_start, VitalSigns.recorded_at < today_start).scalar() or 0
+    total_triaged_vitals = db.query(func.count(VitalSigns.id)).scalar() or 0
+
+    total_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.visit_date >= today_start).scalar() or 0
     active_doctors = db.query(func.count(Doctor.id)).filter(Doctor.is_available == True).scalar() or 0
     departments = db.query(func.count(Department.id)).filter(Department.is_active == True).scalar() or 0
-
-    # Queue breakdowns (both today and overall)
-    waiting_today = db.query(func.count(OPDVisit.id)).filter(
+    waiting = db.query(func.count(OPDVisit.id)).filter(
         OPDVisit.visit_date >= today_start,
         OPDVisit.status.in_(["WAITING", "REGISTERED"])
     ).scalar() or 0
-    waiting_all = db.query(func.count(OPDVisit.id)).filter(
-        OPDVisit.status.in_(["WAITING", "REGISTERED"])
-    ).scalar() or 0
-    waiting = waiting_today if today_visits > 0 else waiting_all
-
-    triaged_today = db.query(func.count(OPDVisit.id)).filter(
+    triaged = db.query(func.count(OPDVisit.id)).filter(
         OPDVisit.visit_date >= today_start,
         OPDVisit.status == "TRIAGED"
     ).scalar() or 0
-    triaged_all = db.query(func.count(OPDVisit.id)).filter(
-        OPDVisit.status == "TRIAGED"
-    ).scalar() or 0
-    triaged = triaged_today if today_visits > 0 else triaged_all
-
-    completed_today = db.query(func.count(OPDVisit.id)).filter(
+    completed = db.query(func.count(OPDVisit.id)).filter(
         OPDVisit.visit_date >= today_start,
         OPDVisit.status == "COMPLETED"
     ).scalar() or 0
-    completed_all = db.query(func.count(OPDVisit.id)).filter(
-        OPDVisit.status == "COMPLETED"
-    ).scalar() or 0
-    completed = completed_today if today_visits > 0 else completed_all
-
-    # Sign-up & Sign-in live tracking
-    total_staff = db.query(func.count(User.id)).scalar() or 0
-    total_signups = total_patients + total_staff
-    
-    signins_today = db.query(func.count(RefreshTokenSession.id)).filter(RefreshTokenSession.created_at >= today_start).scalar() or 0
-    active_sessions = db.query(func.count(RefreshTokenSession.id)).filter(
-        RefreshTokenSession.is_revoked == False,
-        RefreshTokenSession.expires_at > datetime.utcnow()
-    ).scalar() or 0
-    total_signins = db.query(func.count(RefreshTokenSession.id)).scalar() or 0
 
     return success_response(
         data={
             "total_patients": total_patients,
-            "total_visits": effective_visits,
+            "today_registered_patients": today_registered,
+            "yesterday_registered_patients": yesterday_registered,
+            "today_triaged_vitals": today_triaged_vitals,
+            "yesterday_triaged_vitals": yesterday_triaged_vitals,
+            "total_triaged_vitals": total_triaged_vitals,
+            "total_visits": total_visits,
             "active_doctors": active_doctors,
             "departments": departments,
             "waiting": waiting,
@@ -122,14 +104,8 @@ def get_admin_stats(
                 "TRIAGE": triaged,
                 "COMPLETED": completed,
             },
-            "total_signups": total_signups,
-            "patient_signups": total_patients,
-            "staff_signups": total_staff,
-            "total_signins_today": signins_today,
-            "total_signins": total_signins,
-            "active_sessions": active_sessions,
         },
-        message="Live operational stats retrieved successfully"
+        message="Live operational stats retrieved successfully",
     )
 
 @router.get("/dashboard-summary", summary="Comprehensive Hospital Operational Dashboard")
@@ -154,70 +130,18 @@ def get_operational_dashboard_summary(
     active_doctors = db.query(func.count(Doctor.id)).filter(Doctor.is_available == True).scalar() or 0
 
     # Billing & Financial Collections
-    tx_today = (
+    revenue_today = (
         db.query(func.sum(PaymentTransaction.amount))
         .filter(PaymentTransaction.payment_status == "COMPLETED", PaymentTransaction.created_at >= today_start)
         .scalar()
         or 0.0
     )
-    bills_paid_today = (
-        db.query(func.sum(Bill.paid_amount))
-        .filter(Bill.payment_status.in_(["PAID", "PARTIAL"]), Bill.billed_at >= today_start)
-        .scalar()
-        or 0.0
-    )
-    all_bills_paid = db.query(func.sum(Bill.paid_amount)).filter(Bill.paid_amount > 0).scalar() or 0.0
-    all_tx_paid = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED").scalar() or 0.0
-
-    # Grand Total Collections (all-time completed payments / bills)
-    all_bills_paid = db.query(func.sum(Bill.paid_amount)).filter(Bill.paid_amount > 0).scalar() or 0.0
-    all_tx_paid = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED").scalar() or 0.0
-    grand_total_revenue = float(max(all_bills_paid, all_tx_paid))
-
-    # Yesterday's bill payments & count
-    yesterday_start = today_start - timedelta(days=1)
-    yesterday_end = today_start
-    tx_yesterday = (
-        db.query(func.sum(PaymentTransaction.amount))
-        .filter(PaymentTransaction.payment_status == "COMPLETED", PaymentTransaction.created_at >= yesterday_start, PaymentTransaction.created_at < yesterday_end)
-        .scalar() or 0.0
-    )
-    bills_yesterday = (
-        db.query(func.sum(Bill.paid_amount))
-        .filter(Bill.payment_status.in_(["PAID", "PARTIAL"]), Bill.billed_at >= yesterday_start, Bill.billed_at < yesterday_end)
-        .scalar() or 0.0
-    )
-    yesterday_revenue = float(max(tx_yesterday, bills_yesterday))
-    yesterday_bills_count = db.query(func.count(Bill.id)).filter(
-        Bill.payment_status.in_(["PAID", "PARTIAL"]),
-        Bill.billed_at >= yesterday_start,
-        Bill.billed_at < yesterday_end
-    ).scalar() or 0
-
-    today_bills_count = db.query(func.count(Bill.id)).filter(
-        Bill.payment_status.in_(["PAID", "PARTIAL"]),
-        Bill.billed_at >= today_start
-    ).scalar() or 0
-
-    # Maximize across transaction and invoice payment tracking to ensure no collections are missed
-    revenue_today = max(float(tx_today), float(bills_paid_today))
-    if revenue_today == 0.0 and (all_bills_paid > 0 or all_tx_paid > 0):
-        # Graceful fallback to total collections if records were seeded or recorded across midnight
-        revenue_today = float(max(all_bills_paid, all_tx_paid))
-
-    tx_month = (
+    revenue_month = (
         db.query(func.sum(PaymentTransaction.amount))
         .filter(PaymentTransaction.payment_status == "COMPLETED", PaymentTransaction.created_at >= month_start)
         .scalar()
         or 0.0
     )
-    bills_paid_month = (
-        db.query(func.sum(Bill.paid_amount))
-        .filter(Bill.payment_status.in_(["PAID", "PARTIAL"]), Bill.billed_at >= month_start)
-        .scalar()
-        or 0.0
-    )
-    revenue_month = max(float(tx_month), float(bills_paid_month), float(revenue_today), float(all_bills_paid), float(all_tx_paid))
 
     pending_bills = db.query(Bill).filter(Bill.payment_status.in_(["UNPAID", "PARTIAL"])).all()
     pending_bills_count = len(pending_bills)
@@ -231,16 +155,6 @@ def get_operational_dashboard_summary(
         .all()
     )
     revenue_by_method = {m[0]: float(m[1]) for m in methods_today}
-    if not revenue_by_method:
-        bill_methods = (
-            db.query(Bill.payment_method, func.sum(Bill.paid_amount))
-            .filter(Bill.paid_amount > 0)
-            .group_by(Bill.payment_method)
-            .all()
-        )
-        revenue_by_method = {str(m[0] or "CASH"): float(m[1]) for m in bill_methods if m[1]}
-    if not revenue_by_method and revenue_today > 0:
-        revenue_by_method = {"CASH": float(revenue_today)}
 
     # Pharmacy Inventory Alerts
     low_stock_count = db.query(MedicineInventory).filter(MedicineInventory.available_quantity <= MedicineInventory.reorder_level).count()
@@ -283,10 +197,6 @@ def get_operational_dashboard_summary(
         active_doctors_count=active_doctors,
         revenue_today=float(revenue_today),
         revenue_month=float(revenue_month),
-        grand_total_revenue=float(grand_total_revenue),
-        yesterday_revenue=float(yesterday_revenue),
-        today_bills_count=today_bills_count,
-        yesterday_bills_count=yesterday_bills_count,
         pending_bills_count=pending_bills_count,
         pending_bills_amount=float(pending_bills_amount),
         revenue_by_method=revenue_by_method,
@@ -299,106 +209,42 @@ def get_operational_dashboard_summary(
         staff_by_role=staff_by_role,
         inactive_accounts_count=inactive_accounts,
         locked_accounts_count=locked_accounts,
-        total_signups=total_registered + total_staff,
-        total_signins_today=db.query(func.count(RefreshTokenSession.id)).filter(RefreshTokenSession.created_at >= today_start).scalar() or 0,
-        active_sessions=db.query(func.count(RefreshTokenSession.id)).filter(
-            RefreshTokenSession.is_revoked == False,
-            RefreshTokenSession.expires_at > datetime.utcnow()
-        ).scalar() or 0,
     )
 
     return success_response(data=metrics.model_dump(), message="Operational dashboard summaries retrieved")
 
 
-@router.get("/billing-history", summary="Comprehensive Hospital Patient Billing History (Admin Only)")
-def get_admin_billing_history(
-    date_filter: Optional[str] = Query(None, description="today, yesterday, month, or all"),
-    search: Optional[str] = Query(None),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+@router.get("/metrics/summary", summary="OPD Hospital Statistics & Metrics (Legacy/Summary)")
+def get_dashboard_stats(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "billing"])),
+    current_user: User = Depends(require_roles(["admin"])),
 ):
-    """Returns comprehensive hospital billing ledger including grand totals, yesterday's payments, and line items."""
-    today_start = datetime.combine(date.today(), datetime.min.time())
-    yesterday_start = today_start - timedelta(days=1)
-    yesterday_end = today_start
+    total_patients = db.query(func.count(Patient.id)).scalar() or 0
+    total_visits = db.query(func.count(OPDVisit.id)).scalar() or 0
+    active_doctors = db.query(func.count(Doctor.id)).filter(Doctor.is_available == True).scalar() or 0
+    departments = db.query(func.count(Department.id)).filter(Department.is_active == True).scalar() or 0
 
-    # Grand Totals
-    all_bills_paid = db.query(func.sum(Bill.paid_amount)).filter(Bill.paid_amount > 0).scalar() or 0.0
-    all_tx_paid = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED").scalar() or 0.0
-    grand_total_revenue = float(max(all_bills_paid, all_tx_paid))
-
-    tx_today = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED", PaymentTransaction.created_at >= today_start).scalar() or 0.0
-    bills_today = db.query(func.sum(Bill.paid_amount)).filter(Bill.payment_status.in_(["PAID", "PARTIAL"]), Bill.billed_at >= today_start).scalar() or 0.0
-    today_revenue = float(max(tx_today, bills_today))
-    today_bills_count = db.query(func.count(Bill.id)).filter(Bill.billed_at >= today_start).scalar() or 0
-
-    tx_yesterday = db.query(func.sum(PaymentTransaction.amount)).filter(PaymentTransaction.payment_status == "COMPLETED", PaymentTransaction.created_at >= yesterday_start, PaymentTransaction.created_at < yesterday_end).scalar() or 0.0
-    bills_yesterday = db.query(func.sum(Bill.paid_amount)).filter(Bill.payment_status.in_(["PAID", "PARTIAL"]), Bill.billed_at >= yesterday_start, Bill.billed_at < yesterday_end).scalar() or 0.0
-    yesterday_revenue = float(max(tx_yesterday, bills_yesterday))
-    yesterday_bills_count = db.query(func.count(Bill.id)).filter(Bill.billed_at >= yesterday_start, Bill.billed_at < yesterday_end).scalar() or 0
-
-    # Query Bills
-    q = db.query(Bill).join(Patient, Bill.patient_id == Patient.id, isouter=True)
-    if date_filter == "today":
-        q = q.filter(Bill.billed_at >= today_start)
-    elif date_filter == "yesterday":
-        q = q.filter(Bill.billed_at >= yesterday_start, Bill.billed_at < yesterday_end)
-
-    if search and search.strip():
-        term = f"%{search.strip()}%"
-        q = q.filter(
-            or_(
-                Bill.bill_number.ilike(term),
-                Patient.full_name.ilike(term),
-                Patient.uhid.ilike(term),
-            )
-        )
-
-    total_count = q.count()
-    bills = q.order_by(Bill.billed_at.desc()).offset(skip).limit(limit).all()
-
-    items = []
-    for b in bills:
-        pat = b.patient
-        v = b.visit
-        cashier = b.billed_by_user
-        items.append({
-            "id": b.id,
-            "bill_number": b.bill_number,
-            "patient_id": b.patient_id,
-            "patient_name": pat.full_name if pat else "Walk-in Patient",
-            "patient_uhid": pat.uhid if pat else "N/A",
-            "visit_id": b.visit_id,
-            "visit_number": v.visit_number if v else "N/A",
-            "department_name": (v.department.name if v and v.department else "General"),
-            "doctor_name": (v.doctor.user.full_name if v and v.doctor and v.doctor.user else "Consulting Doctor"),
-            "total_amount": float(b.total_amount or 0.0),
-            "discount_amount": float(b.discount_amount or 0.0),
-            "tax_amount": float(b.tax_amount or 0.0),
-            "paid_amount": float(b.paid_amount or 0.0),
-            "pending_amount": float(b.pending_amount or 0.0),
-            "payment_status": b.payment_status,
-            "payment_method": b.payment_method or "CASH",
-            "billed_at": b.billed_at.isoformat() if b.billed_at else None,
-            "cashier_name": cashier.full_name if cashier else "OPD Cashier",
-            "items_count": len(b.items) if b.items else 0,
-        })
+    registered_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.status == "REGISTERED").scalar() or 0
+    triaged_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.status == "TRIAGED").scalar() or 0
+    completed_visits = db.query(func.count(OPDVisit.id)).filter(OPDVisit.status == "COMPLETED").scalar() or 0
 
     return success_response(
         data={
-            "summary": {
-                "grand_total_revenue": grand_total_revenue,
-                "today_revenue": today_revenue,
-                "yesterday_revenue": yesterday_revenue,
-                "today_bills_count": today_bills_count,
-                "yesterday_bills_count": yesterday_bills_count,
-                "total_bills_count": total_count,
-            },
-            "bills": items,
+            "total_patients": total_patients,
+            "total_visits": total_visits,
+            "active_doctors": active_doctors,
+            "departments": departments,
+            "queue_breakdown": {
+                "waiting": registered_visits,
+                "triaged": triaged_visits,
+                "completed": completed_visits,
+                "WAITING": registered_visits,
+                "TRIAGED": triaged_visits,
+                "TRIAGE": triaged_visits,
+                "COMPLETED": completed_visits,
+            }
         },
-        message="Hospital billing history retrieved successfully"
+        message="Hospital OPD statistics retrieved"
     )
 
 
@@ -412,28 +258,14 @@ def list_hospital_users(
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(150, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"])),
 ):
     q = db.query(User).join(Role, User.role_id == Role.id, isouter=True)
 
     if role and role.strip():
-        r_name = role.strip().lower()
-        if r_name == "doctor":
-            q = q.filter(Role.name == "doctor")
-        elif r_name in ["receptionist", "reception"]:
-            q = q.filter(Role.name.in_(["receptionist", "reception"]))
-        elif r_name in ["lab_technician", "lab_tech", "laboratory"]:
-            q = q.filter(Role.name.in_(["lab_technician", "lab_tech", "laboratory"]))
-        elif r_name == "pharmacist":
-            q = q.filter(Role.name == "pharmacist")
-        elif r_name == "nurse":
-            q = q.filter(Role.name == "nurse")
-        elif r_name == "admin":
-            q = q.filter(Role.name == "admin")
-        else:
-            q = q.filter(Role.name == r_name)
+        q = q.filter(Role.name == role.strip().lower())
 
     if is_active is not None:
         q = q.filter(User.is_active == is_active)
@@ -443,32 +275,8 @@ def list_hospital_users(
         q = q.filter(or_(User.full_name.ilike(term), User.email.ilike(term), User.phone.ilike(term)))
 
     users = q.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
-
-    user_list = []
-    for u in users:
-        d = UserRead.model_validate(u).model_dump()
-        role_str = u.role.name if u.role else "staff"
-        d["role_name"] = role_str
-        d["role"] = {"id": u.role.id, "name": role_str} if u.role else {"name": role_str}
-        # Look up doctor profile
-        doc = db.query(Doctor).filter(or_(Doctor.user_id == u.id, Doctor.id == u.id)).first()
-        if not doc and u.email:
-            prefix = u.email.split("@")[0].lower()
-            doc = db.query(Doctor).filter(Doctor.specialization.ilike(f"%{prefix}%")).first()
-        if doc:
-            d["doctor_id"] = doc.id
-            d["department_id"] = doc.department_id
-            d["department_name"] = doc.department.name if doc.department else "Specialty Clinic"
-            d["specialization"] = doc.specialization
-            d["qualification"] = doc.qualification
-            d["room_number"] = doc.room_number or "Cabin 101"
-            d["consultation_fee"] = str(doc.consultation_fee or "500.00")
-            d["registration_number"] = doc.registration_number
-            d["is_available"] = doc.is_available
-        user_list.append(d)
-
     return success_response(
-        data=user_list,
+        data=[UserRead.model_validate(u).model_dump() for u in users],
         message="Hospital users retrieved"
     )
 

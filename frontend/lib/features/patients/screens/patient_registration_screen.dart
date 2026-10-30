@@ -112,6 +112,30 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
     _ageMonthsController.text = months >= 0 ? months.toString() : '0';
   }
 
+  void _onAgeChanged() {
+    final text = _ageYearsController.text.trim();
+    if (text.isNotEmpty) {
+      final years = int.tryParse(text);
+      if (years != null && years >= 0 && years <= 130) {
+        final months = int.tryParse(_ageMonthsController.text.trim()) ?? 0;
+        final now = DateTime.now();
+        int birthYear = now.year - years;
+        int birthMonth = now.month - months;
+        if (birthMonth <= 0) {
+          birthYear--;
+          birthMonth += 12;
+        }
+        final approxDob = DateTime(birthYear, birthMonth.clamp(1, 12), now.day.clamp(1, 28));
+        if (!approxDob.isAfter(now)) {
+          setState(() {
+            _selectedDob = approxDob;
+            _dobController.text = "${approxDob.year}-${approxDob.month.toString().padLeft(2, '0')}-${approxDob.day.toString().padLeft(2, '0')}";
+          });
+        }
+      }
+    }
+  }
+
   Future<void> _selectDateOfBirth() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -1246,51 +1270,108 @@ class _PatientRegistrationScreenState extends ConsumerState<PatientRegistrationS
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: InkWell(
-                  onTap: _selectDateOfBirth,
-                  child: IgnorePointer(
-                    child: OPDTextField(
-                      controller: _dobController,
-                      label: 'Date of Birth',
-                      hint: 'YYYY-MM-DD',
-                      prefixIcon: const Icon(Icons.calendar_today),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 420) {
+                return Column(
+                  children: [
+                    InkWell(
+                      onTap: _selectDateOfBirth,
+                      child: IgnorePointer(
+                        child: OPDTextField(
+                          controller: _dobController,
+                          label: 'Date of Birth',
+                          hint: 'YYYY-MM-DD',
+                          prefixIcon: const Icon(Icons.calendar_today),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OPDTextField(
+                            controller: _ageYearsController,
+                            label: 'Age (Y)',
+                            hint: 'Years',
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3),
+                            ],
+                            validator: (v) => FieldValidators.validateAge(v, isRequired: false),
+                            onChanged: (_) => _onAgeChanged(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OPDTextField(
+                            controller: _ageMonthsController,
+                            label: 'Months',
+                            hint: '0-11',
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(2),
+                            ],
+                            validator: (v) => FieldValidators.validateAgeMonths(v),
+                            onChanged: (_) => _onAgeChanged(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: InkWell(
+                      onTap: _selectDateOfBirth,
+                      child: IgnorePointer(
+                        child: OPDTextField(
+                          controller: _dobController,
+                          label: 'Date of Birth',
+                          hint: 'YYYY-MM-DD',
+                          prefixIcon: const Icon(Icons.calendar_today),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OPDTextField(
-                  controller: _ageYearsController,
-                  label: 'Age (Y)',
-                  hint: 'Years',
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(3),
-                  ],
-                  validator: (v) => FieldValidators.validateAge(v, isRequired: false),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OPDTextField(
-                  controller: _ageMonthsController,
-                  label: 'Months',
-                  hint: '0-11',
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(2),
-                  ],
-                  validator: (v) => FieldValidators.validateAgeMonths(v),
-                ),
-              ),
-            ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OPDTextField(
+                      controller: _ageYearsController,
+                      label: 'Age (Y)',
+                      hint: 'Years',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(3),
+                      ],
+                      validator: (v) => FieldValidators.validateAge(v, isRequired: false),
+                      onChanged: (_) => _onAgeChanged(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OPDTextField(
+                      controller: _ageMonthsController,
+                      label: 'Months',
+                      hint: '0-11',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(2),
+                      ],
+                      validator: (v) => FieldValidators.validateAgeMonths(v),
+                      onChanged: (_) => _onAgeChanged(),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           const Text('Sex / Gender *', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),

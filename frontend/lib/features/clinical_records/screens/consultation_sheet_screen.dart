@@ -11,6 +11,10 @@ import '../../../shared/widgets/triage_chip.dart';
 import '../../visits/models/visit_model.dart';
 import '../../visits/models/vitals_model.dart';
 import '../../visits/providers/visit_provider.dart';
+import '../../visits/repositories/visit_repository.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
+import '../../dashboard/providers/doctor_dashboard_provider.dart';
+import '../../patients/providers/patient_provider.dart';
 import '../models/clinical_record_model.dart';
 import '../providers/clinical_provider.dart';
 import '../models/consultation_context_model.dart';
@@ -67,16 +71,64 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
   final _followUpController = TextEditingController();
   final _referralController = TextEditingController();
 
+  // 4. Clinical Vitals Controllers (Mandatory if nurse didn't take them)
+  final _systolicController = TextEditingController();
+  final _diastolicController = TextEditingController();
+  final _pulseController = TextEditingController();
+  final _tempController = TextEditingController();
+  final _spo2Controller = TextEditingController();
+  final _respRateController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _heightController = TextEditingController();
+  bool _doctorEditingVitals = false;
+
   bool _isSaving = false;
   bool _isLoaded = false;
   bool _contextExpanded = true;
   ClinicalRecordModel? _currentRecord;
   List<ClinicalAmendmentModel> _amendments = [];
 
+  bool get _hasNurseVitals {
+    final v = widget.visit?.vitals;
+    return v != null &&
+        v.systolicBp != null &&
+        v.diastolicBp != null &&
+        v.pulseRate != null &&
+        v.temperatureF != null &&
+        v.spo2Percent != null;
+  }
+
+  bool get _hasCompleteVitals {
+    if (_hasNurseVitals && !_doctorEditingVitals) return true;
+
+    final sys = int.tryParse(_systolicController.text.trim());
+    final dia = int.tryParse(_diastolicController.text.trim());
+    final pulse = int.tryParse(_pulseController.text.trim());
+    final temp = double.tryParse(_tempController.text.trim());
+    final spo2 = int.tryParse(_spo2Controller.text.trim());
+
+    return sys != null && sys > 0 &&
+           dia != null && dia > 0 &&
+           pulse != null && pulse > 0 &&
+           temp != null && temp > 0 &&
+           spo2 != null && spo2 > 0;
+  }
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    final v = widget.visit?.vitals;
+    if (v != null) {
+      if (v.systolicBp != null) _systolicController.text = v.systolicBp.toString();
+      if (v.diastolicBp != null) _diastolicController.text = v.diastolicBp.toString();
+      if (v.pulseRate != null) _pulseController.text = v.pulseRate.toString();
+      if (v.temperatureF != null) _tempController.text = v.temperatureF.toString();
+      if (v.spo2Percent != null) _spo2Controller.text = v.spo2Percent.toString();
+      if (v.respiratoryRate != null) _respRateController.text = v.respiratoryRate.toString();
+      if (v.weightKg != null) _weightController.text = v.weightKg.toString();
+      if (v.heightCm != null) _heightController.text = v.heightCm.toString();
+    }
   }
 
   @override
@@ -108,6 +160,14 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
     _dietaryAdviceController.dispose();
     _followUpController.dispose();
     _referralController.dispose();
+    _systolicController.dispose();
+    _diastolicController.dispose();
+    _pulseController.dispose();
+    _tempController.dispose();
+    _spo2Controller.dispose();
+    _respRateController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
     super.dispose();
   }
 
@@ -217,8 +277,29 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
 
   Future<void> _handleFinalizeAndSign() async {
     if (!_formKey.currentState!.validate()) {
+      _tabController.animateTo(0);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please provide required assessment & diagnosis fields.')),
+        const SnackBar(content: Text('Please complete required assessment & diagnosis fields.')),
+      );
+      return;
+    }
+
+    if (!_hasCompleteVitals) {
+      _tabController.animateTo(0);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.triageEmergency,
+          duration: Duration(seconds: 4),
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Mandatory Vitals Missing: Please record BP, Pulse, Temperature, and SpO2 before finalizing.'),
+              ),
+            ],
+          ),
+        ),
       );
       return;
     }
@@ -312,17 +393,57 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
   Future<void> _executeFinalizeAndSign() async {
     setState(() => _isSaving = true);
     try {
+      // 1. If doctor entered or edited vitals, save them to the visit
+      if (!_hasNurseVitals || _doctorEditingVitals) {
+        final sys = int.tryParse(_systolicController.text.trim());
+        final dia = int.tryParse(_diastolicController.text.trim());
+        final pulse = int.tryParse(_pulseController.text.trim());
+        final temp = double.tryParse(_tempController.text.trim());
+        final spo2 = double.tryParse(_spo2Controller.text.trim());
+        final rr = int.tryParse(_respRateController.text.trim());
+        final wt = double.tryParse(_weightController.text.trim());
+        final ht = double.tryParse(_heightController.text.trim());
+
+        if (sys != null && dia != null && pulse != null && temp != null && spo2 != null) {
+          final doctorVitals = VitalSignsModel(
+            id: widget.visit?.vitals?.id ?? 'vit-${widget.visitId}',
+            visitId: widget.visitId,
+            systolicBp: sys,
+            diastolicBp: dia,
+            pulseRate: pulse,
+            temperatureF: temp,
+            spo2Percent: spo2,
+            respiratoryRate: rr,
+            weightKg: wt,
+            heightCm: ht,
+            recordedAt: DateTime.now(),
+            notes: 'Recorded by Consulting Physician in OPD Chamber',
+          );
+          await ref.read(visitRepositoryProvider).recordVitals(doctorVitals);
+        }
+      }
+
+      // 2. Save and finalize clinical consultation sheet
       final record = _buildModel(status: 'FINALIZED');
       final saved = await ref.read(clinicalRepositoryProvider).saveRecord(record);
       setState(() => _currentRecord = saved);
+
+      // 3. Mark OPD visit as COMPLETED across all portals (Doctor, Patient, Admin)
+      await ref.read(visitRepositoryProvider).updateVisitStatus(widget.visitId, 'COMPLETED');
+
+      // 4. Invalidate all dashboard, queue, and patient providers for instant real-time sync
       ref.invalidate(clinicalRecordProvider(widget.visitId));
       ref.invalidate(visitListProvider);
+      ref.invalidate(dashboardStatsProvider);
+      ref.invalidate(doctorDashboardProvider);
+      ref.invalidate(patientListProvider);
+      ref.invalidate(doctorAssignedPatientsProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: AppColors.primaryTeal,
-            content: Text('OPD Clinical Sheet signed & finalized! Visit marked COMPLETED.'),
+            content: Text('OPD Clinical Sheet signed & finalized! Visit updated to COMPLETED across all portals.'),
           ),
         );
       }
@@ -432,6 +553,7 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
         _currentRecord!.id,
         reason: reason,
         updateFields: updatedFields,
+        fallbackCurrent: _currentRecord,
       );
 
       setState(() {
@@ -439,6 +561,11 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
         _amendments = amended.amendments;
       });
       ref.invalidate(clinicalRecordProvider(widget.visitId));
+      ref.invalidate(visitListProvider);
+      ref.invalidate(dashboardStatsProvider);
+      ref.invalidate(doctorDashboardProvider);
+      ref.invalidate(patientListProvider);
+      ref.invalidate(doctorAssignedPatientsProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -637,55 +764,9 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
           _buildPatientHistoryAndContextCard(contextAsync.value),
           const SizedBox(height: 16),
 
-          // Vitals Observation Panel
-          if (vitals != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.cardBackgroundLight,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.borderLight),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      const Text('Clinical Observations & Vitals', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      if (vitals.bmi != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryTeal.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text('BMI: ${vitals.bmi} kg/m² (${vitals.bmiCategory})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryTeal)),
-                        ),
-                    ],
-                  ),
-                  const Divider(height: 16),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      _buildVitalMetric('BP', vitals.bloodPressureDisplay),
-                      _buildVitalMetric('Pulse', vitals.pulseRate != null ? '${vitals.pulseRate} bpm' : '--'),
-                      _buildVitalMetric('Temp', vitals.temperatureF != null ? '${vitals.temperatureF} °F' : '--'),
-                      _buildVitalMetric('SpO2', vitals.spo2Percent != null ? '${vitals.spo2Percent}%' : '--'),
-                      _buildVitalMetric('Resp Rate', vitals.respiratoryRate != null ? '${vitals.respiratoryRate} /min' : '--'),
-                      _buildVitalMetric('Wt/Ht', '${vitals.weightKg ?? "--"} kg / ${vitals.heightCm ?? "--"} cm'),
-                      _buildVitalMetric('Blood Glucose', vitals.bloodGlucoseMgDl != null ? '${vitals.bloodGlucoseMgDl} mg/dL' : '--'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
+          // Vitals Observation Panel & Mandatory Entry Section
+          _buildVitalsObservationAndEntrySection(vitals),
+          const SizedBox(height: 16),
 
           OPDTextField(
             controller: _presentingComplaintController,
@@ -792,6 +873,235 @@ class _ConsultationSheetScreenState extends ConsumerState<ConsultationSheetScree
             label: 'Family History',
             hint: 'CAD, Diabetes, Hypertension, Asthma in parents/siblings',
             maxLines: 2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVitalsObservationAndEntrySection(VitalSignsModel? vitals) {
+    if (_hasNurseVitals && !_doctorEditingVitals) {
+      final v = vitals!;
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackgroundLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primaryTeal.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_user_rounded, color: AppColors.primaryTeal, size: 18),
+                    SizedBox(width: 6),
+                    Text('Clinical Observations & Vitals', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.teal.shade300),
+                  ),
+                  child: const Text('✓ Triage Recorded by Nurse', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (v.bmi != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text('BMI: ${v.bmi} kg/m² (${v.bmiCategory})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryTeal)),
+                  )
+                else
+                  const SizedBox.shrink(),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  ),
+                  icon: const Icon(Icons.edit_note_rounded, size: 16, color: AppColors.primaryBlue),
+                  label: const Text('Re-measure / Edit', style: TextStyle(fontSize: 11, color: AppColors.primaryBlue)),
+                  onPressed: () => setState(() => _doctorEditingVitals = true),
+                ),
+              ],
+            ),
+            const Divider(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                _buildVitalMetric('BP', v.bloodPressureDisplay),
+                _buildVitalMetric('Pulse', v.pulseRate != null ? '${v.pulseRate} bpm' : '--'),
+                _buildVitalMetric('Temp', v.temperatureF != null ? '${v.temperatureF} °F' : '--'),
+                _buildVitalMetric('SpO2', v.spo2Percent != null ? '${v.spo2Percent}%' : '--'),
+                _buildVitalMetric('Resp Rate', v.respiratoryRate != null ? '${v.respiratoryRate} /min' : '--'),
+                _buildVitalMetric('Wt/Ht', '${v.weightKg ?? "--"} kg / ${v.heightCm ?? "--"} cm'),
+                _buildVitalMetric('Blood Glucose', v.bloodGlucoseMgDl != null ? '${v.bloodGlucoseMgDl} mg/dL' : '--'),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Nurse did not record vitals or Doctor is re-measuring -> Doctor MUST take basic vitals
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.shade600, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                !_hasNurseVitals ? Icons.warning_amber_rounded : Icons.medical_information_rounded,
+                color: Colors.amber.shade900,
+                size: 24,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      !_hasNurseVitals
+                          ? 'MANDATORY CLINICAL VITALS (Nurse Triage Pending)'
+                          : 'DOCTOR CLINICAL VITALS ENTRY (Consultation Room)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                        color: Colors.amber.shade900,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      !_hasNurseVitals
+                          ? 'Hospital protocol requires vital signs before clinical finalization. Because nursing triage was not completed for this visit, the consulting physician must record basic vitals.'
+                          : 'Update the patient vital signs observed in the doctor chamber.',
+                      style: const TextStyle(fontSize: 11, color: Colors.black87),
+                    ),
+                  ],
+                ),
+              ),
+              if (_doctorEditingVitals && _hasNurseVitals)
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  tooltip: 'Cancel Edit',
+                  onPressed: () => setState(() => _doctorEditingVitals = false),
+                ),
+            ],
+          ),
+          const Divider(height: 18),
+
+          // Basic Mandatory Vitals: BP, Pulse, Temperature, SpO2
+          Row(
+            children: [
+              Expanded(
+                child: OPDTextField(
+                  controller: _systolicController,
+                  label: 'Systolic BP (mmHg) *',
+                  hint: 'e.g. 120',
+                  keyboardType: TextInputType.number,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OPDTextField(
+                  controller: _diastolicController,
+                  label: 'Diastolic BP (mmHg) *',
+                  hint: 'e.g. 80',
+                  keyboardType: TextInputType.number,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OPDTextField(
+                  controller: _pulseController,
+                  label: 'Pulse (bpm) *',
+                  hint: 'e.g. 74',
+                  keyboardType: TextInputType.number,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OPDTextField(
+                  controller: _tempController,
+                  label: 'Temperature (°F) *',
+                  hint: 'e.g. 98.6',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OPDTextField(
+                  controller: _spo2Controller,
+                  label: 'SpO2 (%) *',
+                  hint: 'e.g. 98',
+                  keyboardType: TextInputType.number,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OPDTextField(
+                  controller: _respRateController,
+                  label: 'Resp Rate (/min)',
+                  hint: 'e.g. 18',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OPDTextField(
+                  controller: _weightController,
+                  label: 'Weight (kg)',
+                  hint: 'e.g. 68.0',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OPDTextField(
+                  controller: _heightController,
+                  label: 'Height (cm)',
+                  hint: 'e.g. 172',
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ),
+            ],
           ),
         ],
       ),

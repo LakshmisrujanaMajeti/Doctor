@@ -628,6 +628,33 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                             if (tokenWidget != null) ...[
                               const SizedBox(width: 6),
                               tokenWidget,
+                            ] else if (profile.activeTokenQueueStatus?.toLowerCase().contains('complete') == true) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  border: Border.all(color: const Color(0xFF16A34A), width: 1.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF15803D)),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Consultation\nCompleted',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF15803D),
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ],
                         ),
@@ -709,6 +736,45 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
                             ),
                           ],
                         ),
+                        if (profile.activeTokenQueueStatus?.toLowerCase().contains('complete') == true) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF064E3B) : const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.5)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.verified_rounded, color: Color(0xFF15803D), size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Consultation Completed',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF15803D),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Doctor consultation concluded. Prescriptions & receipts are available below.',
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: isDark ? Colors.grey.shade300 : const Color(0xFF166534),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1669,7 +1735,41 @@ class _PatientPortalWorkspaceViewState extends ConsumerState<PatientPortalWorksp
         Expanded(
           child: ticketsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error loading tickets: $e')),
+            error: (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.wifi_off_rounded, size: 36, color: AppColors.hospitalMaroon),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Hospital Desk Offline or Delayed',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Unable to retrieve inquiries right now. Please check your network connection and retry.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Retry Connection'),
+                      onPressed: () => ref.invalidate(patientSupportTicketsProvider),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             data: (tickets) {
               if (tickets.isEmpty) {
                 return EmptyStateWidget(

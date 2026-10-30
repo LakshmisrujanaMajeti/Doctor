@@ -114,6 +114,53 @@ class VisitService:
         if not doctor:
             raise NotFoundException(f"Doctor with ID '{visit_in.doctor_id}' not found")
 
+        # Check if patient already has an active (unconcluded) visit today
+        today = datetime.utcnow().date()
+        start_of_day = datetime.combine(today, datetime.min.time())
+        existing_active = (
+            db.query(OPDVisit)
+            .filter(
+                OPDVisit.patient_id == visit_in.patient_id,
+                OPDVisit.visit_date >= start_of_day,
+                OPDVisit.status.in_(["REGISTERED", "TRIAGED", "IN_CONSULTATION"]),
+            )
+            .order_by(OPDVisit.created_at.desc())
+            .first()
+        )
+
+        if existing_active and not getattr(visit_in, "allow_additional_visit", False):
+            # REASSIGN DOCTOR / DEPARTMENT FOR THE EXISTING ENCOUNTER
+            old_doc_id = existing_active.doctor_id
+            old_dept_id = existing_active.department_id
+
+            existing_active.doctor_id = doctor.id
+            existing_active.department_id = dept.id
+            if visit_in.triage_priority:
+                existing_active.triage_priority = visit_in.triage_priority
+            if visit_in.notes:
+                existing_active.notes = visit_in.notes
+
+            db.commit()
+            db.refresh(existing_active)
+
+            db.add(AuditLog(
+                user_id=current_user_id,
+                action="REASSIGN_OPD_VISIT",
+                entity_type="OPDVisit",
+                entity_id=existing_active.id,
+                details_json=f'{{"action": "reassigned", "old_doctor_id": "{old_doc_id}", "new_doctor_id": "{doctor.id}", "old_department_id": "{old_dept_id}", "new_department_id": "{dept.id}", "token": {existing_active.queue_token}}}'
+            ))
+            db.commit()
+
+            # Real-time Cloud Sync to Supabase
+            try:
+                from app.services.supabase_sync_service import SupabaseSyncService
+                SupabaseSyncService.sync_visit(existing_active)
+            except Exception as se:
+                logger.debug(f"Supabase visit reassign sync notice: {se}")
+
+            return existing_active
+
         queue_tok = VisitService.get_next_queue_token(db, datetime.utcnow().date())
         visit_num = VisitService.generate_visit_number(db, queue_tok)
 
@@ -277,8 +324,64 @@ class VisitService:
     ) -> OPDVisit:
         visit = VisitService.get_visit_by_id(db, visit_id)
         data = update_in.model_dump(exclude_unset=True)
+
+        old_doc_id = visit.doctor_id
+        old_dept_id = visit.department_id
+        old_status = visit.status
+
+        # If doctor_id is changing, validate doctor
+        if "doctor_id" in data and data["doctor_id"]:
+            new_doc = db.query(Doctor).filter(Doctor.id == data["doctor_id"]).first()
+            if not new_doc:
+                new_doc = db.query(Doctor).filter(Doctor.user_id == data["doctor_id"]).first()
+            if new_doc:
+                data["doctor_id"] = new_doc.id
+                if "department_id" not in data or not data["department_id"]:
+                    data["department_id"] = new_doc.department_id
+
+        # If department_id is changing, validate department
+        if "department_id" in data and data["department_id"]:
+            new_dept = db.query(Department).filter(Department.id == data["department_id"]).first()
+            if not new_dept:
+                new_dept = db.query(Department).filter(
+                    or_(Department.code == data["department_id"], Department.name.ilike(f"%{data['department_id']}%"))
+                ).first()
+            if new_dept:
+                data["department_id"] = new_dept.id
+
         for k, v in data.items():
             setattr(visit, k, v)
+
         db.commit()
         db.refresh(visit)
+
+        # Audit log for reassignment or status change
+        if visit.doctor_id != old_doc_id or visit.department_id != old_dept_id:
+            db.add(AuditLog(
+                user_id=current_user_id,
+                action="REASSIGN_OPD_VISIT",
+                entity_type="OPDVisit",
+                entity_id=visit.id,
+                details_json=f'{{"old_doctor_id": "{old_doc_id}", "new_doctor_id": "{visit.doctor_id}", "old_department_id": "{old_dept_id}", "new_department_id": "{visit.department_id}"}}'
+            ))
+            db.commit()
+
+        # If marked completed, trigger patient notification
+        if visit.status == "COMPLETED" and old_status != "COMPLETED":
+            try:
+                from app.services.notification_service import NotificationService
+                NotificationService.notify_consultation_completed(
+                    db=db,
+                    visit=visit,
+                )
+            except Exception:
+                pass
+
+        # Sync to Supabase Cloud
+        try:
+            from app.services.supabase_sync_service import SupabaseSyncService
+            SupabaseSyncService.sync_visit(visit)
+        except Exception:
+            pass
+
         return visit

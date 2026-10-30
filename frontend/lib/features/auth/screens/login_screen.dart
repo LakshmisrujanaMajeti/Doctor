@@ -18,6 +18,10 @@ import '../../../shared/widgets/smvmch_hospital_logo.dart';
 import '../models/auth_state.dart';
 import '../providers/auth_provider.dart';
 import '../../patient_portal/providers/patient_portal_provider.dart';
+import '../../../core/config/app_config.dart';
+import '../../../shared/widgets/server_config_dialog.dart';
+import '../../patients/repositories/patient_repository.dart';
+import '../../visits/repositories/visit_repository.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -253,67 +257,55 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           'parent_spouse_name': 'Peddiraju',
           'parent_spouse_relation': 'S/o'
         },
-        {
-          'id': 'pat-venu-00010',
-          'uhid': 'UHID-2026-00010',
-          'full_name': 'Venu',
-          'phone': '9879879879',
-          'gender': 'MALE',
-          'age_years': 28,
-          'city': 'Puducherry',
-          'blood_group': 'B+',
-          'parent_spouse_name': 'Rao',
-          'parent_spouse_relation': 'S/o'
-        },
-        {
-          'id': 'pat-gayathri-00011',
-          'uhid': 'UHID-2026-00011',
-          'full_name': 'gayathri',
-          'phone': '6666666666',
-          'gender': 'FEMALE',
-          'age_years': 24,
-          'city': 'Puducherry',
-          'blood_group': 'A+',
-          'parent_spouse_name': 'Suresh',
-          'parent_spouse_relation': 'D/o'
-        },
-        {
-          'id': 'pat-daksha-00012',
-          'uhid': 'UHID-2026-00012',
-          'full_name': 'daksha',
-          'phone': '7777777779',
-          'gender': 'FEMALE',
-          'age_years': 22,
-          'city': 'Puducherry',
-          'blood_group': 'O+',
-          'parent_spouse_name': 'Kalyan',
-          'parent_spouse_relation': 'D/o'
-        },
-        {
-          'id': 'pat-nayak-00013',
-          'uhid': 'UHID-2026-00013',
-          'full_name': 'nayak',
-          'phone': '6545248151',
-          'gender': 'MALE',
-          'age_years': 25,
-          'city': 'Puducherry',
-          'blood_group': 'B+',
-          'parent_spouse_name': 'Nayak',
-          'parent_spouse_relation': 'S/o'
-        },
-        {
-          'id': 'pat-nayak-00014',
-          'uhid': 'UHID-2026-00014',
-          'full_name': 'nayak',
-          'phone': '6545248151',
-          'gender': 'MALE',
-          'age_years': 25,
-          'city': 'Puducherry',
-          'blood_group': 'B+',
-          'parent_spouse_name': 'Nayak',
-          'parent_spouse_relation': 'S/o'
-        },
       ];
+
+      final Map<String, Map<String, dynamic>> authenticVisitsByPatientId = {
+        '9791dc19-e67c-4921-8f9b-d1c6c8d12408': {
+          'id': '1e7ab4f3-e305-450d-888b-01a77b6023f5',
+          'visit_number': 'SMVMCH2210260002',
+          'patient_id': '9791dc19-e67c-4921-8f9b-d1c6c8d12408',
+          'status': 'COMPLETED',
+          'queue_token': 2,
+          'visit_date': '2026-10-22 05:57:24',
+          'payment_status': 'PAID',
+        },
+        '746b2fb8-cc53-4e2f-aa85-0388067b1022': {
+          'id': 'eb3db1bc-6e0e-403e-b883-279b285c7345',
+          'visit_number': 'SMVMCH2110260001',
+          'patient_id': '746b2fb8-cc53-4e2f-aa85-0388067b1022',
+          'status': 'REGISTERED',
+          'queue_token': 1,
+          'visit_date': '2026-10-21 15:00:37',
+          'payment_status': 'UNPAID',
+        },
+        'f5c22d18-d291-4992-adbc-01351ac5c40f': {
+          'id': '363b499a-46e3-4a5b-ad56-a125d14ac7f5',
+          'visit_number': 'SMVMCH2110260002',
+          'patient_id': 'f5c22d18-d291-4992-adbc-01351ac5c40f',
+          'status': 'IN_CONSULTATION',
+          'queue_token': 2,
+          'visit_date': '2026-10-21 17:30:10',
+          'payment_status': 'UNPAID',
+        },
+        'b45c7957-b64f-4fd8-b9ef-705bf68da328': {
+          'id': 'c6a9251a-f098-4242-888a-b556c120c1af',
+          'visit_number': 'SMVMCH2210260001',
+          'patient_id': 'b45c7957-b64f-4fd8-b9ef-705bf68da328',
+          'status': 'COMPLETED',
+          'queue_token': 1,
+          'visit_date': '2026-10-22 05:28:27',
+          'payment_status': 'UNPAID',
+        },
+        '57cdc8e1-bbe5-4386-a47f-436bd078d80d': {
+          'id': '82551188-4d28-449b-b751-a6842e393d03',
+          'visit_number': 'SMVMCH2310260001',
+          'patient_id': '57cdc8e1-bbe5-4386-a47f-436bd078d80d',
+          'status': 'WAITING',
+          'queue_token': 1,
+          'visit_date': '2026-10-23 05:16:54',
+          'payment_status': 'PENDING',
+        },
+      };
 
       final match = known.firstWhere(
         (p) =>
@@ -324,6 +316,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
 
       if (match.isNotEmpty) {
+        final patId = match['id'].toString();
         data = {
           'access_token': 'patient-token-${match['uhid']}',
           'token_type': 'bearer',
@@ -340,20 +333,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             'blood_group': match['blood_group'],
             'parent_spouse_name': match['parent_spouse_name'],
             'parent_spouse_relation': match['parent_spouse_relation'],
-            'email': 'srujana@smvmch.ac.in',
-            'address': 'SMVMCH OPD Ward',
+            'email': '${match['full_name'].toString().toLowerCase().replaceAll(' ', '.')}@gmail.com',
+            'address': 'Puducherry',
           },
-          'active_visit': {
-            'id': 'vis-srujana-001',
-            'visit_number': 'VIS-2026-00001',
-            'patient_id': match['id'],
-            'doctor_name': 'Dr. Sarah Chen, MD',
-            'department_name': 'General Medicine',
-            'status': 'COMPLETED',
-            'queue_token': 1,
-            'visit_date': '2026-10-21 10:15:00',
-            'notes': 'Consultation completed. Prescribed standard OPD symptomatic regimen.',
-          },
+          'active_visit': authenticVisitsByPatientId[patId],
         };
       }
     }
@@ -365,6 +348,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         final rawVisits = await SecureStorageService.getVisitsJson();
         List<dynamic> localPatients = rawPatients != null ? jsonDecode(rawPatients) : [];
         List<dynamic> localVisits = rawVisits != null ? jsonDecode(rawVisits) : [];
+        if (localPatients.isEmpty && PatientRepository.cachedPatients.isNotEmpty) {
+          localPatients = PatientRepository.cachedPatients.map((p) => p.toJson()).toList();
+        }
+        if (localVisits.isEmpty && VisitRepository.cachedVisits.isNotEmpty) {
+          localVisits = VisitRepository.cachedVisits.map((v) => v.toJson()).toList();
+        }
 
         final q = rawId.toLowerCase().trim();
         final cleanDigits = rawId.replaceAll(RegExp(r'\D'), '');
@@ -375,13 +364,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             final uhid = p['uhid']?.toString().toLowerCase() ?? '';
             final reg = p['hospital_reg_num']?.toString().toLowerCase() ?? '';
             final phone = p['phone']?.toString().trim() ?? '';
+            final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
             final name = p['full_name']?.toString().toLowerCase() ?? '';
             return uhid == q ||
                 uhid.contains(q) ||
                 reg == q ||
                 reg.contains(q) ||
-                (last10.isNotEmpty && phone.contains(last10)) ||
-                name.contains(q);
+                (last10.isNotEmpty && cleanPhone.contains(last10)) ||
+                (cleanDigits.isNotEmpty && cleanPhone == cleanDigits) ||
+                (q.length >= 2 && name.contains(q));
           },
           orElse: () => null,
         );
@@ -487,7 +478,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 440),
+                    constraints: const BoxConstraints(
+                      maxWidth: 440,
+                      minHeight: 577,
+                    ),
                     child: Container(
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E293B) : Colors.white,
@@ -509,6 +503,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // Server Endpoint Indicator & Host Configuration
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              InkWell(
+                                onTap: () => showDialog(
+                                  context: context,
+                                  builder: (ctx) => const Dialog(
+                                    backgroundColor: Colors.transparent,
+                                    insetPadding: EdgeInsets.all(16),
+                                    child: ServerConfigDialog(),
+                                  ),
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFCBD5E1)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.dns_rounded, size: 12, color: AppColors.primaryTeal),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        AppConfig.apiBaseUrl
+                                            .replaceFirst('http://', '')
+                                            .replaceFirst('/api/v1', ''),
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+
                           // SMVMCH Official Crest & Hospital Title
                           const Center(
                             child: SmvmchHospitalLogo(
@@ -573,11 +611,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           const SizedBox(height: 18),
 
-                          // Form Content (Fits cleanly within viewport)
-                          if (_selectedTab == 0)
-                            _buildStaffLoginForm(authState, isDark)
-                          else
-                            _buildPatientLoginForm(isDark),
+                          // Form Content (Fits cleanly with equalized height across both tabs)
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 316),
+                            child: _selectedTab == 0
+                                ? _buildStaffLoginForm(authState, isDark)
+                                : _buildPatientLoginForm(isDark),
+                          ),
                         ],
                       ),
                     ),
@@ -726,38 +766,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Log in with your registered mobile phone number or unique UHID. No password needed.',
-          style: TextStyle(
-            fontSize: 11.5,
-            color: isDark ? Colors.grey[400] : Colors.grey[600],
-          ),
-        ),
         const SizedBox(height: 14),
 
         // Patient Error Banner
         if (_patientErrorMessage != null)
-          Container(
-            padding: const EdgeInsets.all(10),
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.red.shade200),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _patientErrorMessage!,
-                    style: const TextStyle(fontSize: 11.5, color: Colors.red, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: ErrorBannerWidget(
+              message: _patientErrorMessage!,
+              onDismiss: () => setState(() => _patientErrorMessage = null),
             ),
           ),
 
@@ -778,27 +795,90 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Compressed concise registration note
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        // Direct Patient Verification Container (matches height of Password field ~73px)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF0FDFA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark ? const Color(0xFF134E4A) : const Color(0xFFCCFBF1),
+            ),
+          ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Icon(Icons.info_outline_rounded, color: AppColors.primaryTeal, size: 14),
-              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTeal.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.verified_user_rounded, color: AppColors.primaryTeal, size: 20),
+              ),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'First visit? Front Desk registration required upon hospital arrival.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Direct Patient Verification',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Access clinical records & tokens directly without passwords.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.grey[400] : const Color(0xFF475569),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+
+        // Remember Me & Need Assistance? (matches Staff form row)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: _rememberMe,
+                    activeColor: AppColors.primaryTeal,
+                    onChanged: (val) => setState(() => _rememberMe = val ?? true),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('Remember me', style: TextStyle(fontSize: 12.5)),
+              ],
+            ),
+            TextButton(
+              onPressed: () => _showPatientHelpDialog(context, isDark),
+              child: const Text(
+                'Need Assistance?',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryTeal,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
 
         // Patient Login Button
         OpdButton(
@@ -808,7 +888,82 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           color: AppColors.primaryTeal,
           onPressed: _isPatientLoading ? null : _handlePatientLogin,
         ),
+        const SizedBox(height: 12),
+
+        // First Visit Notice
+        Center(
+          child: Text(
+            'First visit? Front Desk registration required upon hospital arrival.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.grey[500] : Colors.grey[600],
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  void _showPatientHelpDialog(BuildContext context, bool isDark) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.help_outline_rounded, color: AppColors.primaryTeal),
+            SizedBox(width: 8),
+            Text('Patient Access Help', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'How to sign in to SMVMCH Patient Portal:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '• Enter your registered 10-digit mobile number (e.g. 8374477999) or your hospital UHID (e.g. UHID-2026-00001).',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '• No password is required. Verification happens instantly with hospital records.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '• First-time patients should visit the OPD Registration Desk at Ground Floor to generate a UHID.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.call_rounded, size: 16, color: AppColors.primaryTeal),
+                  SizedBox(width: 8),
+                  Text('Helpline: +91 413 2643000', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 }
