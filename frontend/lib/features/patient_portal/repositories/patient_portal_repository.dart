@@ -45,10 +45,15 @@ class PatientPortalRepository {
         );
       }
 
-      if (targetPatientJson == null && localPatients.isNotEmpty) {
-        targetPatientJson = localPatients.first as Map<String, dynamic>;
-      } else if (targetPatientJson == null && PatientRepository.cachedPatients.isNotEmpty) {
-        targetPatientJson = PatientRepository.cachedPatients.first.toJson();
+      if (targetPatientJson == null && PatientRepository.cachedPatients.isNotEmpty) {
+        final match = PatientRepository.cachedPatients.where(
+          (p) => (uid.isNotEmpty && (p.id == uid || p.uhid == uid)) ||
+              (userUhid.isNotEmpty && p.uhid == userUhid) ||
+              (userPhone.isNotEmpty && p.phone == userPhone),
+        ).firstOrNull;
+        if (match != null) {
+          targetPatientJson = match.toJson();
+        }
       }
 
       final patModel = targetPatientJson != null
@@ -166,10 +171,11 @@ class PatientPortalRepository {
       final uid = userMap['id']?.toString();
       if (uid != null && uid.isNotEmpty) return uid;
       final uhid = userMap['uhid']?.toString();
-      if (uhid != null && uhid.isNotEmpty) return uhid;
-    }
-    if (PatientRepository.cachedPatients.isNotEmpty) {
-      return PatientRepository.cachedPatients.first.id;
+      final userPhone = userMap['phone']?.toString().trim() ?? '';
+      if (userPhone.isNotEmpty && PatientRepository.cachedPatients.isNotEmpty) {
+        final match = PatientRepository.cachedPatients.where((p) => p.phone == userPhone).firstOrNull;
+        if (match != null) return match.id;
+      }
     }
     return null;
   }

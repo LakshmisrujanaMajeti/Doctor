@@ -225,7 +225,7 @@ class _RecordVitalsScreenState extends ConsumerState<RecordVitalsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  visit.patient?.fullName ?? 'Patient ${visit.visitNumber}',
+                                  visit.effectivePatientName,
                                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                                 ),
                                 Text(

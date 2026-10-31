@@ -2,7 +2,7 @@ from datetime import datetime, date
 import re
 from typing import List, Optional
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.core.exceptions import NotFoundException, BadRequestException
 from app.models.visit import OPDVisit, VitalSigns
 from app.models.patient import Patient
@@ -253,7 +253,12 @@ class VisitService:
 
     @staticmethod
     def get_visit_by_id(db: Session, visit_id: str) -> OPDVisit:
-        visit = db.query(OPDVisit).filter(OPDVisit.id == visit_id).first()
+        visit = db.query(OPDVisit).options(
+            joinedload(OPDVisit.patient),
+            joinedload(OPDVisit.doctor),
+            joinedload(OPDVisit.department),
+            joinedload(OPDVisit.vitals),
+        ).filter(OPDVisit.id == visit_id).first()
         if not visit:
             raise NotFoundException(f"OPD visit '{visit_id}' not found")
         return visit
@@ -269,7 +274,12 @@ class VisitService:
         skip: int = 0,
         limit: int = 50,
     ) -> List[OPDVisit]:
-        stmt = db.query(OPDVisit)
+        stmt = db.query(OPDVisit).options(
+            joinedload(OPDVisit.patient),
+            joinedload(OPDVisit.doctor),
+            joinedload(OPDVisit.department),
+            joinedload(OPDVisit.vitals),
+        )
         if doctor_id:
             stmt = stmt.filter(OPDVisit.doctor_id == doctor_id)
         if department_id:

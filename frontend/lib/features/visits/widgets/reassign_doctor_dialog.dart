@@ -186,14 +186,14 @@ Future<void> showReassignDoctorDialog(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              visit.patient?.fullName ?? 'Outpatient ${visit.visitNumber}',
+                              visit.effectivePatientName,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${visit.patient?.uhid ?? "UHID Pending"} • Currently: ${visit.departmentName ?? "OPD"} (${visit.doctorName ?? "Doctor"})',
+                              '${visit.effectivePatientUhid} • Currently: ${visit.departmentName ?? "OPD"} (${visit.doctorName ?? "Doctor"})',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: isDark ? Colors.grey[400] : Colors.grey[700],

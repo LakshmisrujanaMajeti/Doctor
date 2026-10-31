@@ -406,7 +406,7 @@ class DashboardScreen extends ConsumerWidget {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        v.patient?.fullName ?? 'Patient ${v.visitNumber}',
+                                        v.effectivePatientName,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 15,
@@ -414,7 +414,7 @@ class DashboardScreen extends ConsumerWidget {
                                       ),
                                       const SizedBox(height: 3),
                                       Text(
-                                        '${v.patient?.uhid ?? "UHID Pending"} • ${v.departmentName}',
+                                        '${v.effectivePatientUhid} • ${v.departmentName}',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey[500],

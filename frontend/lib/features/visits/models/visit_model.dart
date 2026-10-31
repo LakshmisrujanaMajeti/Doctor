@@ -1,5 +1,6 @@
 import '../models/vitals_model.dart';
 import '../../patients/models/patient_model.dart';
+import '../../patients/repositories/patient_repository.dart';
 import '../../doctors/repositories/doctor_repository.dart';
 
 class OPDVisitModel {
@@ -39,6 +40,33 @@ class OPDVisitModel {
     this.departmentName,
   });
 
+  PatientModel? get effectivePatient {
+    if (patient != null) return patient;
+    if (patientId.isNotEmpty) {
+      try {
+        final matches = PatientRepository.cachedPatients.where((p) => p.id == patientId || p.uhid == patientId).toList();
+        if (matches.isNotEmpty) return matches.first;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  String get effectivePatientName {
+    final ep = effectivePatient;
+    if (ep != null && ep.fullName.trim().isNotEmpty && !ep.fullName.startsWith('Patient ')) {
+      return ep.fullName;
+    }
+    return 'Patient $visitNumber';
+  }
+
+  String get effectivePatientUhid {
+    final ep = effectivePatient;
+    if (ep != null && ep.uhid.trim().isNotEmpty && ep.uhid != 'UHID Pending') {
+      return ep.uhid;
+    }
+    return 'UHID Pending';
+  }
+
   /// Formatted departmental OPD Token: `SMVMCH<DD><MM><YY><0001>`
   /// Ensures tokens never overlap across dates or departments
   String get formattedToken {
@@ -56,6 +84,15 @@ class OPDVisitModel {
     PatientModel? patientObj;
     if (json['patient'] != null && json['patient'] is Map) {
       patientObj = PatientModel.fromJson(json['patient']);
+    }
+    final rawPid = json['patient_id'] as String? ?? '';
+    if (patientObj == null && rawPid.isNotEmpty) {
+      try {
+        final matches = PatientRepository.cachedPatients.where((p) => p.id == rawPid || p.uhid == rawPid).toList();
+        if (matches.isNotEmpty) {
+          patientObj = matches.first;
+        }
+      } catch (_) {}
     }
 
     VitalSignsModel? vitalsObj;

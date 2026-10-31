@@ -22,6 +22,7 @@ import '../../../core/config/app_config.dart';
 import '../../../shared/widgets/server_config_dialog.dart';
 import '../../patients/repositories/patient_repository.dart';
 import '../../visits/repositories/visit_repository.dart';
+import '../../../core/storage/initial_hospital_data.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -142,255 +143,100 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } catch (_) {}
     }
 
-    // 2b. Canonical Database Instant Resolution (0ms latency fallback)
+    // 2b. Canonical Database Instant Resolution (0ms latency fallback across all 25 canonical hospital patients)
     if (data == null) {
       final cleanDigits = rawId.replaceAll(RegExp(r'\D'), '');
       final last10 = cleanDigits.length >= 10 ? cleanDigits.substring(cleanDigits.length - 10) : cleanDigits;
       final q = rawId.trim().toLowerCase();
 
-      final known = [
-        {
-          'id': '9791dc19-e67c-4921-8f9b-d1c6c8d12408',
-          'uhid': 'UHID-2026-00001',
-          'full_name': 'Lakshmi Srujana Majeti',
-          'phone': '8374477999',
-          'gender': 'FEMALE',
-          'age_years': 22,
-          'city': 'Puducherry',
-          'blood_group': 'O+',
-          'parent_spouse_name': 'Majeti Satyanarayana',
-          'parent_spouse_relation': 'D/o'
-        },
-        {
-          'id': '746b2fb8-cc53-4e2f-aa85-0388067b1022',
-          'uhid': 'UHID-2026-00002',
-          'full_name': 'Uday Kumar',
-          'phone': '9347989890',
-          'gender': 'MALE',
-          'age_years': 23,
-          'city': 'Puducherry',
-          'blood_group': 'A+',
-          'parent_spouse_name': 'S. Kumar',
-          'parent_spouse_relation': 'S/o'
-        },
-        {
-          'id': 'f5c22d18-d291-4992-adbc-01351ac5c40f',
-          'uhid': 'UHID-2026-00003',
-          'full_name': 'Ravi Shankar',
-          'phone': '9876543211',
-          'gender': 'MALE',
-          'age_years': 25,
-          'city': 'Puducherry',
-          'blood_group': 'O+',
-          'parent_spouse_name': 'Prasad',
-          'parent_spouse_relation': 'S/o'
-        },
-        {
-          'id': 'b45c7957-b64f-4fd8-b9ef-705bf68da328',
-          'uhid': 'UHID-2026-00004',
-          'full_name': 'Pavan Surya',
-          'phone': '9876543222',
-          'gender': 'MALE',
-          'age_years': 25,
-          'city': 'Puducherry',
-          'blood_group': 'O+',
-          'parent_spouse_name': 'Venkatesh',
-          'parent_spouse_relation': 'S/o'
-        },
-        {
-          'id': 'pat-sheela-00005',
-          'uhid': 'UHID-2026-00005',
-          'full_name': 'Sheela',
-          'phone': '9999999999',
-          'gender': 'FEMALE',
-          'age_years': 25,
-          'city': 'Puducherry',
-          'blood_group': 'A-',
-          'parent_spouse_name': 'David',
-          'parent_spouse_relation': 'D/o'
-        },
-        {
-          'id': 'pat-samanta-00006',
-          'uhid': 'UHID-2026-00006',
-          'full_name': 'Samanta',
-          'phone': '1234567890',
-          'gender': 'FEMALE',
-          'age_years': 79,
-          'city': 'Puducherry',
-          'blood_group': 'B+',
-          'parent_spouse_name': 'Subramaniam',
-          'parent_spouse_relation': 'W/o'
-        },
-        {
-          'id': 'pat-teja-00007',
-          'uhid': 'UHID-2026-00007',
-          'full_name': 'Teja',
-          'phone': '9848022338',
-          'gender': 'MALE',
-          'age_years': 25,
-          'city': 'Puducherry',
-          'blood_group': 'AB+',
-          'parent_spouse_name': 'Narayana',
-          'parent_spouse_relation': 'S/o'
-        },
-        {
-          'id': '57cdc8e1-bbe5-4386-a47f-436bd078d80d',
-          'uhid': 'UHID-2026-00008',
-          'full_name': 'Swaroop',
-          'phone': '9988776655',
-          'gender': 'MALE',
-          'age_years': 23,
-          'city': 'Puducherry',
-          'blood_group': 'B-',
-          'parent_spouse_name': 'Akhil',
-          'parent_spouse_relation': 'S/o'
-        },
-        {
-          'id': 'pat-1792739937154',
-          'uhid': 'UHID-2026-00009',
-          'full_name': 'Syam Peddiraju',
-          'phone': '7337262831',
-          'gender': 'MALE',
-          'age_years': 20,
-          'city': 'Puducherry',
-          'blood_group': 'O+',
-          'parent_spouse_name': 'Peddiraju',
-          'parent_spouse_relation': 'S/o'
-        },
-      ];
+      // Collect all candidate patients
+      final Map<String, Map<String, dynamic>> allPatientsById = {};
 
-      final Map<String, Map<String, dynamic>> authenticVisitsByPatientId = {
-        '9791dc19-e67c-4921-8f9b-d1c6c8d12408': {
-          'id': '1e7ab4f3-e305-450d-888b-01a77b6023f5',
-          'visit_number': 'SMVMCH2210260002',
-          'patient_id': '9791dc19-e67c-4921-8f9b-d1c6c8d12408',
-          'status': 'COMPLETED',
-          'queue_token': 2,
-          'visit_date': '2026-10-22 05:57:24',
-          'payment_status': 'PAID',
-        },
-        '746b2fb8-cc53-4e2f-aa85-0388067b1022': {
-          'id': 'eb3db1bc-6e0e-403e-b883-279b285c7345',
-          'visit_number': 'SMVMCH2110260001',
-          'patient_id': '746b2fb8-cc53-4e2f-aa85-0388067b1022',
-          'status': 'REGISTERED',
-          'queue_token': 1,
-          'visit_date': '2026-10-21 15:00:37',
-          'payment_status': 'UNPAID',
-        },
-        'f5c22d18-d291-4992-adbc-01351ac5c40f': {
-          'id': '363b499a-46e3-4a5b-ad56-a125d14ac7f5',
-          'visit_number': 'SMVMCH2110260002',
-          'patient_id': 'f5c22d18-d291-4992-adbc-01351ac5c40f',
-          'status': 'IN_CONSULTATION',
-          'queue_token': 2,
-          'visit_date': '2026-10-21 17:30:10',
-          'payment_status': 'UNPAID',
-        },
-        'b45c7957-b64f-4fd8-b9ef-705bf68da328': {
-          'id': 'c6a9251a-f098-4242-888a-b556c120c1af',
-          'visit_number': 'SMVMCH2210260001',
-          'patient_id': 'b45c7957-b64f-4fd8-b9ef-705bf68da328',
-          'status': 'COMPLETED',
-          'queue_token': 1,
-          'visit_date': '2026-10-22 05:28:27',
-          'payment_status': 'UNPAID',
-        },
-        '57cdc8e1-bbe5-4386-a47f-436bd078d80d': {
-          'id': '82551188-4d28-449b-b751-a6842e393d03',
-          'visit_number': 'SMVMCH2310260001',
-          'patient_id': '57cdc8e1-bbe5-4386-a47f-436bd078d80d',
-          'status': 'WAITING',
-          'queue_token': 1,
-          'visit_date': '2026-10-23 05:16:54',
-          'payment_status': 'PENDING',
-        },
-      };
-
-      final match = known.firstWhere(
-        (p) =>
-            p['uhid']!.toString().toLowerCase() == q ||
-            p['phone']?.toString() == rawId ||
-            (last10.isNotEmpty && p['phone']!.toString().contains(last10)),
-        orElse: () => {},
-      );
-
-      if (match.isNotEmpty) {
-        final patId = match['id'].toString();
-        data = {
-          'access_token': 'patient-token-${match['uhid']}',
-          'token_type': 'bearer',
-          'expires_in': 86400,
-          'patient': {
-            'id': match['id'],
-            'uhid': match['uhid'],
-            'hospital_reg_num': 'REG-2026-0000${match['uhid']!.toString().split('-').last}',
-            'full_name': match['full_name'],
-            'gender': match['gender'],
-            'age_years': match['age_years'],
-            'phone': match['phone'],
-            'city': match['city'],
-            'blood_group': match['blood_group'],
-            'parent_spouse_name': match['parent_spouse_name'],
-            'parent_spouse_relation': match['parent_spouse_relation'],
-            'email': '${match['full_name'].toString().toLowerCase().replaceAll(' ', '.')}@gmail.com',
-            'address': 'Puducherry',
-          },
-          'active_visit': authenticVisitsByPatientId[patId],
-        };
-      }
-    }
-
-    // 3. Fallback to Local Offline Cache
-    if (data == null) {
+      // 1. From InitialHospitalData
       try {
-        final rawPatients = await SecureStorageService.getPatientsJson();
-        final rawVisits = await SecureStorageService.getVisitsJson();
-        List<dynamic> localPatients = rawPatients != null ? jsonDecode(rawPatients) : [];
-        List<dynamic> localVisits = rawVisits != null ? jsonDecode(rawVisits) : [];
-        if (localPatients.isEmpty && PatientRepository.cachedPatients.isNotEmpty) {
-          localPatients = PatientRepository.cachedPatients.map((p) => p.toJson()).toList();
-        }
-        if (localVisits.isEmpty && VisitRepository.cachedVisits.isNotEmpty) {
-          localVisits = VisitRepository.cachedVisits.map((v) => v.toJson()).toList();
-        }
-
-        final q = rawId.toLowerCase().trim();
-        final cleanDigits = rawId.replaceAll(RegExp(r'\D'), '');
-        final last10 = cleanDigits.length >= 10 ? cleanDigits.substring(cleanDigits.length - 10) : cleanDigits;
-
-        final matchedPatient = localPatients.firstWhere(
-          (p) {
-            final uhid = p['uhid']?.toString().toLowerCase() ?? '';
-            final reg = p['hospital_reg_num']?.toString().toLowerCase() ?? '';
-            final phone = p['phone']?.toString().trim() ?? '';
-            final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-            final name = p['full_name']?.toString().toLowerCase() ?? '';
-            return uhid == q ||
-                uhid.contains(q) ||
-                reg == q ||
-                reg.contains(q) ||
-                (last10.isNotEmpty && cleanPhone.contains(last10)) ||
-                (cleanDigits.isNotEmpty && cleanPhone == cleanDigits) ||
-                (q.length >= 2 && name.contains(q));
-          },
-          orElse: () => null,
-        );
-
-        if (matchedPatient != null) {
-          final matchedVisit = localVisits.firstWhere(
-            (v) => v['patient_id'] == matchedPatient['id'],
-            orElse: () => null,
-          );
-          data = {
-            'access_token': 'patient-token-${matchedPatient['id'] ?? 'pat'}',
-            'token_type': 'bearer',
-            'expires_in': 86400,
-            'patient': matchedPatient,
-            'active_visit': matchedVisit,
-          };
+        final snap = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
+        final list = (snap['patients'] as List?) ?? [];
+        for (final item in list) {
+          final m = item as Map<String, dynamic>;
+          final id = m['id']?.toString() ?? '';
+          if (id.isNotEmpty) allPatientsById[id] = m;
         }
       } catch (_) {}
+
+      // 2. From SecureStorageService
+      try {
+        final rawPats = await SecureStorageService.getPatientsJson();
+        if (rawPats != null && rawPats.isNotEmpty) {
+          final list = jsonDecode(rawPats) as List<dynamic>;
+          for (final item in list) {
+            final m = item as Map<String, dynamic>;
+            final id = m['id']?.toString() ?? '';
+            if (id.isNotEmpty) allPatientsById[id] = m;
+          }
+        }
+      } catch (_) {}
+
+      // 3. From PatientRepository
+      for (final p in PatientRepository.cachedPatients) {
+        allPatientsById[p.id] = p.toJson();
+      }
+
+      // Match patient accurately
+      Map<String, dynamic>? matchedPatient;
+      for (final p in allPatientsById.values) {
+        final pUhid = p['uhid']?.toString().toLowerCase() ?? '';
+        final pReg = p['hospital_reg_num']?.toString().toLowerCase() ?? '';
+        final pPhone = p['phone']?.toString().replaceAll(RegExp(r'\D'), '') ?? '';
+        final pLast10 = pPhone.length >= 10 ? pPhone.substring(pPhone.length - 10) : pPhone;
+        final pName = p['full_name']?.toString().toLowerCase() ?? '';
+
+        if (pUhid == q ||
+            pReg == q ||
+            (cleanDigits.isNotEmpty && pPhone == cleanDigits) ||
+            (last10.isNotEmpty && pLast10 == last10) ||
+            (cleanDigits.isNotEmpty && pPhone.contains(cleanDigits)) ||
+            (q.length >= 3 && pName == q)) {
+          matchedPatient = p;
+          break;
+        }
+      }
+
+      if (matchedPatient != null) {
+        // Collect all visits
+        final Map<String, Map<String, dynamic>> allVisitsById = {};
+        try {
+          final snap = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
+          final list = (snap['visits'] as List?) ?? [];
+          for (final item in list) {
+            final m = item as Map<String, dynamic>;
+            final id = m['id']?.toString() ?? '';
+            if (id.isNotEmpty) allVisitsById[id] = m;
+          }
+        } catch (_) {}
+        for (final v in VisitRepository.cachedVisits) {
+          allVisitsById[v.id] = v.toJson();
+        }
+
+        final patId = matchedPatient['id']?.toString() ?? '';
+        final patUhid = matchedPatient['uhid']?.toString() ?? '';
+
+        Map<String, dynamic>? activeVisit;
+        for (final v in allVisitsById.values) {
+          final vPid = v['patient_id']?.toString();
+          if (vPid == patId || vPid == patUhid) {
+            activeVisit = v;
+            break;
+          }
+        }
+
+        data = {
+          'access_token': 'patient-token-${matchedPatient['uhid'] ?? patId}',
+          'token_type': 'bearer',
+          'expires_in': 86400,
+          'patient': matchedPatient,
+          'active_visit': activeVisit,
+        };
+      }
     }
 
     if (data != null && mounted) {

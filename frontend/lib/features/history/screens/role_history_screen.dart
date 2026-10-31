@@ -135,21 +135,76 @@ class _RoleHistoryScreenState extends ConsumerState<RoleHistoryScreen> {
       }).toList();
     }
 
-    final items = filtered.map((v) {
+    final List<Map<String, dynamic>> items = [];
+
+    // Include patient registrations for front-desk / receptionist intake history
+    if (role == 'receptionist' || role == 'staff' || role == 'admin') {
+      for (final p in allPatients) {
+        final pDate = p.registrationDate ?? p.createdAt ?? DateTime.now();
+        bool dateMatches = true;
+        if (_selectedDateFilter == 'today') {
+          dateMatches = pDate.isAfter(todayStart) || pDate.isAtSameMomentAs(todayStart);
+        } else if (_selectedDateFilter == 'yesterday') {
+          dateMatches = pDate.isAfter(yesterdayStart) && pDate.isBefore(todayStart);
+        } else if (_selectedDateFilter == 'week') {
+          dateMatches = pDate.isAfter(todayStart.subtract(const Duration(days: 7)));
+        }
+
+        if (_selectedDateFilter == 'all' || dateMatches) {
+          final isYesterday = pDate.isAfter(yesterdayStart) && pDate.isBefore(todayStart);
+          final isToday = pDate.isAfter(todayStart);
+          final dateLabel = isToday ? 'Today' : (isYesterday ? 'Yesterday' : DateFormat('dd MMM yyyy').format(pDate));
+          final timeStr = DateFormat('hh:mm a').format(pDate);
+
+          if (_searchQuery.trim().isEmpty ||
+              p.fullName.toLowerCase().contains(_searchQuery.trim().toLowerCase()) ||
+              p.uhid.toLowerCase().contains(_searchQuery.trim().toLowerCase()) ||
+              p.phone.contains(_searchQuery.trim())) {
+            items.add({
+              'id': 'reg-${p.id}',
+              'type': 'PATIENT_REGISTRATION',
+              'title': 'Registered: ${p.fullName}',
+              'patient_id': p.id,
+              'patient_name': p.fullName,
+              'patient_uhid': p.uhid,
+              'patient_gender': p.gender,
+              'patient_age': '${p.ageYears} Y',
+              'phone': p.phone,
+              'reg_number': p.hospitalRegNum ?? 'REG-${p.uhid}',
+              'visit_number': p.hospitalRegNum ?? p.uhid,
+              'queue_token': 0,
+              'department_name': 'Patient Registration Counter',
+              'doctor_name': 'Front Desk Intake',
+              'status': 'REGISTERED',
+              'triage_priority': 'NORMAL',
+              'consultation_fee': 0.0,
+              'notes': 'Permanent UHID Registration: ${p.uhid} • Phone: ${p.phone} • Blood: ${p.bloodGroup ?? "N/A"}',
+              'timestamp': pDate.toIso8601String(),
+              'time_display': '$dateLabel, $timeStr',
+              'action_badge': 'REGISTERED',
+              'diagnosis': 'Permanent UHID Issued: ${p.uhid}',
+            });
+          }
+        }
+      }
+    }
+
+    // Add visits
+    for (final v in filtered) {
       final isYesterday = v.visitDate.isAfter(yesterdayStart) && v.visitDate.isBefore(todayStart);
       final isToday = v.visitDate.isAfter(todayStart);
       final dateLabel = isToday ? 'Today' : (isYesterday ? 'Yesterday' : DateFormat('dd MMM yyyy').format(v.visitDate));
       final timeStr = DateFormat('hh:mm a').format(v.visitDate);
 
-      return {
+      items.add({
         'id': v.id,
         'type': role == 'doctor' ? 'CONSULTATION' : 'VISIT_RECORD',
         'title': 'Token #${v.queueToken} • ${v.visitNumber}',
         'patient_id': v.patientId,
-        'patient_name': v.patient?.fullName ?? 'Patient',
-        'patient_uhid': v.patient?.uhid ?? 'UHID',
-        'patient_gender': v.patient?.gender ?? 'N/A',
-        'patient_age': v.patient?.ageYears != null ? '${v.patient!.ageYears} Y' : 'N/A',
+        'patient_name': v.effectivePatientName,
+        'patient_uhid': v.effectivePatientUhid,
+        'patient_gender': v.effectivePatient?.gender ?? 'N/A',
+        'patient_age': v.effectivePatient?.ageYears != null ? '${v.effectivePatient!.ageYears} Y' : 'N/A',
         'visit_number': v.visitNumber,
         'queue_token': v.queueToken,
         'department_name': v.departmentName ?? 'General Medicine',
@@ -164,8 +219,15 @@ class _RoleHistoryScreenState extends ConsumerState<RoleHistoryScreen> {
         'diagnosis': (v.status == 'COMPLETED')
             ? (v.notes != null && v.notes!.isNotEmpty ? v.notes : 'Clinical consultation signed & finalized')
             : (v.notes ?? 'Consultation encounter'),
-      };
-    }).toList();
+      });
+    }
+
+    // Sort items newest first
+    items.sort((a, b) {
+      final tA = DateTime.tryParse(a['timestamp'] ?? '') ?? DateTime(2000);
+      final tB = DateTime.tryParse(b['timestamp'] ?? '') ?? DateTime(2000);
+      return tB.compareTo(tA);
+    });
 
     double grandTotal = 0.0;
     for (final v in targetVisits) {

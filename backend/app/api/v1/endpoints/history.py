@@ -270,6 +270,43 @@ def get_role_history(
 
         history_items = [_serialize_visit_item(v, db) for v in visits]
 
+        # Also include patient registrations for front desk intake history
+        pat_query = db.query(Patient)
+        if start_dt:
+            pat_query = pat_query.filter(Patient.created_at >= start_dt)
+        if end_dt:
+            pat_query = pat_query.filter(Patient.created_at < end_dt)
+        for f in search_filters:
+            pat_query = pat_query.filter(f)
+        patients_list = pat_query.order_by(Patient.created_at.desc()).offset(skip).limit(limit).all()
+        for p in patients_list:
+            history_items.append({
+                "id": f"reg-{p.id}",
+                "visit_id": None,
+                "visit_number": p.hospital_reg_num or p.uhid,
+                "token_number": 0,
+                "appointment_date": p.created_at.isoformat() if p.created_at else None,
+                "doctor_name": "Front Desk Registration",
+                "department_name": "Registration Counter",
+                "status": "REGISTERED",
+                "triage_priority": "NORMAL",
+                "consultation_fee": 0.0,
+                "payment_status": "PAID",
+                "patient": {
+                    "id": p.id,
+                    "uhid": p.uhid,
+                    "hospital_reg_num": p.hospital_reg_num,
+                    "full_name": p.full_name,
+                    "phone": p.phone,
+                    "gender": p.gender,
+                    "age_years": p.age_years,
+                },
+                "chief_complaint": f"New UHID Registration: {p.uhid}",
+                "vitals_summary": "Registration Completed",
+            })
+
+        history_items.sort(key=lambda x: x.get("appointment_date") or "", reverse=True)
+
         total_patients = db.query(Patient).count()
         today_patients = db.query(Patient).filter(Patient.created_at >= today_start).count()
         total_tokens = db.query(OPDVisit).count()

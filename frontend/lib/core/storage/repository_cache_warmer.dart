@@ -10,6 +10,7 @@ import '../../features/doctors/repositories/doctor_repository.dart';
 import '../../features/admin_portal/models/admin_portal_models.dart';
 import '../../features/admin_portal/repositories/admin_portal_repository.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
 import 'initial_hospital_data.dart';
 
 /// Pre-warms in-memory repository caches at application startup.
@@ -18,10 +19,23 @@ class RepositoryCacheWarmer {
   static bool _hasWarmed = false;
   static bool get hasWarmed => _hasWarmed;
 
+  static const String currentCacheVersion = 'smvmch_canonical_db_v9';
+
   static Future<void> prewarmAll() async {
     if (_hasWarmed) return;
 
     try {
+      // Purge old stale cache from earlier test builds on mobile devices
+      final prefs = await SharedPreferences.getInstance();
+      final savedVersion = prefs.getString('opd_cache_version');
+      if (savedVersion != currentCacheVersion) {
+        await prefs.remove(SecureStorageService.keyPatientsData);
+        await prefs.remove(SecureStorageService.keyVisitsData);
+        await prefs.remove(SecureStorageService.keyStaffDirectoryData);
+        await prefs.remove(SecureStorageService.keyBillsData);
+        await prefs.setString('opd_cache_version', currentCacheVersion);
+      }
+
       final results = await Future.wait([
         SecureStorageService.getPatientsJson().catchError((_) => null),
         SecureStorageService.getVisitsJson().catchError((_) => null),
@@ -50,15 +64,21 @@ class RepositoryCacheWarmer {
         }
       }
 
-      // Fallback to bundled hospital seed data if local storage empty (e.g. fresh APK install)
-      if (patients.isEmpty) {
-        try {
-          final map = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
-          final list = (map['patients'] as List?) ?? [];
-          patients = list.map((m) => PatientModel.fromJson(m as Map<String, dynamic>)).toList();
-        } catch (e) {
-          debugPrint('Initial patients parse error: $e');
+      // Populate authoritative canonical hospital patients from InitialHospitalData
+      try {
+        final map = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
+        final list = (map['patients'] as List?) ?? [];
+        final canonicalPatients = list.map((m) => PatientModel.fromJson(m as Map<String, dynamic>)).toList();
+        final Map<String, PatientModel> patientMap = {};
+        for (final p in patients) {
+          patientMap[p.uhid] = p;
         }
+        for (final cp in canonicalPatients) {
+          patientMap[cp.uhid] = cp; // Canonical database record is authoritative
+        }
+        patients = patientMap.values.toList();
+      } catch (e) {
+        debugPrint('Canonical patients merge error: $e');
       }
 
       if (patients.isNotEmpty) {
@@ -84,14 +104,29 @@ class RepositoryCacheWarmer {
         }
       }
 
-      // Fallback to bundled hospital seed visits if local storage empty
-      if (visits.isEmpty) {
-        try {
-          final map = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
-          final list = (map['visits'] as List?) ?? [];
-          visits = list.map((m) => OPDVisitModel.fromJson(m as Map<String, dynamic>)).toList();
-        } catch (e) {
-          debugPrint('Initial visits parse error: $e');
+      // Populate authoritative canonical hospital visits from InitialHospitalData
+      try {
+        final map = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
+        final list = (map['visits'] as List?) ?? [];
+        final canonicalVisits = list.map((m) => OPDVisitModel.fromJson(m as Map<String, dynamic>)).toList();
+        final Map<String, OPDVisitModel> visitMap = {};
+        for (final v in visits) {
+          visitMap[v.visitNumber] = v;
+        }
+        for (final cv in canonicalVisits) {
+          visitMap[cv.visitNumber] = cv; // Canonical database record is authoritative
+        }
+        visits = visitMap.values.toList();
+      } catch (e) {
+        debugPrint('Canonical visits merge error: $e');
+      }
+
+      // Hydrate all visits with their corresponding PatientModel
+      for (int i = 0; i < visits.length; i++) {
+        final v = visits[i];
+        final matchedPat = patients.where((p) => p.id == v.patientId || p.uhid == v.patientId).firstOrNull;
+        if (matchedPat != null) {
+          visits[i] = v.copyWith(patient: matchedPat);
         }
       }
 
@@ -133,6 +168,33 @@ class RepositoryCacheWarmer {
         } catch (e) {
           debugPrint('Warm staff error: $e');
         }
+      }
+
+      // Fallback to bundled doctors if staff cache empty
+      if (DoctorRepository.cachedDoctors.isEmpty) {
+        try {
+          final map = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
+          final docList = (map['doctors'] as List?) ?? [];
+          final doctors = <DoctorModel>[];
+          for (final item in docList) {
+            final m = item as Map<String, dynamic>;
+            doctors.add(DoctorModel(
+              id: m['id']?.toString() ?? '',
+              userId: m['user_id']?.toString() ?? m['id']?.toString() ?? '',
+              name: m['name']?.toString() ?? 'Dr. Specialist',
+              specialization: m['specialization']?.toString() ?? 'General Medicine',
+              departmentId: m['department_id']?.toString() ?? 'General Medicine',
+              departmentName: m['department_name']?.toString() ?? 'General Medicine',
+              qualification: m['qualification']?.toString() ?? 'MBBS, MD',
+              roomNumber: m['room_number']?.toString() ?? 'Room 101',
+              consultationFee: (m['consultation_fee'] as num?)?.toDouble() ?? 500.0,
+              isAvailable: true,
+            ));
+          }
+          if (doctors.isNotEmpty) {
+            DoctorRepository.initializeCache(doctors);
+          }
+        } catch (_) {}
       }
 
       _hasWarmed = true;

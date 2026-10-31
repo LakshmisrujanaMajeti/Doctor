@@ -385,7 +385,16 @@ class AuthRepository {
         : 'Patient@${cleanPhone.length >= 4 ? cleanPhone.substring(cleanPhone.length - 4) : '2026'}';
     final cleanDigits = cleanPhone.replaceAll(RegExp(r'\D'), '');
     final last10 = cleanDigits.length >= 10 ? cleanDigits.substring(cleanDigits.length - 10) : cleanDigits;
-    final generatedUhid = 'UHID-2026-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
+    int maxUhidSeq = 25;
+    for (final p in PatientRepository.cachedPatients) {
+      final match = RegExp(r'UHID-2026-(\d+)').firstMatch(p.uhid);
+      if (match != null) {
+        final val = int.tryParse(match.group(1)!);
+        if (val != null && val > maxUhidSeq) maxUhidSeq = val;
+      }
+    }
+    final nextUhidSeq = maxUhidSeq + 1;
+    final generatedUhid = 'UHID-2026-${nextUhidSeq.toString().padLeft(5, '0')}';
 
     // 0. Strict duplicate check against cached patients
     for (final p in PatientRepository.cachedPatients) {

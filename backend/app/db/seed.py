@@ -688,23 +688,8 @@ def seed_database():
                 db.add(pat)
                 db.flush()
             else:
-                pat.uhid = cp["uhid"]
-                pat.hospital_reg_num = cp["hospital_reg_num"]
-                pat.full_name = cp["full_name"]
-                pat.parent_spouse_name = cp["parent_spouse_name"]
-                pat.parent_spouse_relation = cp["parent_spouse_relation"]
-                pat.gender = cp["gender"]
-                pat.age_years = cp["age_years"]
-                pat.phone = cp["phone"]
-                pat.email = cp["email"]
-                pat.address = cp["address"]
-                pat.city = cp["city"]
-                pat.state = cp["state"]
-                pat.postal_code = cp["postal_code"]
-                pat.blood_group = cp["blood_group"]
-                pat.barcode_value = f"BAR-{cp['uhid']}"
-                pat.qr_code_data = f"OPDCONNECT+{cp['uhid']}+{cp['hospital_reg_num']}"
-                db.flush()
+                # Existing database record is authoritative: do not overwrite
+                pass
 
             # Ensure linked user login account
             pat_user = db.query(User).filter(or_(User.patient_id == pat.id, User.phone == cp["phone"])).first()

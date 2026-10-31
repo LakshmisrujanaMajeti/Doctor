@@ -310,7 +310,7 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          visit.patient?.fullName ?? 'Patient ${visit.visitNumber}',
+                                          visit.effectivePatientName,
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w700,
                                             fontSize: 15.5,
@@ -320,7 +320,7 @@ class _OpdQueueScreenState extends ConsumerState<OpdQueueScreen> {
                                         ),
                                         const SizedBox(height: 3),
                                         Text(
-                                          '${visit.patient?.uhid ?? "UHID Pending"} • ${visit.departmentName}' + ((visit.doctorName != null && visit.doctorName!.trim().isNotEmpty && visit.doctorName != 'Dr. Specialist') ? ' • ${visit.doctorName}' : ''),
+                                          '${visit.effectivePatientUhid} • ${visit.departmentName}' + ((visit.doctorName != null && visit.doctorName!.trim().isNotEmpty && visit.doctorName != 'Dr. Specialist') ? ' • ${visit.doctorName}' : ''),
                                           style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,

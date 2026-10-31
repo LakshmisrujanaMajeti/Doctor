@@ -1822,7 +1822,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              v.patient?.fullName ?? 'Patient ${v.visitNumber}',
+                              v.effectivePatientName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14.5,
@@ -1832,7 +1832,7 @@ class _RoleDashboardShellState extends ConsumerState<RoleDashboardShell> {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              '${v.patient?.uhid ?? "UHID Pending"} • ${v.departmentName}'
+                              '${v.effectivePatientUhid} • ${v.departmentName}'
                               '${(v.doctorName != null && v.doctorName!.trim().isNotEmpty && v.doctorName != 'Dr. Specialist') ? ' • ${v.doctorName}' : ''}',
                               style: TextStyle(
                                 fontSize: 12,

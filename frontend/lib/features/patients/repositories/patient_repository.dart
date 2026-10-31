@@ -6,6 +6,7 @@ import '../../../core/network/supabase_service.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../models/patient_model.dart';
 import '../../visits/repositories/visit_repository.dart';
+import '../../../core/storage/initial_hospital_data.dart';
 
 class PatientRepository {
   final DioClient _dioClient;
@@ -53,6 +54,23 @@ class PatientRepository {
             await _saveCache();
           }
         }
+      } catch (_) {}
+    }
+    if (_localPatients.length < 25) {
+      try {
+        final map = jsonDecode(InitialHospitalData.jsonSnapshot) as Map<String, dynamic>;
+        final list = (map['patients'] as List?) ?? [];
+        final canonicalPatients = list.map((m) => PatientModel.fromJson(m as Map<String, dynamic>)).toList();
+        final existingIds = _localPatients.map((p) => p.id).toSet();
+        final existingUhids = _localPatients.map((p) => p.uhid).toSet();
+        bool addedAny = false;
+        for (final cp in canonicalPatients) {
+          if (!existingIds.contains(cp.id) && !existingUhids.contains(cp.uhid)) {
+            _localPatients.add(cp);
+            addedAny = true;
+          }
+        }
+        if (addedAny) await _saveCache();
       } catch (_) {}
     }
     _isLoaded = true;
